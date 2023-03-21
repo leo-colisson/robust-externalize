@@ -1,12 +1,80 @@
 \RequirePackage{pgfkeys} % We use the /robExt/… path to store our keys.
 \RequirePackage{pgffor} % For the .list keys
 \RequirePackage{graphicx} % For the includegraphics command
+%% Benchmark on an initial version of the ZX paper (76 small tikz-cd based pictures):
+%% - First compilation with this library: 75,10s user 33,96s system 99% cpu 1:49,20 total
+%% - Next compilations with this library: 2,43s user 0,19s system 97% cpu 2,680 total
+%% - Without this library: 34,63s user 0,13s system 99% cpu 34,772 total
+%% So first time we lose x2 (roughly an additional time of .5 seconds per picture, seems like on average a picture takes .5 seconds to be built),
+%% but then we have a speedup of x15 (2.43s instead of 34.63s). And I expect this to be even higher with more pictures.
+
+%% TODO list:
+% - create the subfolder if it does not exists
+% - provide an easy way to reference cross-ref etc (we just need to add them when writing the file)
+% - create pre-made settings for tikz, tikz-cd, …
+% - provide an easy way to externalize other stuff, like python code execution etc… The major issue right now is that the file is not written
+% like the input: for instance lines are removed, latex comments also etc. For LaTeX it's not too much of an issue, but for anything else it can.
+% Also, this seems quite fundamental as soon as the syntax is expected to work
+% inside other functions (for instance if you put an fbox, or just use pgfkeys, the inner function has simply no way to access the raw content, even with scantoken or
+% any other magic. Which means that it's certainly simpler to provide a way to provide a file before the fbox (possibly multiple files if we have multiple fboxed), for instance using something like \begin{filecontents}[overwrite,noheader]{abc.py}, and load that file. We might also be able to avoid using an intermediary file using https://tex.stackexchange.com/questions/680240/put-in-a-latex3-string-the-exact-input-string-to-write-in-a-file?noredirect=1#comment1688012_680240 but anyway this.
+% - check compatibility with windows
+% - write documentation
+
 %%% Under the hood, this library is quite simple: each picture must, somehow, provide:
 %% - \l_robExt_final_file LaTeX3 string containing the content of the final file
 %% - 
 %% Then, the library will hash everything to create a unique name (of the content, the template code, and the set of dependency filenames),
 %% it will create a file "MD5.tex" containing the pre-template+content+post-template, and it will compile it.
 
+
+%%% Create scripts to remove useless files:
+%%% Note that we don't override the script if it exists on purpose (the user might have changed it to fits his needs)
+\begin{filecontents}[noheader]{robExt-remove-old-figures.py}
+#!/usr/bin/env python3
+import os
+import re
+# Just run this script in order to remove all old figures not listed in robExt-all-figures.txt.
+
+# Note that this part is not extracted from the pdf file since it might be different on a previous run. You can however hardcode
+# it here, your updated script will not be overriden unless you remove it yourself.
+prefixes = [ "robExt-" ]
+folders  = [ "." ]
+
+def main():
+    imagesToKeep = dict()
+    with open("robExt-all-figures.txt") as f:
+        for line in f:
+            line = line.strip()
+            if line.endswith('.tex'):
+                imagesToKeep[line[:-4]] = True # The exact value is not important, we mostly use dict to get ~O(1) access
+
+    listOfFilesToRemove = []
+    # We are looking for images in the folders
+    for folder in folders:
+        for root, dirs, files in os.walk(folder):
+            for f in files:
+                for prefix in prefixes: # Not the most efficient, but anyway we typically have a single prefix
+                    # In case prefix contains weird caracters that collide with regexps:
+                    prefixEsc = re.escape(prefix)
+                    # result_search = re.search(rf"^({prefixEsc}[A-F0-1]{32}).*", f)
+                    result_search = re.search(rf"^(.*[A-F0-9]{{32}}).*", f)
+                    if result_search:
+                        if result_search.group(1) not in imagesToKeep:
+                            listOfFilesToRemove.append(os.path.join(root,f))
+    for f in listOfFilesToRemove:
+        print(f"-- {f}")
+    print(f"Above are the files to remove, are you sure you want to proceed? [y/N] (based on prefixes {prefixes})")
+    x = input().strip()
+    if x not in ["y", "Y"]:
+        print("All right, we abort.")
+        exit(1)
+    for f in listOfFilesToRemove:
+        os.remove(f)
+        print(f"Removed {f}")
+        
+if __name__ == '__main__':
+    main()
+\end{filecontents}
 
 \ExplSyntaxOn
 
@@ -272,6 +340,10 @@
 }
 
 %% #1: Arguments, #2: content to externalize
+% \NewDocumentEnvironment{robExtern}{O{}+b}{%
+%   \robExt[#1]{#2}%
+% }{}
+
 \NewDocumentEnvironment{robExtern}{O{}+b}{%
   \robExt[#1]{#2}%
 }{}
