@@ -1,0 +1,134 @@
+\documentclass{article}
+%% TODO list:
+% - try with tikz/ZX
+% - create the subfolder if it does not exists
+% - make it compatible with windows
+% - write documentation
+
+
+%%% Benchmark:
+% My library (9 pictures):
+% First run: 4,17s user 0,50s system 99% cpu 4,679 total
+% Second run (barely noticeable): 0,41s user 0,04s system 99% cpu 0,458 total
+% Tikz externalize pdflatex -shell-escape test.tex  4,55s user 0,70s system 98% cpu 5,319 total
+
+
+\makeatletter
+\input{../robust-externalize.sty}
+\makeatother
+\usepackage{amsmath}
+\usepackage{tikz}
+% \usetikzlibrary{external}
+% \tikzexternalize[]
+
+\begin{document}
+
+\pgfkeys{
+  /robExt/.cd,
+  set filename prefix={myRobExt-},
+  set subfolder={robustExternalize/},
+  template1/.style={
+    defineTemplate={
+      \documentclass{standalone}
+      \usepackage{tikz}
+      \def\sayBye##1{Bye ##1}%
+      \input{../input_externalize.tex}
+      \begin{document}%
+      \robExtMainContent%
+      \end{document}
+    },
+    dependencies={input_externalize.tex},
+  },
+}
+
+
+% Hello \robExt[template1]{%
+%   \def\sayHello#1{Hello #1}%
+%   \begin{tikzpicture}[baseline,anchor=base]%
+%     \node[draw,fill=\myfillcolor]{\sayHello{Alice}, \sayBye{Bobb}};% Coucou
+%   \end{tikzpicture}%
+% }.
+
+
+% \robExt[template1, use latexmk]{%
+%   \def\sayHello#1{Hello #1}%
+%   \begin{tikzpicture}[baseline,anchor=base]%
+%     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
+%   \end{tikzpicture}%
+% }
+
+% \begin{robExtern}[template1]
+%   \def\sayHello#1{Hello #1}%
+%   \begin{tikzpicture}[baseline,anchor=base]%
+%     \node[draw,fill=\myfillcolor]{\sayHello{Alice Bob and my friend}};% Coucou
+%   \end{tikzpicture}%
+% \end{robExtern}
+
+% #1: Arguments, #2: content to externalize
+\RenewDocumentEnvironment{tikzpicture}{O{}+b}{%
+  \begin{robExtern}[template1]
+    \begin{tikzpicture}[#1]
+      #2
+    \end{tikzpicture}
+  \end{robExtern}
+}{}
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 1};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 2};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 3};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 4};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 5};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 6};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 7};% Coucou
+\end{tikzpicture}%
+
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 8};% Coucou
+\end{tikzpicture}%
+
+\begin{tikzpicture}[baseline,anchor=base]%
+  \node[draw,fill=green]{Alice and Bob 9};% Coucou
+\end{tikzpicture}%
+
+
+% \begin{align}
+%   \robExt[template1, set compilation command={pdflatex -halt-on-error "\robExtFinalFile"}]{%
+%   \def\sayHello#1{Hello #1}%
+%   \begin{tikzpicture}[baseline,anchor=base]%
+%     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
+%   \end{tikzpicture}%
+%   }
+% \end{align}
+
+\end{document}
+
+% Local Variables:
+% TeX-command-extra-options: "-shell-escape -halt-on-error"
+% End:

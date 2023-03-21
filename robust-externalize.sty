@@ -1,0 +1,258 @@
+\RequirePackage{pgfkeys} % We use the /robExt/… path to store our keys.
+\RequirePackage{pgffor} % For the .list keys
+\RequirePackage{graphicx} % We use the /robExt/… path to store our keys.
+%%% Under the hood, this library is quite simple: each picture must, somehow, provide:
+%% - \l_robExt_final_file LaTeX3 string containing the content of the final file
+%% - 
+%% Then, the library will hash everything to create a unique name (of the content, the template code, and the set of dependency filenames),
+%% it will create a file "MD5.tex" containing the pre-template+content+post-template, and it will compile it.
+
+
+\ExplSyntaxOn
+
+\def\robExtPrefixFilename{robExt-}
+
+\NewExpandableDocumentCommand{\robExtAddPrefixPathAndName}{m}{%
+  \ifdefined\robExtPrefixPath%
+    \robExtPrefixPath%
+  \fi\robExtPrefixFilename#1%
+}
+
+\NewExpandableDocumentCommand{\robExtAddPrefixName}{m}{%
+  \robExtPrefixFilename#1%
+}
+
+%% Todo: not sure if I should use \seq_push:Nx \l_file_search_path_seq {subfolder}
+%% to find the subfolder, or if it's better to hardcode it.
+
+\cs_generate_variant:Nn \iow_now:Nn { NV }
+\cs_generate_variant:Nn \iow_now:Nn { Nx }
+\cs_generate_variant:Nn \iow_open:Nn { Nx }
+\cs_generate_variant:Nn \str_replace_all:Nnn { NnV }
+\cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
+\cs_generate_variant:Nn \file_if_exist:nTF { xTF }
+\cs_generate_variant:Nn \str_set:Nn { NV }
+
+%% Temporary: used when quickly writing to a file
+\iow_new:N \g_robExt_write_iow
+%% This is used to write the full list of figures in a single file (used for instance by Makefile etc...)
+%% TODO: create a makefile.
+\iow_new:N \g_robExt_write_list_all_figures
+%% Create a file robExt-all-figures.txt with the list of .tex files
+\iow_open:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixPathAndName{all-figures.txt}}
+\iow_new:N \g_robExt_write_manually_compile_all_missing_figures
+\iow_open:Nx \g_robExt_write_manually_compile_all_missing_figures {\robExtAddPrefixPathAndName{compile-missing-figures.sh}}
+% Contains the template:
+\str_new:N \l_robExt_template
+\str_new:N \l_robExt_final_file
+
+% Contains the list of dependency files (useful to compute the final md5sum)
+\seq_new:N \l_robExt_dependencies
+% Contains a string where on each line we have: "md5sum, dependency". The first line has nothing as "dependency" as it is the main fine whose final name is the md5sum of the dependencies.
+\str_new:N \l_robExt_dependencies_mdfive
+% Contains the current compilation command (including the name of the file to compile).
+\str_new:N \l_robExt_currentCompilationCommand
+
+\NewDocumentCommand{\robExtDefineTemplate}{m}{
+  % #1 = file name, #2 = what to write
+  \str_set:Nn \l_robExt_template { #1 }
+}
+
+\NewDocumentCommand{\robExtFinalContentFile}{m}
+{
+  \str_if_empty:NTF \l_robExt_template {
+    \PackageError{robExt}{Your ~ template ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
+  }{}
+  % Copy the template:
+  \str_set:NV \l_robExt_final_file \l_robExt_template
+  % Avoids #1 to be turned into ##1:
+  % https://tex.stackexchange.com/questions/680126/token-read-write-turns-into
+  \str_set:NV \l_robExt_final_file \l_robExt_template
+  % Someone might not want our custom code to add box, compute height etc...
+  % In that case, use \robExtMainContentNoBox instead of \robExtMainContent.
+  \str_replace_all:Nnn \l_robExt_final_file { \robExtMainContentNoBox } {#1}
+  \str_replace_all:Nnn \l_robExt_final_file { \robExtMainContent } {
+    %% We save the height/depth of the content by using a savebox:
+    \newwrite\writeRobExt%
+    \immediate\openout\writeRobExt=\jobname-out.tex%
+    \newsavebox\boxRobExt%
+    \savebox{\boxRobExt}{%
+      #1%
+    }%
+    \usebox{\boxRobExt}%
+    \immediate\write\writeRobExt{%
+      \string\def\string\robExtWidth{\the\wd\boxRobExt}%
+      \string\def\string\robExtHeight{\the\ht\boxRobExt}%
+      \string\def\string\robExtDepth{\the\dp\boxRobExt}%
+    }%
+  }%
+  % Needed to be able to define stuff like \def\sayBye#1{Bye #1}.
+  % Just, if you use it inside a template style, you might need to double the # into ##
+  \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
+}
+
+\NewDocumentCommand{\robExtResetDependencies}{m}{
+  \seq_clear:N \l_robExt_dependencies
+}
+
+\NewDocumentCommand{\robExtAddDependency}{m}{
+  \seq_put_left:Nx \l_robExt_dependencies {#1}
+}
+
+%% Note that the compilation command does not need to be identical to the host compilation command. This way we don't need to
+%% remove all the cache just because we compile the main document with a different command.
+\NewDocumentCommand{\robExtSetCompilationCommand}{O{pdflatex ~ -shell-escape ~ -halt-on-error ~ "\robExtFinalFile"}}{
+  % Note that \l_robExt_final_file is not yet defined (we need the hash to get the filename… and the filename to get the hash: so in the deps file we
+  % only put \robExtFinaFile as a placeholder.
+  \str_set:Nn \l_robExt_currentCompilationCommand {#1}
+}
+\robExtSetCompilationCommand
+
+%%% \l_robExt_final_file must contain before calling this function the content of the final file.
+%%% \l_robExt_dependencies must contain the extensions (list).
+%%% \l_robExt_currentCompilationCommand contains the compilation command to use.
+%%% Note that we do note parse them as input to allow more flexibility on the way the user
+%%% defines them, and to limit issues with expansion.
+\NewDocumentCommand{\robExtWriteFile}{m}{
+  %%% First we get all dependencies stored in \l_robExt_dependencies to create a csv-like file:
+  \str_clear:N \l_robExt_dependencies_mdfive
+  % We first add on the first line the compilation command, and on the second line the current picture.
+  \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
+  \seq_map_inline:Nn \l_robExt_dependencies {
+    \str_put_right:Nx \l_robExt_dependencies_mdfive {\file_mdfive_hash:n{##1},##1^^J} %% ^^J is a newline
+  }
+  %%
+  %% Compute the final hash (the hash of all dependencies, including the current picture that is on the first line):
+  %% The last newline is needed as the write operation automatically adds a newline.
+  \tl_set:Nx \robExtFinalName {\pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
+  %% We add the figure in the list of files.
+  \iow_now:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixName{\robExtFinalName.tex}^^J}
+  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.tex}}{
+    \message{The\space file\space \robExtAddPrefixPathAndName{\robExtFinalName.tex} \space already\space exists.^^J}
+  }{
+    \str_if_empty:NTF \l_robExt_final_file {
+      \PackageError{robExt}{You ~ are ~ writing ~ an ~ empty ~ tex ~ file, ~ that ~ will ~ fail ~ to ~ compile. ~ Make ~ sure ~ you ~ defined ~ a ~ template.}{}
+    }{
+      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.deps}}
+      \iow_now:NV \g_robExt_write_iow \l_robExt_dependencies_mdfive
+      \iow_close:N \g_robExt_write_iow
+      %% Save the final file:
+      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.tex}}
+      \iow_now:NV \g_robExt_write_iow \l_robExt_final_file
+      \iow_close:N \g_robExt_write_iow
+      \message{Source ~ saved ~ in ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex}.}
+    }
+  }
+}
+
+% https://tex.stackexchange.com/questions/133324/shell-escape-with-latex-3
+% We need shell escape to work (but it's enabled by default on overleaf!)
+% TODO: add more configuration options, deal with lualatex pdflatex, xelatex etc. Also, think about the number of compilations.
+% TODO: deal with depth
+\NewDocumentCommand{\robExtCompileFile}{m}{
+  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{
+    \message{No ~ need ~ to ~ recompile ~ \robExtAddPrefixPathAndName{\robExtFinalName.pdf}^^J}
+  }{
+    \str_set:NV \l_robExt_finalCompilationCommand {\l_robExt_currentCompilationCommand} %
+    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
+    \ifdefined\robExtPrefixPath
+      \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
+    \fi
+    \ifdefined\robExtManualMode
+      \message{[robExt] Manual mode enabled: please, manually compile the images using \l_robExt_finalCompilationCommand or run 'bash \robExtAddPrefixName{compile-missing-figures.sh}'.}
+      \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_finalCompilationCommand^^J}
+    \else
+      \sys_if_shell_unrestricted:TF{
+        \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l_robExt_finalCompilationCommand.}
+        \sys_shell_now:x {\l_robExt_finalCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
+      }{
+        \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
+      }
+    \fi
+  }
+}
+
+\NewDocumentCommand{\robExtIncludeFile}{m}{%
+  \ifdefined\robExtIncludeCommand%
+    \robExtIncludeCommand%
+  \else%
+    {%
+      \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{
+        \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}{
+          \input{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
+        }{}
+        \ifdefined\robExtDepth%
+          \raisebox{-\robExtDepth}{\includegraphics{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
+        \else%
+          \includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+        \fi%
+      }{
+        \ifdefined\robExtManualMode
+          \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ \ifdefined\robExtPrefixPath cd \robExtPrefixPath; \fi bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}}
+          \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ the ~ bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}
+        \else
+          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ is ~ not ~ present. ~ Please ~ report ~ the ~ issue.}{}
+        \fi
+      }
+    }%
+  \fi%
+}
+
+
+\ExplSyntaxOff
+
+%%% Interface
+
+\pgfkeys{
+  /robExt/.cd,
+  defineTemplate/.code={\robExtDefineTemplate{#1}},
+  dependenciesList/.code={\robExtAddDependency{#1}},
+  % Usage like: dependencies={input_externalize.tex,input_b.tex}
+  % They should be relative to the main file when using the subfolder option.
+  dependencies/.style={
+    /utils/exec={\robExtResetDependencies{}},
+    dependenciesList/.list={#1}
+  },
+  add dependencies/.style={
+    dependenciesList/.list={#1}
+  },
+  include command/.code={\def\robExtIncludeCommand{#1}},
+  set compilation command/.code={\robExtSetCompilationCommand[#1]},
+  use latexmk/.style={
+    set compilation command={latexmk -shell-escape -halt-on-error "\robExtFinalFile"},
+  },
+  use lualatex/.style={
+    set compilation command={lualatex -shell-escape -halt-on-error "\robExtFinalFile"},
+  },
+  use xelatex/.style={
+    set compilation command={xelatex -shell-escape -halt-on-error "\robExtFinalFile"},
+  },
+  custom include command/.code={\def\robExtIncludeCommand{#1}},
+  enable manual mode/.code={\def\robExtManualMode{}},
+  disable manual mode/.code={\let\robExtManualMode\undefined},
+  generate final content/.code={\robExtFinalContentFile{#1}},
+  set filename prefix/.code={\def\robExtPrefixFilename{#1}},
+  set subfolder/.code={\def\robExtPrefixPath{#1}},
+}
+
+
+%% #1: Arguments, #2: content to externalize
+\NewDocumentCommand{\robExt}{O{}m}{%
+  {% Group
+    \pgfkeys{%
+      /robExt/.cd,
+      #1,
+      generate final content={#2},
+    }%
+    %
+    \robExtWriteFile{}%
+    \robExtCompileFile{}%
+    \robExtIncludeFile{}%
+  }%
+}
+
+%% #1: Arguments, #2: content to externalize
+\NewDocumentEnvironment{robExtern}{O{}+b}{%
+  \robExt[#1]{#2}%
+}{}
+
