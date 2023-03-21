@@ -21,6 +21,7 @@
 % \usetikzlibrary{external}
 % \tikzexternalize[]
 
+
 \begin{document}
 
 \pgfkeys{
@@ -38,31 +39,47 @@
       \end{document}
     },
     dependencies={input_externalize.tex},
+    %disable externalization,
+  },
+  for tikzpicture/.style={
+    command if no externalization/.code={%
+      \begin{tikzpicture}##1\end{tikzpicture}
+    },
   },
 }
 
 
-% Hello \robExt[template1]{%
-%   \def\sayHello#1{Hello #1}%
-%   \begin{tikzpicture}[baseline,anchor=base]%
-%     \node[draw,fill=\myfillcolor]{\sayHello{Alice}, \sayBye{Bobb}};% Coucou
-%   \end{tikzpicture}%
+% This diagram is made without externalization \robExt[disable externalization, for tikzpicture]{[baseline,anchor=base]
+%   \node[draw,fill=green]{Alice and Bob 9};% Coucou
 % }.
 
-
-% \robExt[template1, use latexmk]{%
-%   \def\sayHello#1{Hello #1}%
-%   \begin{tikzpicture}[baseline,anchor=base]%
-%     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
-%   \end{tikzpicture}%
-% }
-
-% \begin{robExtern}[template1]
-%   \def\sayHello#1{Hello #1}%
-%   \begin{tikzpicture}[baseline,anchor=base]%
-%     \node[draw,fill=\myfillcolor]{\sayHello{Alice Bob and my friend}};% Coucou
-%   \end{tikzpicture}%
+% This diagram is made without externalization with the block version.
+% \begin{robExtern}[disable externalization, for tikzpicture]
+%   [baseline,anchor=base]
+%   \node[draw,fill=green]{Alice and Bob 9};% Coucou
 % \end{robExtern}
+
+Hello \robExt[template1]{%
+  \def\sayHello#1{Hello #1}%
+  \begin{tikzpicture}[baseline,anchor=base]%
+    \node[draw,fill=\myfillcolor]{\sayHello{Alice}, \sayBye{Bobb}};% Coucou
+  \end{tikzpicture}%
+}.
+
+
+\robExt[template1, use latexmk]{%
+  \def\sayHello#1{Hello #1}%
+  \begin{tikzpicture}[baseline,anchor=base]%
+    \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
+  \end{tikzpicture}%
+}
+
+\begin{robExtern}[template1]
+  \def\sayHello#1{Hello #1}%
+  \begin{tikzpicture}[baseline,anchor=base]%
+    \node[draw,fill=\myfillcolor]{\sayHello{Alice Bob and my friend}};% Coucou
+  \end{tikzpicture}%
+\end{robExtern}
 
 % #1: Arguments, #2: content to externalize
 \RenewDocumentEnvironment{tikzpicture}{O{}+b}{%
@@ -72,7 +89,6 @@
     \end{tikzpicture}
   \end{robExtern}
 }{}
-
 
 \begin{tikzpicture}[baseline,anchor=base]%
   \node[draw,fill=green]{Alice and Bob 1};% Coucou
@@ -118,14 +134,15 @@
 \end{tikzpicture}%
 
 
-% \begin{align}
-%   \robExt[template1, set compilation command={pdflatex -halt-on-error "\robExtFinalFile"}]{%
-%   \def\sayHello#1{Hello #1}%
-%   \begin{tikzpicture}[baseline,anchor=base]%
-%     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
-%   \end{tikzpicture}%
-%   }
-% \end{align}
+\begin{align}
+  \robExt[template1, set compilation command={pdflatex -halt-on-error "\robExtFinalFile"}]{%
+  \def\sayHello#1{Hello #1}%
+  \begin{tikzpicture}[baseline,anchor=base]%
+    \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
+  \end{tikzpicture}%
+  }
+\end{align}
+
 
 \end{document}
 

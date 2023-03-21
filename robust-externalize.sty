@@ -1,6 +1,6 @@
 \RequirePackage{pgfkeys} % We use the /robExt/… path to store our keys.
 \RequirePackage{pgffor} % For the .list keys
-\RequirePackage{graphicx} % We use the /robExt/… path to store our keys.
+\RequirePackage{graphicx} % For the includegraphics command
 %%% Under the hood, this library is quite simple: each picture must, somehow, provide:
 %% - \l_robExt_final_file LaTeX3 string containing the content of the final file
 %% - 
@@ -23,7 +23,8 @@
 }
 
 %% Todo: not sure if I should use \seq_push:Nx \l_file_search_path_seq {subfolder}
-%% to find the subfolder, or if it's better to hardcode it.
+%% to find the subfolder (seems to work for input/includegraphics/...), or if it's
+%% better to hardcode the subfolder.
 
 \cs_generate_variant:Nn \iow_now:Nn { NV }
 \cs_generate_variant:Nn \iow_now:Nn { Nx }
@@ -52,6 +53,14 @@
 \str_new:N \l_robExt_dependencies_mdfive
 % Contains the current compilation command (including the name of the file to compile).
 \str_new:N \l_robExt_currentCompilationCommand
+
+% \NewDocumentCommand{\robExtDefineTemplate}{m}{
+%   % #1 = file name, #2 = what to write
+%   \tl_rescan:nn {
+%     \char_set_catcode_active:N \&
+%     %\int_step_inline:nnn {1} {255} {\char_set_catcode_active:n {#1}}
+%   } { \l_robExt_template { #1 }}
+% }
 
 \NewDocumentCommand{\robExtDefineTemplate}{m}{
   % #1 = file name, #2 = what to write
@@ -233,6 +242,10 @@
   generate final content/.code={\robExtFinalContentFile{#1}},
   set filename prefix/.code={\def\robExtPrefixFilename{#1}},
   set subfolder/.code={\def\robExtPrefixPath{#1}},
+  disable externalization/.code={\def\robExtDisableExternalization{}},
+  enable externalization/.code={\let\robExtDisableExternalization\undefined},
+  % Useful to wrap, for instance, text
+  command if no externalization/.code={#1},
 }
 
 
@@ -242,12 +255,19 @@
     \pgfkeys{%
       /robExt/.cd,
       #1,
-      generate final content={#2},
     }%
-    %
-    \robExtWriteFile{}%
-    \robExtCompileFile{}%
-    \robExtIncludeFile{}%
+    \ifdefined\robExtDisableExternalization%
+      \pgfkeys{/robExt/.cd,command if no externalization={#2}}%
+    \else%
+      %
+      \pgfkeys{%
+        /robExt/.cd,
+        generate final content={#2}
+      }%
+      \robExtWriteFile{}%
+      \robExtCompileFile{}%
+      \robExtIncludeFile{}%
+    \fi%
   }%
 }
 
