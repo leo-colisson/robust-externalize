@@ -1,6 +1,7 @@
 \RequirePackage{pgfkeys} % We use the /robExt/… path to store our keys.
 \RequirePackage{pgffor} % For the .list keys
 \RequirePackage{graphicx} % For the includegraphics command
+\RequirePackage{xsimverb} % To easily write verbatim code to files
 %% Benchmark on an initial version of the ZX paper (76 small tikz-cd based pictures):
 %% - First compilation with this library: 75,10s user 33,96s system 99% cpu 1:49,20 total
 %% - Next compilations with this library: 2,43s user 0,19s system 97% cpu 2,680 total
@@ -9,8 +10,7 @@
 %% but then we have a speedup of x15 (2.43s instead of 34.63s). And I expect this to be even higher with more pictures.
 
 %% TODO list:
-% - create the subfolder if it does not exists
-% - provide an easy way to reference cross-ref etc (we just need to add them when writing the file)
+% - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
 % - create pre-made settings for tikz, tikz-cd, …
 % - provide an easy way to externalize other stuff, like python code execution etc… The major issue right now is that the file is not written
 % like the input: for instance lines are removed, latex comments also etc. For LaTeX it's not too much of an issue, but for anything else it can.
@@ -97,6 +97,7 @@ if __name__ == '__main__':
 \cs_generate_variant:Nn \iow_now:Nn { NV }
 \cs_generate_variant:Nn \iow_now:Nn { Nx }
 \cs_generate_variant:Nn \iow_open:Nn { Nx }
+\cs_generate_variant:Nn \ior_str_get:NN { Nc }
 \cs_generate_variant:Nn \str_replace_all:Nnn { NnV }
 \cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
 \cs_generate_variant:Nn \file_if_exist:nTF { xTF }
@@ -104,6 +105,7 @@ if __name__ == '__main__':
 
 %% Temporary: used when quickly writing to a file
 \iow_new:N \g_robExt_write_iow
+\ior_new:N \g_robExt_read_ior
 %% This is used to write the full list of figures in a single file (used for instance by Makefile etc...)
 %% TODO: create a makefile.
 \iow_new:N \g_robExt_write_list_all_figures
@@ -135,6 +137,14 @@ if __name__ == '__main__':
   \str_set:Nn \l_robExt_template { #1 }
 }
 
+\NewDocumentCommand{\robExtDefineTemplateFromName}{m}{
+  % #1 = file name, #2 = what to write
+  \str_set:Nx \l_robExt_template {\use:c{l_robExt_template_named_#1}}
+  %\str_set:Nc \l_robExt_template {l_robExt_template_named_#1}
+}
+
+
+%% The role of this is to set \l_robExt_final_file to the final content of the file.
 \NewDocumentCommand{\robExtFinalContentFile}{m}
 {
   \str_if_empty:NTF \l_robExt_template {
@@ -167,6 +177,103 @@ if __name__ == '__main__':
   % Just, if you use it inside a template style, you might need to double the # into ##
   \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
 }
+
+%% This variation is used mostly for non-latex stuff (e.g. you want to create a figure using python)
+%% Because it's fundamentally impossible to read non-latex code inside a macro or align environment
+%% (latex will lose all comments etc… that might not be actual comments), we do it in two parts.
+%% This is the 0 part, to create a string containing the code (also useful for templates)
+%% The first argument is the name of the string
+% \NewDocumentEnvironment{robExtCodeToString}{m}{% Ins
+% \begin{filecontents}[overwrite,noheader]{robExt-tmp-file.tex}}{
+% \end{filecontents}
+%   \ior_str_get:Nc \g_robExt_read_ior { #1 }
+% }
+
+%% Environments can't use verbatim yet: https://github.com/latex3/latex3/issues/591
+% Might be related: https://tex.stackexchange.com/questions/633523/saving-the-body-of-an-environment-to-a-file-verbatim-using-xparse
+% \NewDocumentEnvironment{robExtCodeToString}{m+v}{
+%   \str_set:cn { #1 } { #2 }
+% }{}
+
+\NewDocumentCommand{\robExtCodeToStr} { m+v }
+{
+  \str_set:cn { #1 } { #2 }
+}
+
+% % You can use the above to associate (almost) arbitrary text with a global
+% % variable.
+% \takeverbatim {
+% verbatim text that can include anything you like ($#%^_/)
+% but NOT a closing brace.
+% }
+
+%% Here is the first part:
+%% https://tex.stackexchange.com/a/680259/116348 might work and be more efficient, but it might be less reliable
+%% and definitely more complicated and error prone. Instead, we write to a file and read the result.
+%% TODO: try to do it using verbatim, might be trivial or complicated, not sure, maybe see https://tex.stackexchange.com/questions/555359/reading-lines-verbatim-into-a-sequence-variable
+% \NewDocumentEnvironment{robExtNamedContent}{O{}}{%
+% \begin{robExtCodeToString}{l_robExt_content_named_#1}%
+% }{
+% \end{robExtCodeToString}
+% }
+
+\NewDocumentEnvironment{robExtNamedTemplate}{O{default}}{
+  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
+}{
+  \XSIMfilewritestop
+  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
+  \str_gclear:c {l_robExt_template_named_#1}
+  %% Loop on all lines of the file:
+  \ior_str_map_inline:Nn \g_robExt_read_ior {
+    \str_gput_right:cx {l_robExt_template_named_#1} {\tl_to_str:N{##1}^^J}
+  }
+}
+
+\NewDocumentEnvironment{robExtNamedContent}{O{}}{
+  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
+}{
+  \XSIMfilewritestop
+  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
+  \str_gclear:c {l_robExt_content_named#1}
+  %% Loop on all lines of the file:
+  \ior_str_map_inline:Nn \g_robExt_read_ior {
+    \str_gput_right:cx {l_robExt_content_named#1} {\tl_to_str:N{##1}^^J}
+  }
+}
+
+%% does robExtNamedContent + \robExternPrev (not sure how to avoid code duplication, I get error because
+%% of verbatim stuff)
+\NewDocumentEnvironment{robExtCode}{m}{
+  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
+}{
+  \XSIMfilewritestop
+  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
+  \str_gclear:c {l_robExt_content_named}
+  %% Loop on all lines of the file:
+  \ior_str_map_inline:Nn \g_robExt_read_ior {
+    \str_gput_right:cx {l_robExt_content_named} {\tl_to_str:N{##1}^^J}
+  }
+  \robExternPrev{#1}
+}
+
+
+%% Here is the second part, that assumes that somehow the content string is in
+%% \l_robExt_content_named_NAMEOFTHECONTENT
+\NewDocumentCommand{\robExtFinalContentFileNamed}{O{default}}{
+  \str_if_empty:NTF \l_robExt_template {
+    \PackageError{robExt}{Your ~ template ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
+  }{}
+  \str_if_empty:cTF {l_robExt_content_named#1} {
+    \PackageError{robExt}{Your ~ content ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
+  }{}
+  % Copy the template:
+  \str_set:NV \l_robExt_final_file \l_robExt_template
+  \str_set:Nx \l_robExt_tmp {\use:c{l_robExt_content_named#1}}
+  \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
+}
+
+
+
 
 \NewDocumentCommand{\robExtResetDependencies}{m}{
   \seq_clear:N \l_robExt_dependencies
@@ -210,6 +317,20 @@ if __name__ == '__main__':
     \str_if_empty:NTF \l_robExt_final_file {
       \PackageError{robExt}{You ~ are ~ writing ~ an ~ empty ~ tex ~ file, ~ that ~ will ~ fail ~ to ~ compile. ~ Make ~ sure ~ you ~ defined ~ a ~ template.}{}
     }{
+      % Check if the output directory exists
+      \ifdefined\robExtPrefixPath
+        \sys_if_shell_unrestricted:TF{
+          \ifdefined\robExtDoNotMkdirFolder\else
+            \ifdefined\robExtManualMode
+              \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+            \else
+              \sys_shell_now:x {mkdir ~ -p ~ \robExtPrefixPath}
+            \fi
+          \fi
+        }{
+          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+        }
+      \fi
       \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.deps}}
       \iow_now:NV \g_robExt_write_iow \l_robExt_dependencies_mdfive
       \iow_close:N \g_robExt_write_iow
@@ -232,6 +353,8 @@ if __name__ == '__main__':
   }{
     \str_set:NV \l_robExt_finalCompilationCommand {\l_robExt_currentCompilationCommand} %
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
+    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPdfFile } {\robExtAddPrefixName{\robExtFinalName.pdf}}
+    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPathAndPrefix } {\robExtAddPrefixName{\robExtFinalName}}
     \ifdefined\robExtPrefixPath
       \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
     \fi
@@ -249,6 +372,7 @@ if __name__ == '__main__':
   }
 }
 
+\def\robExtIncludeGraphicsArgs{}
 \NewDocumentCommand{\robExtIncludeFile}{m}{%
   \ifdefined\robExtIncludeCommand%
     \robExtIncludeCommand%
@@ -259,9 +383,11 @@ if __name__ == '__main__':
           \input{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
         }{}
         \ifdefined\robExtDepth%
-          \raisebox{-\robExtDepth}{\includegraphics{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
+          \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
         \else%
-          \includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+          \expanded{%
+            \noexpand\includegraphics[\robExtIncludeGraphicsArgs]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+          }%
         \fi%
       }{
         \ifdefined\robExtManualMode
@@ -278,11 +404,14 @@ if __name__ == '__main__':
 
 \ExplSyntaxOff
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Interface
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \pgfkeys{
   /robExt/.cd,
   defineTemplate/.code={\robExtDefineTemplate{#1}},
+  defineTemplateFromName/.code={\robExtDefineTemplateFromName{#1}},
   dependenciesList/.code={\robExtAddDependency{#1}},
   % Usage like: dependencies={input_externalize.tex,input_b.tex}
   % They should be relative to the main file when using the subfolder option.
@@ -308,12 +437,14 @@ if __name__ == '__main__':
   enable manual mode/.code={\def\robExtManualMode{}},
   disable manual mode/.code={\let\robExtManualMode\undefined},
   generate final content/.code={\robExtFinalContentFile{#1}},
+  generate named final content/.code={\robExtFinalContentFileNamed[#1]},
   set filename prefix/.code={\def\robExtPrefixFilename{#1}},
   set subfolder/.code={\def\robExtPrefixPath{#1}},
   disable externalization/.code={\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
   command if no externalization/.code={#1},
+  include graphics args/.code={\def\robExtIncludeGraphicsArgs{#1}},
 }
 
 
@@ -347,4 +478,39 @@ if __name__ == '__main__':
 \NewDocumentEnvironment{robExtern}{O{}+b}{%
   \robExt[#1]{#2}%
 }{}
+
+%%% This command is mostly useful if you want to compile non-latex files (e.g. python code) as there is NO way
+%%% to write arbitrary code if the code is in an align environment or a macro (the
+%%% macro will remove the tokens like newline, latex comments etc… making it impossible to recover them even using
+%%% advanced rescan stuff). Therefore, instead we first create a file outside any macro, and we read that file
+%%% to put it into a variable, and later we will read that file.
+%%% Since our code is now fundamentally separated in two pieces (the code and the insertion of the code),
+%%% one can give a name to the string in order to insert it easily. I wanted at some points to
+%%% create a kind of queue where the insertion command would just take the last code, but it is actually
+%%% not a great idea as it's easy to mess-up things if the code is not local (for instance if I comment the
+%%% insertion but not the code, it would replace content in later paragraphs).
+%%% We could avoid using an intermediate file using:
+%%% https://tex.stackexchange.com/questions/680240/put-in-a-latex3-string-the-exact-input-string-to-write-in-a-file
+%%% but it's significantly more complicated than \filecontents, and I'd say \filecontents is more reliable
+%%% and gives better errors.
+%%% TODO: write an example how to apply it to https://timodenk.com/blog/exporting-matplotlib-plots-to-latex/
+\NewDocumentCommand{\robExternPrev}{O{}m}{%
+  {% Group
+    \pgfkeys{%
+      /robExt/.cd,
+      #2,
+    }%
+    \ifdefined\robExtDisableExternalization%
+      \pgfkeys{/robExt/.cd,command if no externalization={#2}}%
+    \else%
+      \pgfkeys{%
+        /robExt/.cd,
+        generate named final content/.expanded={#1}
+      }%
+      \robExtWriteFile{}%
+      \robExtCompileFile{}%
+      \robExtIncludeFile{}%
+    \fi%
+  }%
+}
 
