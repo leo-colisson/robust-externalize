@@ -19,11 +19,10 @@
 
 \begin{document}
 
-\pgfkeys{
-  /robExt/.cd,
+\robExtConfigure{
   set filename prefix={myRobExt-},
   set subfolder={robustExternalize/},
-  template1/.style={
+  preset1/.style={
     defineTemplate={
       \documentclass{standalone}
       \usepackage{tikz}
@@ -49,12 +48,12 @@
 % }.
 
 % This diagram is made without externalization with the block version.
-% \begin{robExtern}[disable externalization, for tikzpicture]
+% \begin{robExtern}{disable externalization, for tikzpicture}
 %   [baseline,anchor=base]
 %   \node[draw,fill=green]{Alice and Bob 9};% Coucou
 % \end{robExtern}
 
-Hello \robExt[template1]{%
+Hello \robExt[preset1]{%
   \def\sayHello#1{Hello #1}%
   \begin{tikzpicture}[baseline,anchor=base]%
     \node[draw,fill=\myfillcolor]{\sayHello{Alice}, \sayBye{Bobb}};% Coucou
@@ -62,14 +61,14 @@ Hello \robExt[template1]{%
 }.
 
 
-\robExt[template1, use latexmk]{%
+\robExt[preset1, use latexmk]{%
   \def\sayHello#1{Hello #1}%
   \begin{tikzpicture}[baseline,anchor=base]%
     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou
   \end{tikzpicture}%
 }
 
-\begin{robExtern}[template1]
+\begin{robExtern}{preset1}
   \def\sayHello#1{Hello #1}%
   \begin{tikzpicture}[baseline,anchor=base]%
     \node[draw,fill=\myfillcolor]{\sayHello{Alice Bob and my friend}};% Coucou
@@ -78,7 +77,7 @@ Hello \robExt[template1]{%
 
 % #1: Arguments, #2: content to externalize
 \RenewDocumentEnvironment{tikzpicture}{O{}+b}{%
-  \begin{robExtern}[template1]
+  \begin{robExtern}{preset1}
     \begin{tikzpicture}[#1]
       #2
     \end{tikzpicture}
@@ -130,7 +129,7 @@ Hello \robExt[template1]{%
 
 
 \begin{align}
-  \robExt[template1, set compilation command={pdflatex -halt-on-error "\robExtFinalFile"}]{%
+  \robExt[preset1, set compilation command={pdflatex -halt-on-error "\robExtFinalFile"}]{%
   \def\sayHello#1{Hello #1}%
   \begin{tikzpicture}[baseline,anchor=base]%
     \node[draw,fill=\myfillcolor]{\sayHello{Alice and Bob}};% Coucou

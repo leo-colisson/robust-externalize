@@ -2,21 +2,10 @@
 \RequirePackage{pgffor} % For the .list keys
 \RequirePackage{graphicx} % For the includegraphics command
 \RequirePackage{xsimverb} % To easily write verbatim code to files
-%% Benchmark on an initial version of the ZX paper (76 small tikz-cd based pictures):
-%% - First compilation with this library: 75,10s user 33,96s system 99% cpu 1:49,20 total
-%% - Next compilations with this library: 2,43s user 0,19s system 97% cpu 2,680 total
-%% - Without this library: 34,63s user 0,13s system 99% cpu 34,772 total
-%% So first time we lose x2 (roughly an additional time of .5 seconds per picture, seems like on average a picture takes .5 seconds to be built),
-%% but then we have a speedup of x15 (2.43s instead of 34.63s). And I expect this to be even higher with more pictures.
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
 % - create pre-made settings for tikz, tikz-cd, …
-% - provide an easy way to externalize other stuff, like python code execution etc… The major issue right now is that the file is not written
-% like the input: for instance lines are removed, latex comments also etc. For LaTeX it's not too much of an issue, but for anything else it can.
-% Also, this seems quite fundamental as soon as the syntax is expected to work
-% inside other functions (for instance if you put an fbox, or just use pgfkeys, the inner function has simply no way to access the raw content, even with scantoken or
-% any other magic. Which means that it's certainly simpler to provide a way to provide a file before the fbox (possibly multiple files if we have multiple fboxed), for instance using something like \begin{filecontents}[overwrite,noheader]{abc.py}, and load that file. We might also be able to avoid using an intermediary file using https://tex.stackexchange.com/questions/680240/put-in-a-latex3-string-the-exact-input-string-to-write-in-a-file?noredirect=1#comment1688012_680240 but anyway this.
 % - check compatibility with windows
 % - write documentation
 
@@ -110,9 +99,9 @@ if __name__ == '__main__':
 %% TODO: create a makefile.
 \iow_new:N \g_robExt_write_list_all_figures
 %% Create a file robExt-all-figures.txt with the list of .tex files
-\iow_open:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixPathAndName{all-figures.txt}}
+\iow_open:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixName{all-figures.txt}}
 \iow_new:N \g_robExt_write_manually_compile_all_missing_figures
-\iow_open:Nx \g_robExt_write_manually_compile_all_missing_figures {\robExtAddPrefixPathAndName{compile-missing-figures.sh}}
+\iow_open:Nx \g_robExt_write_manually_compile_all_missing_figures {\robExtAddPrefixName{compile-missing-figures.sh}}
 % Contains the template:
 \str_new:N \l_robExt_template
 \str_new:N \l_robExt_final_file
@@ -160,13 +149,21 @@ if __name__ == '__main__':
   \str_replace_all:Nnn \l_robExt_final_file { \robExtMainContentNoBox } {#1}
   \str_replace_all:Nnn \l_robExt_final_file { \robExtMainContent } {
     %% We save the height/depth of the content by using a savebox:
-    \newwrite\writeRobExt%
-    \immediate\openout\writeRobExt=\jobname-out.tex%
+    \robExtCreateOutFile%
     \newsavebox\boxRobExt%
     \savebox{\boxRobExt}{%
       #1%
     }%
     \usebox{\boxRobExt}%
+    \robExtWriteDepthToOutFile%
+  }%
+  % Useful in cases where we want to manually add the boxRobExt where we need it to be
+  \str_replace_all:Nnn \l_robExt_final_file { \robExtCreateOutFile } {
+    %% We save the height/depth of the content by using a savebox:
+    \newwrite\writeRobExt%
+    \immediate\openout\writeRobExt=\jobname-out.tex%
+  }%
+  \str_replace_all:Nnn \l_robExt_final_file { \robExtWriteDepthToOutFile } {
     \immediate\write\writeRobExt{%
       \string\def\string\robExtWidth{\the\wd\boxRobExt}%
       \string\def\string\robExtHeight{\the\ht\boxRobExt}%
@@ -354,7 +351,7 @@ if __name__ == '__main__':
     \str_set:NV \l_robExt_finalCompilationCommand {\l_robExt_currentCompilationCommand} %
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPdfFile } {\robExtAddPrefixName{\robExtFinalName.pdf}}
-    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPathAndPrefix } {\robExtAddPrefixName{\robExtFinalName}}
+    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPrefixedName } {\robExtAddPrefixName{\robExtFinalName}}
     \ifdefined\robExtPrefixPath
       \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
     \fi
@@ -378,10 +375,12 @@ if __name__ == '__main__':
     \robExtIncludeCommand%
   \else%
     {%
-      \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{
-        \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}{
+      \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{%
+        \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}{%
+          \kern0pt%Without the kern, the next unskip would eat spaces before… and we don't want that. See also
+          % https://tex.stackexchange.com/questions/104034/when-is-it-good-practice-to-use-unskip
           \input{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
-        }{}
+        }{}%
         \ifdefined\robExtDepth%
           \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
         \else%
@@ -394,7 +393,7 @@ if __name__ == '__main__':
           \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ \ifdefined\robExtPrefixPath cd \robExtPrefixPath; \fi bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}}
           \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ the ~ bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}
         \else
-          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ is ~ not ~ present. ~ Please ~ report ~ the ~ issue.}{}
+          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
         \fi
       }
     }%
@@ -475,7 +474,7 @@ if __name__ == '__main__':
 %   \robExt[#1]{#2}%
 % }{}
 
-\NewDocumentEnvironment{robExtern}{O{}+b}{%
+\NewDocumentEnvironment{robExtern}{m+b}{%
   \robExt[#1]{#2}%
 }{}
 
@@ -512,5 +511,39 @@ if __name__ == '__main__':
       \robExtIncludeFile{}%
     \fi%
   }%
+}
+
+\NewDocumentCommand{\robExtConfigure}{m}{%
+  \pgfkeys{
+    /robExt/.cd,#1%Do not add a space before the #1!
+  }%
+}
+
+%%%%%%% Integration with existing libraries:
+
+%%%%% Replace tikzpicture:
+
+% We provide a default preset for the above command for tizk… but people surely need to override it very quickly:
+\robExtConfigure{%
+  presetTikzDefault/.style={
+    % We define the code that wraps all our figures
+    defineTemplate={
+      \documentclass{standalone}
+      \usepackage{tikz}
+      \begin{document}%
+      \robExtMainContent% This macro will be replaced with (notably) the code for the figure
+      \end{document}
+    },
+  },
+}
+
+\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
+  \DeclareDocumentEnvironment{tikzpicture}{O{}O{}b}{%
+    \begin{robExtern}{presetTikzDefault,##2}%
+      \begin{tikzpicture}[##1]%
+        ##3%
+      \end{tikzpicture}%
+    \end{robExtern}%
+  }{}%
 }
 

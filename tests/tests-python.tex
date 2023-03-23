@@ -15,8 +15,7 @@ ROBEXTMAINCONTENT
 plt.savefig(sys.argv[0][:-4]+".pdf") # TEMPLATECODE
 \end{robExtNamedTemplate}
 
-\pgfkeys{
-  /robExt/.cd,
+\robExtConfigure{
   set subfolder={robustExternalize/},
   % Simple version that just puts a graph on screen:
   templateMatplot/.style={
@@ -24,8 +23,8 @@ plt.savefig(sys.argv[0][:-4]+".pdf") # TEMPLATECODE
     set compilation command={python3 "\robExtFinalFile"},
   },
   % More complex version that displays both the code and the result:
-  mycaption/.code={\def\mycaption{#1}}, % Provide a key to change the caption
   templateMatplotAdvanced/.style={
+    /robExt/mycaption/.code={\def\mycaption{##1}}, % Provide a key to change the caption
     defineTemplateFromName=pythonMatplotlib,
     % This command compiles the image, and creates a file removing all the lines from the code
     % containing TEMPLATECODE (useful not to display action of saving the file etc)
@@ -37,13 +36,14 @@ plt.savefig(sys.argv[0][:-4]+".pdf") # TEMPLATECODE
         % template a part that creates a new file whose name is the basename of the current (script) file
         % and that contains all its code except for the template (to differentiate between template and
         % non-template, we could add a special comment on lines to remove)
-        \verbatiminput{\robExtAddPrefixPathAndName{\robExtFinalName.codeonly.py}}
+        \verbatiminput{\robExtFinalPrefixedName{\robExtFinalName.codeonly.py}}
         \includegraphics[width=.6\textwidth]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
         \caption{\mycaption}
       \end{figure}
     },
   },
 }
+
 
 \section{Demonstration of the usage with python}
 
@@ -67,7 +67,6 @@ And you can customize the include command at wish, for instance here we display 
 
 When we are not dealing with internal macros, it can be annoying to write them in two parts, so we provide a function to do everything at once:
 
-\def\test{BBB}
 \begin{robExtCode}{templateMatplot,include graphics args={width=\linewidth}}
 year = [2014, 2015, 2016, 2017, 2018, 2019]  
 tutorial_count = [39, 117, 111, 110, 67, 29]
