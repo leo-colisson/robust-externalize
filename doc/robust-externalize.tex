@@ -73,7 +73,11 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \subsection{FAQ}
 
-\paragraph{Do you need to compile using -shell-escape?}
+\paragraph{What is not supported?}
+
+We don't support (yet) overlays, remember picture, and you can't use (yet) cross-references inside your images. See other limitations and known bugs at the end of this documentation. Note that this library is quite young, so expect untested things.
+
+\paragraph{Do I need to compile using -shell-escape?}
 
 Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
@@ -97,6 +101,8 @@ On an early draft of a small paper containing 76 small tikz-cd based pictures (f
 \end{itemize}
 So during the first compilation, we lost a x2 factor (roughly an additional time of .5 seconds per picture coming from the time to start \LaTeX{}, it seems like on average a picture takes .5 seconds to be built in my benchmark), but then we have a speedup of x15 (2.43s instead of 34.63s) for all subsequent runs. And I expect this to be even higher with more pictures and more complex documents.
 
+\paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
+
 \paragraph{Can you deal with baseline position?} Yes, the depth of the box is automatically computed and used to include the figure by default.
 
 \paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command and the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
@@ -115,7 +121,7 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 
 \subsubsection{For \LaTeX{} based content}
 
-In theory, if you only care about \tikzname's picture, you can just do:
+In theory, if you only care about \tikzname's picture (and if you are not afraid of breaking figures using |overlay| and |remember pictures|, possibly defined by other packages), you can just do:
 
 \begin{codeexample}[width=0pt]
 %% We override the default tikzpicture environment
@@ -225,7 +231,7 @@ By choosing the name |tikzpicture| instead of |mytikzpicture|, you would actuall
 \end{tikzpicture}
 \end{codeexample}
 
-
+Note that doing that could be problematic if you use packages that use |tikzpicture| relying on |remember picture| and |overlays|. For this reason it's certainly safer to just define a different |mytikzpicture| environment, or overwrite only the environment that are safe to override.
 
 \subsection{For non-\LaTeX{} code}
 
@@ -383,10 +389,13 @@ the library creates a file |robExt-compile-missing-figures.sh| that contains the
 
 \begin{itemize}
 \item Solve problem with disable externalization not working with tikz pictures
+\item See how to deal with overlays, maybe get inspired by https://github.com/sasozivanovic/memoize that seems to define a padding around the box
+\item See how to deal with label references
 \item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
 \item Some commands like mkdir might not be super compatible with Windows, I need to see how to improve compatibility between OS
 \item The documentation is still sparse.
-\item For now we put |compile-missing-figures.sh| in subfolders 
+\item I just discovered the very interesting https://github.com/sasozivanovic/memoize, not sure how it compares. The approaches seems very different.
+\item I don't think this package can directly externalize remember picture pictures.
 \end{itemize}
 % %% This picture will NOT be externalized .
 % \message{YYYYYYYYYYYYYY Next one:}
