@@ -352,6 +352,10 @@ if __name__ == '__main__':
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPdfFile } {\robExtAddPrefixName{\robExtFinalName.pdf}}
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPrefixedName } {\robExtAddPrefixName{\robExtFinalName}}
+    %% We rescan the string in order to evaluate stuff like \myframes into "12,45,56":
+    \ifdefined\robExtDoNotRescan\else
+      \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand {} \l_robExt_finalCompilationCommand
+    \fi%
     \ifdefined\robExtPrefixPath
       \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
     \fi
