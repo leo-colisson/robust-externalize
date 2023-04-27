@@ -280,6 +280,10 @@ if __name__ == '__main__':
   \seq_put_left:Nx \l_robExt_dependencies {#1}
 }
 
+\NewDocumentCommand{\robExtDebugDependency}{}{
+  \show\l_robExt_dependencies
+}
+
 %% Note that the compilation command does not need to be identical to the host compilation command. This way we don't need to
 %% remove all the cache just because we compile the main document with a different command.
 \NewDocumentCommand{\robExtSetCompilationCommand}{O{pdflatex ~ -shell-escape ~ -halt-on-error ~ "\robExtFinalFile"}}{
@@ -297,6 +301,14 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtWriteFile}{m}{
   %%% First we get all dependencies stored in \l_robExt_dependencies to create a csv-like file:
   \str_clear:N \l_robExt_dependencies_mdfive
+  %%% We rescan the string in order to evaluate stuff like \myframes into "12,45,56".
+  \ifdefined\robExtDoNotRescanFirstTime\else
+    %%% However we cannot rescan all tokens (not those depending on the md5) as this will be known later
+    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalFile } {\noexpand\robExtFinalFile}
+    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalPdfFile } {\noexpand\robExtFinalPdfFile}
+    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalPrefixedName } {\noexpand\robExtFinalPrefixedName}
+    \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand {} \l_robExt_currentCompilationCommand%
+  \fi%
   % We first add on the first line the compilation command, and on the second line the current picture.
   \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
   \seq_map_inline:Nn \l_robExt_dependencies {
@@ -353,8 +365,8 @@ if __name__ == '__main__':
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPdfFile } {\robExtAddPrefixName{\robExtFinalName.pdf}}
     \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPrefixedName } {\robExtAddPrefixName{\robExtFinalName}}
     %% We rescan the string in order to evaluate stuff like \myframes into "12,45,56":
-    \ifdefined\robExtDoNotRescan\else
-      \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand {} \l_robExt_finalCompilationCommand
+    \ifdefined\robExtDoNotRescanSecondTime\else
+      \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand {} \l_robExt_finalCompilationCommand%
     \fi%
     \ifdefined\robExtPrefixPath
       \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
