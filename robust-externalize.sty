@@ -75,6 +75,13 @@ if __name__ == '__main__':
   \fi\robExtPrefixFilename#1%
 }
 
+\NewExpandableDocumentCommand{\robExtGetPrefixPath}{}{%
+  \ifdefined\robExtPrefixPath%
+    \robExtPrefixPath%
+  \fi%
+}
+
+
 \NewExpandableDocumentCommand{\robExtAddPrefixName}{m}{%
   \robExtPrefixFilename#1%
 }
@@ -175,6 +182,7 @@ if __name__ == '__main__':
   \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
 }
 
+
 %% This variation is used mostly for non-latex stuff (e.g. you want to create a figure using python)
 %% Because it's fundamentally impossible to read non-latex code inside a macro or align environment
 %% (latex will lose all comments etc… that might not be actual comments), we do it in two parts.
@@ -266,7 +274,49 @@ if __name__ == '__main__':
   % Copy the template:
   \str_set:NV \l_robExt_final_file \l_robExt_template
   \str_set:Nx \l_robExt_tmp {\use:c{l_robExt_content_named#1}}
-  \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
+  %%% For a mysterious reason, if we define:
+  %% \str_replace_all:NnV \l_robExt_final_file {\robExtMainContentNoBox} \l_robExt_tmp
+  %%% the replacement will occur in the file only if \robExtMainContentNoBox
+  %%% is followed by a space... since I don’t know how to avoid that issue, I prefer to
+  %%% avoid using this shape, and I use pure letters instead.
+  \ifdefined\robExtLatexMode
+    %% This must come before ROBEXTMAINCONTENT as it contains a subsequence
+    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
+    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTMAINCONTENT } {
+      %% We save the height/depth of the content by using a savebox:
+      ROBEXTCREATEOUTFILE%
+      \newsavebox\boxRobExt%
+      \savebox{\boxRobExt}{%
+        ROBEXTMAINCONTENTNOBOX%
+      }%
+      \usebox{\boxRobExt}%
+      ROBEXTWRITEDEPTHTOOUTFILE%
+    }%
+    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
+    \ifdefined\robExtDefinedVariables%
+      \str_replace_all:NnV \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } \robExtDefinedVariables
+    \else
+      \str_replace_all:Nnx \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } {}
+    \fi
+    % Useful in cases where we want to manually add the boxRobExt where we need it to be
+    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTCREATEOUTFILE } {
+      %% We save the height/depth of the content by using a savebox:
+      \newwrite\writeRobExt%
+      \immediate\openout\writeRobExt=\jobname-out.tex%
+    }%
+    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTWRITEDEPTHTOOUTFILE } {
+      \immediate\write\writeRobExt{%
+        \string\def\string\robExtWidth{\the\wd\boxRobExt}%
+        \string\def\string\robExtHeight{\the\ht\boxRobExt}%
+        \string\def\string\robExtDepth{\the\dp\boxRobExt}%
+      }%
+    }%
+    % Needed to be able to define stuff like \def\sayBye#1{Bye #1}.
+    % Just, if you use it inside a template style, you might need to double the # into ##
+    \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
+  \else
+    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
+  \fi
 }
 
 
@@ -387,8 +437,8 @@ if __name__ == '__main__':
 
 \def\robExtIncludeGraphicsArgs{}
 \NewDocumentCommand{\robExtIncludeFile}{m}{%
-  \ifdefined\robExtIncludeCommand%
-    \robExtIncludeCommand%
+  \ifdefined\robExtIncludeCommandAdvanced%
+    \robExtIncludeCommandAdvanced%
   \else%
     {%
       \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{%
@@ -397,12 +447,16 @@ if __name__ == '__main__':
           % https://tex.stackexchange.com/questions/104034/when-is-it-good-practice-to-use-unskip
           \input{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
         }{}%
-        \ifdefined\robExtDepth%
-          \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
+        \ifdefined\robExtIncludeCommand%
+          \robExtIncludeCommand%
         \else%
-          \expanded{%
-            \noexpand\includegraphics[\robExtIncludeGraphicsArgs]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
-          }%
+          \ifdefined\robExtDepth%
+            \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
+          \else%
+            \expanded{%
+              \noexpand\includegraphics[\robExtIncludeGraphicsArgs]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+            }%
+          \fi%
         \fi%
       }{
         \ifdefined\robExtManualMode
@@ -437,6 +491,7 @@ if __name__ == '__main__':
   add dependencies/.style={
     dependenciesList/.list={#1}
   },
+  include command advanced/.code={\def\robExtIncludeCommandAdvanced{#1}},
   include command/.code={\def\robExtIncludeCommand{#1}},
   set compilation command/.code={\robExtSetCompilationCommand[#1]},
   use latexmk/.style={
@@ -448,6 +503,7 @@ if __name__ == '__main__':
   use xelatex/.style={
     set compilation command={xelatex -shell-escape -halt-on-error "\robExtFinalFile"},
   },
+  custom include command advanced/.code={\def\robExtIncludeCommandAdvanced{#1}},
   custom include command/.code={\def\robExtIncludeCommand{#1}},
   enable manual mode/.code={\def\robExtManualMode{}},
   disable manual mode/.code={\let\robExtManualMode\undefined},
@@ -460,6 +516,17 @@ if __name__ == '__main__':
   % Useful to wrap, for instance, text
   command if no externalization/.code={#1},
   include graphics args/.code={\def\robExtIncludeGraphicsArgs{#1}},
+  enable latex mode/.code={\def\robExtLatexMode{}},
+  disable latex mode/.code={\let\robExtLatexMode\undefined},
+  % Use like
+  %   defined variables={
+  %     \string\setcounter{framenumber}{\theframenumber}
+  %   }
+  defined variables/.code={%
+    \edef\robExtDefinedVariables{#1}%
+  },
+  execute before each externalization/.code={\def\robExtExecuteBefore{#1}},
+  execute after each externalization/.code={\def\robExtExecuteAfter{#1}},
 }
 
 
@@ -478,9 +545,11 @@ if __name__ == '__main__':
         /robExt/.cd,
         generate final content={#2}
       }%
+      \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
       \robExtWriteFile{}%
       \robExtCompileFile{}%
       \robExtIncludeFile{}%
+      \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
     \fi%
   }%
 }
@@ -497,7 +566,9 @@ if __name__ == '__main__':
 %%% This command is mostly useful if you want to compile non-latex files (e.g. python code) as there is NO way
 %%% to write arbitrary code if the code is in an align environment or a macro (the
 %%% macro will remove the tokens like newline, latex comments etc… making it impossible to recover them even using
-%%% advanced rescan stuff). Therefore, instead we first create a file outside any macro, and we read that file
+%%% advanced rescan stuff). This can also be useful when some LaTeX commands make a difference between \end {frame}
+%%% and \end{frame} (looking at you beamer)
+%%% Therefore, instead we first create a file outside any macro, and we read that file
 %%% to put it into a variable, and later we will read that file.
 %%% Since our code is now fundamentally separated in two pieces (the code and the insertion of the code),
 %%% one can give a name to the string in order to insert it easily. I wanted at some points to
@@ -522,9 +593,11 @@ if __name__ == '__main__':
         /robExt/.cd,
         generate named final content/.expanded={#1}
       }%
+      \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
       \robExtWriteFile{}%
       \robExtCompileFile{}%
       \robExtIncludeFile{}%
+      \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
     \fi%
   }%
 }
