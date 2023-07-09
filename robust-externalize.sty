@@ -77,6 +77,23 @@ if __name__ == '__main__':
   \fi\robExtPrefixFilename#1%
 }
 
+\NewDocumentCommand{\robExtCheckIfPrefixFolderExists}{}{
+  % Check if the output directory exists
+  \ifdefined\robExtPrefixPath
+    \sys_if_shell_unrestricted:TF{
+      \ifdefined\robExtDoNotMkdirFolder\else
+        \ifdefined\robExtManualMode
+          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+        \else
+          \sys_shell_now:x {mkdir ~ -p ~ \robExtPrefixPath}
+        \fi
+      \fi
+    }{
+      \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+    }
+  \fi
+}
+
 \NewExpandableDocumentCommand{\robExtGetPrefixPath}{}{%
   \ifdefined\robExtPrefixPath%
     \robExtPrefixPath%
@@ -141,8 +158,13 @@ if __name__ == '__main__':
   %\str_set:Nc \l_robExt_template {l_robExt_template_named_#1}
 }
 
+\NewDocumentCommand{\robExtDefineContentFromName}{m}{
+  \str_set:Nx \l_robExt_content_named {\use:c{l_robExt_content_named#1}}
+}
+
 
 %% The role of this is to set \l_robExt_final_file to the final content of the file.
+%% TODO: this is deviating significantly from the code for code, I need to combine it into one element.
 \NewDocumentCommand{\robExtFinalContentFile}{m}
 {
   \str_if_empty:NTF \l_robExt_template {
@@ -249,7 +271,7 @@ if __name__ == '__main__':
 }
 
 %% does robExtNamedContent + \robExternPrev (not sure how to avoid code duplication, I get error because
-%% of verbatim stuff)
+%% of verbatim stuff) TODO: using \blabla \endblabla it should work.
 \NewDocumentEnvironment{robExtCode}{m}{
   \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
 }{
@@ -293,6 +315,7 @@ if __name__ == '__main__':
   \str_clear_new:N \l_robExt_tmp_filename
   \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#1}
   %% Writes the content to the file
+  \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
   \iow_close:N \g_robExt_write_iow
@@ -315,6 +338,7 @@ if __name__ == '__main__':
   \str_clear_new:N \l_robExt_tmp_filename
   \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#2}
   %% Writes the content to the file
+  \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
   \iow_close:N \g_robExt_write_iow
@@ -338,9 +362,18 @@ if __name__ == '__main__':
   \str_gset:cV {l_robExt_template_named_#1} \l_robExt_tmp_contain_file
 }
 
+%% Create a placeholder from a text:
+%% Usage:
+%% \begin{robExtNewPlaceholder}{MYPLACEHOLDER}
+%% my content
+%% \end{robExtNewPlaceholder}
+\NewDocumentEnvironment{robExtNewPlaceholder}{m}{\robExtNamedTemplate[template#1]}{\endrobExtNamedTemplate\robExtAddPlaceholderFromTemplateName{#1}{template#1}}
+
+
 
 %% Here is the second part, that assumes that somehow the content string is in
 %% \l_robExt_content_named_NAMEOFTHECONTENT
+%% TODO: Merge this with the normal version, as we do not replace the same set of variables.
 \NewDocumentCommand{\robExtFinalContentFileNamed}{O{default}}{
   \str_if_empty:NTF \l_robExt_template {
     \PackageError{robExt}{Your ~ template ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
@@ -356,54 +389,63 @@ if __name__ == '__main__':
   %%% the replacement will occur in the file only if \robExtMainContentNoBox
   %%% is followed by a space... since I don’t know how to avoid that issue, I prefer to
   %%% avoid using this shape, and I use pure letters instead.
-  \ifdefined\robExtLatexMode
-    %% This must come before ROBEXTMAINCONTENT as it contains a subsequence
-    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
-    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTMAINCONTENT } {
-      %% We save the height/depth of the content by using a savebox:
-      ROBEXTCREATEOUTFILE%
-      \newsavebox\boxRobExt%
-      \savebox{\boxRobExt}{%
-        ROBEXTMAINCONTENTNOBOX%
+  %% We define a macro to do one round of replacement. We will iterate it until the string converges.
+  \cs_set:Nn \__robext_replacement:n {
+    % We store the initial value
+    \str_set_eq:NN \l_robExt_final_file_before_change \l_robExt_final_file
+    % We perform one round of replacement
+    \ifdefined\robExtLatexMode
+      %% This must come before ROBEXTMAINCONTENT as it contains a subsequence
+      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
+      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTMAINCONTENT } {
+        %% We save the height/depth of the content by using a savebox:
+        ROBEXTCREATEOUTFILE%
+        \newsavebox\boxRobExt%
+        \savebox{\boxRobExt}{%
+          ROBEXTMAINCONTENTNOBOX%
+        }%
+        \usebox{\boxRobExt}%
+        ROBEXTWRITEDEPTHTOOUTFILE%
       }%
-      \usebox{\boxRobExt}%
-      ROBEXTWRITEDEPTHTOOUTFILE%
-    }%
-    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
-    \ifdefined\robExtDefinedVariables%
-      \str_replace_all:NnV \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } \robExtDefinedVariables
+      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
+      \ifdefined\robExtDefinedVariables%
+        \str_replace_all:NnV \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } \robExtDefinedVariables
+      \else
+        \str_replace_all:Nnx \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } {}
+      \fi
+      % Useful in cases where we want to manually add the boxRobExt where we need it to be
+      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTCREATEOUTFILE } {
+        %% We save the height/depth of the content by using a savebox:
+        \newwrite\writeRobExt%
+        \immediate\openout\writeRobExt=\jobname-out.tex%
+      }%
+      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTWRITEDEPTHTOOUTFILE } {
+        \immediate\write\writeRobExt{%
+          \string\def\string\robExtWidth{\the\wd\boxRobExt}%
+          \string\def\string\robExtHeight{\the\ht\boxRobExt}%
+          \string\def\string\robExtDepth{\the\dp\boxRobExt}%
+        }%
+      }%
+      % Needed to be able to define stuff like \def\sayBye#1{Bye #1}.
+      % Just, if you use it inside a template style, you might need to double the # into ##
+      \str_replace_all:NnV \l_robExt_final_file { #### } \c_hash_str
     \else
-      \str_replace_all:Nnx \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } {}
+      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
     \fi
-    % Useful in cases where we want to manually add the boxRobExt where we need it to be
-    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTCREATEOUTFILE } {
-      %% We save the height/depth of the content by using a savebox:
-      \newwrite\writeRobExt%
-      \immediate\openout\writeRobExt=\jobname-out.tex%
-    }%
-    \str_replace_all:Nnn \l_robExt_final_file { ROBEXTWRITEDEPTHTOOUTFILE } {
-      \immediate\write\writeRobExt{%
-        \string\def\string\robExtWidth{\the\wd\boxRobExt}%
-        \string\def\string\robExtHeight{\the\ht\boxRobExt}%
-        \string\def\string\robExtDepth{\the\dp\boxRobExt}%
-      }%
-    }%
-    % Needed to be able to define stuff like \def\sayBye#1{Bye #1}.
-    % Just, if you use it inside a template style, you might need to double the # into ##
-    \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
-  \else
-    \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
-  \fi
-  \ifdefined\robExtAdditionalReplacements%
-    %% We repeat a few times so that if a template contains another template, the content is still replaced. In theory, we should
-    %% iterate the whole process (also robext...) and until the string converges... but writing this in LaTeX is annoying enough that
-    %% I will start with this dirtier version that just iterates 5 times.
-    \robExtAdditionalReplacements
-    \robExtAdditionalReplacements
-    \robExtAdditionalReplacements
-    \robExtAdditionalReplacements
-    \robExtAdditionalReplacements
-  \fi
+    \str_replace_all:NnV \l_robExt_final_file { ROBEXTWAYBACK } \robExtPrefixPathWayBack
+    \ifdefined\robExtAdditionalReplacements%
+      \robExtAdditionalReplacements
+    \fi
+    % We compare the result
+    \str_compare:eNeTF \l_robExt_final_file_before_change = \l_robExt_final_file {
+      % The strings are equal: no need to restart
+    }{
+      % The strings are different: we restart
+      \__robext_replacement:n {}
+    }
+  }
+  % We call the recursive function
+  \__robext_replacement:n {}
 }
 
 \NewDocumentCommand{\robExtReplaceInFileFromTemplateName}{mm}{
@@ -494,19 +536,7 @@ if __name__ == '__main__':
       \PackageError{robExt}{You ~ are ~ writing ~ an ~ empty ~ tex ~ file, ~ that ~ will ~ fail ~ to ~ compile. ~ Make ~ sure ~ you ~ defined ~ a ~ template.}{}
     }{
       % Check if the output directory exists
-      \ifdefined\robExtPrefixPath
-        \sys_if_shell_unrestricted:TF{
-          \ifdefined\robExtDoNotMkdirFolder\else
-            \ifdefined\robExtManualMode
-              \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtPrefixPath.}
-            \else
-              \sys_shell_now:x {mkdir ~ -p ~ \robExtPrefixPath}
-            \fi
-          \fi
-        }{
-          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtPrefixPath.}
-        }
-      \fi
+      \robExtCheckIfPrefixFolderExists
       \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.deps}}
       \iow_now:NV \g_robExt_write_iow \l_robExt_dependencies_mdfive
       \iow_close:N \g_robExt_write_iow
@@ -631,6 +661,7 @@ if __name__ == '__main__':
   /robExt/.cd,
   defineTemplate/.code={\robExtDefineTemplate{#1}},
   defineTemplateFromName/.code={\robExtDefineTemplateFromName{#1}},
+  define content from name/.code={\robExtDefineContentFromName{#1}},
   dependenciesList/.code={\robExtAddDependency{#1}},
   % Usage like: dependencies={input_externalize.tex,input_b.tex}
   % They should be relative to the main file when using the subfolder option.
@@ -769,7 +800,8 @@ if __name__ == '__main__':
 %%% to write arbitrary code if the code is in an align environment or a macro (the
 %%% macro will remove the tokens like newline, latex comments etc... making it impossible to recover them even using
 %%% advanced rescan stuff). This can also be useful when some LaTeX commands make a difference between \end {frame}
-%%% and \end{frame} (looking at you beamer)
+%%% and \end{frame} (looking at you beamer, in [fragile] mode, you cannot have \end {frame}, and
+%%% latex automatically adds a space, not sure how to prevent this)
 %%% Therefore, instead we first create a file outside any macro, and we read that file
 %%% to put it into a variable, and later we will read that file.
 %%% Since our code is now fundamentally separated in two pieces (the code and the insertion of the code),
