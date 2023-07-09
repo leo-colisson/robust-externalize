@@ -263,6 +263,19 @@ if __name__ == '__main__':
   \robExternPrev{#1}
 }
 
+% \robExtEmptyCode{bla} is an equivalent to
+% \begin{robExtCode}{bla}\end{robExtCode}
+% except that it does not give an error when it is inside a macro (no xsim)
+\NewDocumentCommand{\robExtEmpty}{m}{
+  \str_gclear:c {l_robExt_content_named}
+  \robExternPrev{#1}
+}
+
+\NewDocumentEnvironment{robExtEmptyCode}{+b}{
+  \robExtEmpty{#1}
+}{}
+
+
 % \begin{robExtCopyInCacheAndCreatePlaceholderWithPath}{MYLIBRARYPATH} ... \end{robExtNamedTemplate}
 % will create a new file in the cache with ..., and will create a new placeholder MYLIBRARYPATH containing the path of this file (relative to
 % the cache folder) . You can also change the suffix, that defaults to default.tex.
@@ -332,9 +345,9 @@ if __name__ == '__main__':
   \str_if_empty:NTF \l_robExt_template {
     \PackageError{robExt}{Your ~ template ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
   }{}
-  \str_if_empty:cTF {l_robExt_content_named#1} {
-    \PackageError{robExt}{Your ~ content ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
-  }{}
+  % \str_if_empty:cTF {l_robExt_content_named#1} {
+  %   \PackageError{robExt}{Your ~ content ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
+  % }{}
   % Copy the template:
   \str_set:NV \l_robExt_final_file \l_robExt_template
   \str_set:Nx \l_robExt_tmp {\use:c{l_robExt_content_named#1}}
@@ -672,6 +685,10 @@ if __name__ == '__main__':
   % first argument is subfolder, second is how to get from subfolder to the folder containing the source:
   % set subfolder and way back={robustExternal/}{../}
   set subfolder and way back/.code 2 args={\def\robExtPrefixPath{#1}\def\robExtPrefixPathWayBack{#2}},
+  % By default we put everything in robustExternalize
+  % Change this before starting to cache any library, and if you change it mid-document, be aware
+  % that you will not be able to refer to elements in the old folder.
+  set subfolder and way back={robustExternalize/}{../},
   disable externalization/.code={\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
