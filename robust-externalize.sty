@@ -171,6 +171,10 @@ if __name__ == '__main__':
   \IfBooleanTF{#1}{\cs_show:N \l_robExt_placeholders_seq}{}
 }
 
+\NewDocumentCommand{\robExtGetPlaceholder}{sm}{
+  \use:c{l_robExt_placeholder_#2_str}
+}
+
 % Make sure that the placeholder is in the list \l_robExt_placeholders_seq.
 % This should automatically be called by other tools
 \NewDocumentCommand{\robExtAddPlaceholderToList}{m}{
