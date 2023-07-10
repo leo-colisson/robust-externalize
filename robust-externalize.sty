@@ -115,6 +115,7 @@ if __name__ == '__main__':
 \cs_generate_variant:Nn \ior_str_get:NN { Nc }
 \cs_generate_variant:Nn \str_replace_all:Nnn { NnV }
 \cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
+\cs_generate_variant:Nn \str_replace_all:Nnn { Nnv }
 \cs_generate_variant:Nn \file_if_exist:nTF { xTF }
 \cs_generate_variant:Nn \str_set:Nn { NV }
 
@@ -139,6 +140,186 @@ if __name__ == '__main__':
 % Contains the current compilation command (including the name of the file to compile).
 \str_new:N \l_robExt_currentCompilationCommand
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Deal with placeholders
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Placeholders are strings like "MYLIBRARY" or "MAINCONTENT" that will be replaced by a given content.
+%% In practice:
+%% - for every placeholder MYPLACEHOLDER, a macro \l_robExt_placeholder_MYPLACEHOLDER_str is created, containing
+%%   the string to use to replace it
+%% - a sequence \l_robExt_placeholders_seq that is a list of string, contains the list of all placeholders,
+%%   in a string, like [MYLIBRARY, MAINCONTENT] etc...
+%% One issue is that LaTeX does not keep some symbols (e.g. % etc...) when used inside a macro, so we define
+%% different commands depending on whether they can be used in a macro or not.
+\seq_clear_new:N \l_robExt_placeholders_seq 
+
+\NewDocumentCommand{\robExtDebugPlaceholder}{sm}{
+  \message{Placeholder ~ #2 ~ contains: ~ \use:c{l_robExt_placeholder_#2_str}}
+  \IfBooleanTF{#1}{\cs_show:c { l_robExt_placeholder_#2_str }}{}
+}
+
+\NewDocumentCommand{\robExtDebugPlaceholders}{s}{
+  \message{List ~ of ~ placeholders:}
+  \seq_map_inline:Nn \l_robExt_placeholders_seq {\message{##1,}}
+  \IfBooleanTF{#1}{\cs_show:N \l_robExt_placeholders_seq}{}
+}
+
+\NewDocumentCommand{\robExtDebugPlaceholdersContents}{s}{
+  \message{List ~ of ~ placeholders:}
+  \seq_map_inline:Nn \l_robExt_placeholders_seq {\robExtDebugPlaceholder{##1}}
+  \IfBooleanTF{#1}{\cs_show:N \l_robExt_placeholders_seq}{}
+}
+
+% Make sure that the placeholder is in the list \l_robExt_placeholders_seq.
+% This should automatically be called by other tools
+\NewDocumentCommand{\robExtAddPlaceholderToList}{m}{
+  \seq_put_left:Nn \l_robExt_placeholders_seq { #1 }
+}
+
+
+%% Usage: \placeholderFromContent{MYTITLE}{My slide title}
+%% MYTITLE will contain at the end "My slide title"
+%% Warning: only LaTeX-friendly code should be placed here, as LaTeX does not preserve some symbols and adds spaces
+%% Tested!
+\NewDocumentCommand{\robExtPlaceholderFromContent}{mm}{
+  \str_set:cn { l_robExt_placeholder_#1_str } {#2}
+  \robExtAddPlaceholderToList{#1}
+}
+\let\placeholderFromContent\robExtPlaceholderFromContent
+
+%% Usage:
+%% \begin{placeholderFromCode}{HELPERFUNCTION}
+%%   def my_helper_function(bla):
+%%   return bla + 1
+%% \end{placeholderFromCode}
+%% HELPERFUNCTION will contain at the end "def ..."
+%% This environment cannot be placed inside any other macro/align/...
+% \NewDocumentEnvironment{robExtPlaceholderFromCode}{m}{
+%   \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
+% }{
+%   \XSIMfilewritestop
+%   \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
+%   %% Put the file in l_robExt_tmp_contain_file
+%   \str_clear_new:N \l_robExt_tmp
+%   \ior_str_map_inline:Nn \g_robExt_read_ior {
+%     \str_gput_right:cx \l_robExt_tmp {\tl_to_str:N{##1}^^J}
+%   }
+%   XXXXXXXXXXX{l_robExt_placeholder_#1_str}
+%   \robExtAddPlaceholderToList{#1}
+% }
+% \let\placeholderFromCode\robExtPlaceholderFromCode
+% \let\endplaceholderFromCode\endrobExtPlaceholderFromCode
+
+%% Usage:
+%% \placeholderPathFromFilename{MYLIBPATH}{mylib.py}
+%% This will copy mylib.py in the cache, and set MYLIBPATH to the name of the file in the cache like
+%% MYLIBPATH = robExt-abcmylib.py
+%% Tested!
+\NewDocumentCommand{\robExtPlaceholderPathFromFilename}{mm}{
+  \ior_open:Nn \g_robExt_read_ior {#2}
+  %% Put the file in l_robExt_tmp_contain_file
+  \str_clear_new:N \l_robExt_tmp_contain_file
+  \ior_str_map_inline:Nn \g_robExt_read_ior {
+    \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
+  }
+  %% computes the new filename based on the md5
+  \str_clear_new:N \l_robExt_tmp_filename
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#2}
+  %% Writes the content to the file
+  \robExtCheckIfPrefixFolderExists
+  \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
+  \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
+  \iow_close:N \g_robExt_write_iow
+  %% sets the template name to the relative path to the file
+  \str_set:cx { l_robExt_placeholder_#1_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
+  \robExtAddPlaceholderToList{#1}
+}
+\let\placeholderPathFromFilename\robExtPlaceholderPathFromFilename
+
+%% Usage:
+%% \placeholderFromFilename{MYLIB}{mylib.py}
+%% This will set MYLIB to the content of the file mylib.py
+%% Tested!
+\NewDocumentCommand{\robExtPlaceholderFromFilename}{mm}{
+  \ior_open:Nn \g_robExt_read_ior {#2}
+  %% Put the file in l_robExt_tmp_contain_file
+  \str_clear_new:N \l_robExt_tmp_contain_file
+  \ior_str_map_inline:Nn \g_robExt_read_ior {
+    \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
+  }
+  %% sets the template name to the relative path to the file
+  \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_tmp_contain_file
+  \robExtAddPlaceholderToList{#1}
+}
+\let\placeholderFromFilename\robExtPlaceholderFromFilename
+
+%%% Evaluate a string by replacing the placeholders until there is none left
+%%% the result will be in \robExtResult
+\cs_set:Nn \__replace_until_impossible:N {
+  \str_set_eq:NN \l_robext_tmp_before \l_robExt_tmp
+  \show \l_robext_tmp_before
+  \seq_map_inline:Nn \l_robExt_placeholders_seq {
+    \str_replace_all:Nnv \l_robExt_tmp { ##1 } { l_robExt_placeholder_##1_str }
+  }
+  % We compare the result
+  \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_tmp {
+    \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_tmp
+    \robExtAddPlaceholderToList{#1}
+  }{
+    % The strings are different: we restart
+    \__replace_until_impossible:N {#1}
+  }
+}
+\NewDocumentCommand{\robExtEvaluateString}{mm}{
+  \message{Starting #1 #2}
+  \str_set:Nx \l_robExt_tmp { #2 }
+  \__replace_until_impossible:N {#1}
+}
+
+\placeholderFromContent{`MAIN°CONTENT`}{I ~ like ~ the ~ `NAME°FRUIT` ~ and ~ `COUNTRY`.}
+\placeholderFromContent{`NAME°FRUIT`}{orange}
+\placeholderFromContent{`COUNTRY`}{France}
+\placeholderPathFromFilename{`MY°LIBPATH`}{test.mylib}
+\placeholderFromFilename{`MY°LIB`}{test.mylib}
+\robExtDebugPlaceholdersContents*
+\robExtEvaluateString{NEWCONTENT}{`MAIN°CONTENT`}
+\robExtDebugPlaceholdersContents*
+
+% %% Usage:
+% %% \begin{placeholderPathFromCode}{MYLIBPATH}
+% %% def my_helper_function(bla):
+% %%   return bla + 1
+% %% \end{placeholderFromCode}
+% %% This will copy the code in a new file in the cache, and set MYLIBPATH to the name of the file in the cache like
+% %% MYLIBPATH = robExt-abcmylib.py
+% %% This environment cannot be nested inside macro and some environments.
+% \NewDocumentEnvironment{robExtPlaceholderPathFromCode}{m}{
+%   \XSIMfilewritestart{robExt-tmp-file-you-can-remove.tmp}
+% }{
+%   \XSIMfilewritestop
+%   \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
+%   %% Put the file in l_robExt_tmp_contain_file
+%   \str_clear_new:N \l_robExt_tmp_contain_file
+%   \ior_str_map_inline:Nn \g_robExt_read_ior {
+%     \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
+%   }
+%   %% computes the new filename based on the md5
+%   \str_clear_new:N \l_robExt_tmp_filename
+%   \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#1}
+%   %% Writes the content to the file
+%   \robExtCheckIfPrefixFolderExists
+%   \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
+%   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
+%   \iow_close:N \g_robExt_write_iow
+%   %% sets the template name to the relative path to the file
+%   \str_gset:cx {l_robExt_placeholder_#2_str} {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
+%   \robExtAddPlaceholderToList{#1}
+% }
+% \let\placeholderFromFileContent\robExtPlaceholderFromFileContent
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % \NewDocumentCommand{\robExtDefineTemplate}{m}{
 %   % #1 = file name, #2 = what to write
 %   \tl_rescan:nn {
@@ -146,6 +327,7 @@ if __name__ == '__main__':
 %     %\int_step_inline:nnn {1} {255} {\char_set_catcode_active:n {#1}}
 %   } { \l_robExt_template { #1 }}
 % }
+
 
 \NewDocumentCommand{\robExtDefineTemplate}{m}{
   % #1 = file name, #2 = what to write
