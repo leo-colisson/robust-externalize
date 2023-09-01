@@ -75,7 +75,7 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \paragraph{What is not supported?}
 
-We don't support (yet) overlays, remember picture, and you can't use (yet) cross-references inside your images. See other limitations and known bugs at the end of this documentation. Note that this library is quite young, so expect untested things.
+We don't support (yet) overlays, remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks). See other limitations and known bugs at the end of this documentation. Note that this library is quite young, so expect untested things.
 
 \paragraph{Do I need to compile using -shell-escape?}
 
@@ -83,7 +83,7 @@ Since we need to compile the images via an external command, the simpler option 
 \begin{itemize}
 \item If images are all already cached, you don't need to enable \texttt{-shell-escape}.
 \item You can choose not to compile non-cached content, and display a dummy content instead until you choose to compile them.
-\item You can compile manually the images: all the commands that are left to be run are listed in \texttt{robExt-compile-missing-figures.sh} and you can just run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}). 
+\item You can compile manually the images: all the commands that are left to be executed are listed in \texttt{robExt-compile-missing-figures.sh} and you can just run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
 \end{itemize}
 
 
@@ -103,7 +103,7 @@ So during the first compilation, we lost a x2 factor (roughly an additional time
 
 \paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
 
-\paragraph{Can you deal with baseline position?} Yes, the depth of the box is automatically computed and used to include the figure by default.
+\paragraph{Can you deal with baseline position ?} Yes, the depth of the box is automatically computed and used to include the figure by default.
 
 \paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command and the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
 
@@ -121,287 +121,578 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 
 \subsubsection{For \LaTeX{} based content}
 
-In theory, if you only care about \tikzname's picture (and if you are not afraid of breaking figures using |overlay| and |remember pictures|, possibly defined by other packages), you can just do:
+% In theory, if you only care about \tikzname's picture (and if you are not afraid of breaking figures using |overlay| and |remember pictures|, possibly defined by other packages), you can just do:
 
-\begin{codeexample}[width=0pt]
-%% We override the default tikzpicture environment
-%% to externalize all pictures  
-\robExtExternalizeAllTikzpictures
+% \begin{codeexample}[width=0pt]
+% %% We override the default tikzpicture environment
+% %% to externalize all pictures  
+% \robExtExternalizeAllTikzpictures
 
-\begin{tikzpicture}[baseline,anchor=base]
-  \node[draw,rounded corners,fill=pink!60]{Hello World!};
-\end{tikzpicture}
-\end{codeexample}
-
-\noindent and all tikzpictures created using |\begin{tikzpicture}...| will be ``externalized''. However, by default the \LaTeX{} template used to compile these pictures is empty, so you will quickly want to populate the template (for instance to load packages, define custom macros possibly shared with the main document etc.). So let's step back and see how we can define an arbitrary template.
-
-If you want to compile a \LaTeX{} code, say a \tikzname{} picture, you first need to define the \LaTeX{} template that will wrap all your code\footnote{While you could use the same preambule as the main project, for instance using a shared \texttt{\textbackslash input\{input.tex\}} file, this is not recommended as it will not only be longer to load (some packages are useless to build your average tikzpictures), but it also harms purity or efficiency: if you choose to track this common input (i.e.\ dependency), then it will recompile the pictures every time you change \texttt{input.tex}, and if you don't track this dependency, then you might skip a needed recompilation leading to a different outcome after invalidating the cache.}. Because you might want to mix different templates in a document (e.g.\ for tikz pictures, matplotlib python code, tikz-cd or zx diagrams…), we like to define them into a preset that is just a set of configuration options\footnote{Internally this is just a pgfkeys style, if you don't want to define presets, you can just write the configuration outside of the preset… but this is not recommended, except for some specific configuration options like \texttt{disable externalization} that you way want to apply globally.}). For instance to create a basic preset called |presetTikz|, use:
-
-\begin{codeexample}[width=0pt]
-  \robExtConfigure{%
-    presetTikz/.style={
-      % We define the code that wraps all our figures
-      defineTemplate={
-        \documentclass{standalone} % standalone ensures that the pdf output size matches the content
-        \usepackage{tikz} % Loads any package you need to compile your pictures
-        % You can define macros, just make sure to double the number of sharps
-        % as otherwise they will be understood as options of the preset.
-        \def\sayHello##1{Hello ##1}
-        \input{input_externalize.tex} % you can put in this file regular LaTeX code to share with the main document
-        \begin{document}%
-        \robExtMainContent% This macro will be replaced with (notably) the code for the figure
-        \end{document}
-      },
-      % The dependency files needed to compile the file
-      % (included when computing the hash). Separate them with commas.
-      dependencies={input_externalize.tex},
-    },
-  }
-\end{codeexample}
-% For the example to work:
-\robExtConfigure{%
-  presetTikz/.style={
-    % We define the code that wraps all our figures
-    defineTemplate={
-      \documentclass{standalone} % standalone ensures that the pdf output size matches the content
-      \usepackage{tikz} % Loads any package you need to compile your pictures
-      % You can define macros, just make sure to double the number of sharps
-      % as otherwise they will be understood as options of the preset.
-      \def\sayHello##1{Hello ##1}
-      \begin{document}%
-      \robExtMainContent% This macro will be replaced with (notably) the code for the figure
-      \end{document}
-    },
-    % The dependency files needed to compile the file
-    % (included when computing the hash). Separate them with commas.
-    dependencies={input_externalize.tex},
-  },
-}
-
-(see the comments for details)
-
-Then, if needed, create the dependency files, and use this preset as follows in your code:
-
-\begin{codeexample}[width=0pt]
-See that the baseline is respected %
-\begin{robExtern}{presetTikz}%
-  \begin{tikzpicture}[baseline,anchor=base]%
-    \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
-  \end{tikzpicture}
-\end{robExtern}
-\end{codeexample}
-
-Note that one might be tempted to move |\begin{tikzpicture}| inside the template to save a bit of typing. However, our library is actually replacing |\robExtMainContent| with the content wrapped around some code\footnote{Basically creating a box in order to compute the depth of the content, and write it to a tex file to use for later.} that need to wrap the whole content. While we provide other macros that don't add this wrapping code\footnote{But then we need to manually add this box if we want to compute the appropriate depth, and we will need to redefine the command to disable externalization.}, it is actually simpler, more configurable, and more typing-friendly, to define an environment that automatically picks the right preset and adds |\begin{tikzpicture}| automatically for us:
-
-\begin{codeexample}[width=0pt]
-  \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{% = 2 optional arguments + the body (b), cf xparse
-    \begin{robExtern}{presetTikz,#2}%
-      \begin{tikzpicture}[#1]%
-        #3
-      \end{tikzpicture}%
-    \end{robExtern}%
-  }{}
-\end{codeexample}
-
-This way, in your code you can just use:
-{
-  \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{%
-    \begin{robExtern}{presetTikz,#2}%
-      \begin{tikzpicture}[#1]%
-        #3%
-      \end{tikzpicture}%
-    \end{robExtern}%
-  }{}
-\begin{codeexample}[width=0pt]
-See the respected baseline: %
-\begin{mytikzpicture}[baseline,anchor=base]
-  \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
-\end{mytikzpicture}
-\end{codeexample}
-}
-    
-By choosing the name |tikzpicture| instead of |mytikzpicture|, you would actually override \tikzname's macro, which should be perfectly fine if you want to externalize \tikzname's pictures by default. Because this usecase will likely be important, we actually provide a command that defines a similar environment, except that it uses a preset called |presetTikzDefault| (this style is populated with a very simple template, but you surely want to quickly override it with your own template by just creating a new preset called |presetTikzDefault|):
-
-\begin{codeexample}[width=0pt]
-%% We override the default tikzpicture environment:
-\robExtExternalizeAllTikzpictures
-
-\begin{tikzpicture}[baseline,anchor=base]
-  \node[draw,rounded corners,fill=pink!60]{Hello World!};
-\end{tikzpicture}
-\end{codeexample}
-
-Note that doing that could be problematic if you use packages that use |tikzpicture| relying on |remember picture| and |overlays|. For this reason it's certainly safer to just define a different |mytikzpicture| environment, or overwrite only the environment that are safe to override.
-
-\subsection{For non-\LaTeX{} code}
-
-Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside macros and some environments (e.g. align) as some characters are removed (e.g. percent symbol). For this reason, we sometimes need to separate the time where we define the code and where we insert it, and we provide therefore different commands to deal with non-\LaTeX{} code.
-
-The following code will name a template |pythonMatplotlib| (see how we use |ROBEXTMAINCONTENT| as a placeholder for the content), define a preset based on this template, and :
-
-\begin{codeexample}[width=0pt]
-% We define our python template:
-\begin{robExtNamedTemplate}[pythonMatplotlib]
-import matplotlib.pyplot as plt
-import sys
-ROBEXTMAINCONTENT
-plt.savefig(sys.argv[1]+".pdf")
-\end{robExtNamedTemplate}
-
-% We define a reusable preset, note that we specify the compilation command:
-\robExtConfigure{
-  presetMatplot/.style={
-    defineTemplateFromName=pythonMatplotlib,
-    set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
-  },
-}
-
-%%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
-
-% We draw our code:
-\begin{robExtCode}{presetMatplot,include graphics args={width=.5\linewidth}}
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials') 
-\end{robExtCode}
-\end{codeexample}
-
-Note that for the fundamental reasons mentioned above, the above code can't work inside a macro. If we still want to include the result in a macro, we can separate the definition of the code and its usage:
-\begin{codeexample}[width=0pt]
-% We define our python template:
-\begin{robExtNamedTemplate}[pythonMatplotlib]
-import matplotlib.pyplot as plt
-import sys
-ROBEXTMAINCONTENT
-plt.savefig(sys.argv[1]+".pdf")
-\end{robExtNamedTemplate}
-
-% We define a reusable preset, note that we specify the compilation command:
-\robExtConfigure{
-  presetMatplot/.style={
-    defineTemplateFromName=pythonMatplotlib,
-    set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
-  },
-}
-
-%%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
-
-% We define our code (implicitely giving it a default name, that can be changed
-% if multiple codes are inserted in the same macro)
-\begin{robExtNamedContent}
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials') 
-\end{robExtNamedContent}
-
-Inside a macro: %
-\fbox{\robExternPrev{presetMatplot,include graphics args={width=.7\linewidth}}}
-\end{codeexample}
-
-\subsection{Example of more advanced setup}
-
-We can actually do many more things. For instance, here we define another preset that compiles the document with python and matplotlib, and displays the important lines of the code above the result, inside a figure with a customizable caption:
-
-\begin{codeexample}[vbox]
-% Define the template. Lines with TEMPLATECODE
-% will be removed later.  
-\begin{robExtNamedTemplate}[pythonMatplotlib]
-import matplotlib.pyplot as plt # TEMPLATECODE
-import sys # TEMPLATECODE
-ROBEXTMAINCONTENT
-plt.savefig(sys.argv[1]+".pdf") # TEMPLATECODE
-\end{robExtNamedTemplate}
-
-\robExtConfigure{
-  % More complex version that displays both the code and the result:
-  presetMatplotAdvanced/.style={
-    /robExt/caption/.code={\gdef\mycaption{##1}}, % Provide a key to change the caption
-    defineTemplateFromName=pythonMatplotlib,
-    % This command compiles the image, and creates a file removing all the lines from the code
-    % containing TEMPLATECODE (useful not to display action of saving the file etc)
-    % This might not be portable to windows without installing cygwin, but one can replace sed
-    % with some python code doing the same for a more portable code.
-    set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName" %
-      && sed '/TEMPLATECODE/d' "\robExtFinalFile" > "\robExtFinalPrefixedName.codeonly.py"},
-    custom include command={%
-      \begin{figure}[H] % Use H mostly to avoid compilation error in documentation
-        \centering
-        % Note that this will display the template around the code. We could avoid this by putting in our
-        % template a part that creates a new file whose name is the basename of the current (script) file
-        % and that contains all its code except for the template (to differentiate between template and
-        % non-template, we could add a special comment on lines to remove)
-        \verbatiminput{\robExtAddPrefixPathAndName{\robExtFinalName.codeonly.py}}
-        \includegraphics[width=.6\textwidth]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
-        \caption{\mycaption}
-      \end{figure}
-    },
-  },
-}
-
-%%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
-
-\begin{robExtCode}{presetMatplotAdvanced, caption={Here is my caption for the figure}}
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials') 
-\end{robExtCode}
-\end{codeexample}
-
-\section{Manual}
-
-TODO: the example above already provide a nice view of the main functions, the |set subfolder={robustExternalize/}| option might be an important additionnal configuration option that allows you to put the cached pictures in a subfolder.
-
-\section{Operations on the cache}
-
-\subsection{Cleaning the cache}
-
-You might want to clean the cache. Of course you can remove all generated files, but if you want to keep the picture in use in the latest version of the document, we provide a python script (automatically generated in the root folder) to do this. Just install python3 and run:\\
-
-|python3 robExt-remove-old-figures.py|\\
-
-You will then be prompted for a confirmation after providing the list of files that will be removed.
-
-\subsection{Listing all figures in use}
-
-After the compilation of the document, a file |robExt-all-figures.txt| is created with the list of the |.tex| file of all figures used in the current document.
-
-\subsection{Manually compiling the figures}
-
-When enabling the manual mode (useful if we don't want to enable |-shell-escape|):
-
-|\robExtConfigure{|\\
-|  enable manual mode|\\
-|}|\\
-
-the library creates a file |robExt-compile-missing-figures.sh| that contains the instructions to build the figures that are not yet in the cache. On Linux (or on Windows with bash/cygwin/… installed) you can easily execute them using:
-
-|bash robExt-compile-missing-figures.sh|\\
-
-\section{TODO and known bugs:}
-
-\begin{itemize}
-\item Solve problem with disable externalization not working with tikz pictures
-\item See how to deal with overlays, maybe get inspired by https://github.com/sasozivanovic/memoize that seems to define a padding around the box
-\item See how to deal with label references
-\item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
-\item Some commands like mkdir might not be super compatible with Windows, I need to see how to improve compatibility between OS
-\item The documentation is still sparse.
-\item I just discovered the very interesting https://github.com/sasozivanovic/memoize, not sure how it compares. The approaches seems very different.
-\item I don't think this package can directly externalize remember picture pictures.
-\end{itemize}
-% %% This picture will NOT be externalized .
-% \message{YYYYYYYYYYYYYY Next one:}
-% \begin{tikzpicture}[baseline,anchor=base][disable externalization]
+% \begin{tikzpicture}[baseline,anchor=base]
 %   \node[draw,rounded corners,fill=pink!60]{Hello World!};
 % \end{tikzpicture}
+% \end{codeexample}
+
+% \noindent and all tikzpictures created using |\begin{tikzpicture}...| will be ``externalized''. However, by default the \LaTeX{} template used to compile these pictures is empty, so you will quickly want to populate the template (for instance to load packages, define custom macros possibly shared with the main document etc.). So let's step back and see how we can define an arbitrary template.
+
+% If you want to compile a \LaTeX{} code, say a \tikzname{} picture, you first need to define the \LaTeX{} template that will wrap all your code\footnote{While you could use the same preambule as the main project, for instance using a shared \texttt{\textbackslash input\{input.tex\}} file, this is not recommended as it will not only be longer to load (some packages are useless to build your average tikzpictures), but it also harms purity or efficiency: if you choose to track this common input (i.e.\ dependency), then it will recompile the pictures every time you change \texttt{input.tex}, and if you don't track this dependency, then you might skip a needed recompilation leading to a different outcome after invalidating the cache.}. Because you might want to mix different templates in a document (e.g.\ for tikz pictures, matplotlib python code, tikz-cd or zx diagrams…), we like to define them into a preset that is just a set of configuration options\footnote{Internally this is just a pgfkeys style, if you don't want to define presets, you can just write the configuration outside of the preset… but this is not recommended, except for some specific configuration options like \texttt{disable externalization} that you way want to apply globally.}). For instance to create a basic preset called |presetTikz|, use:
+
+% \begin{codeexample}[width=0pt]
+%   \robExtConfigure{%
+%     presetTikz/.style={
+%       % We define the code that wraps all our figures
+%       defineTemplate={
+%         \documentclass{standalone} % standalone ensures that the pdf output size matches the content
+%         \usepackage{tikz} % Loads any package you need to compile your pictures
+%         % You can define macros, just make sure to double the number of sharps
+%         % as otherwise they will be understood as options of the preset.
+%         \def\sayHello##1{Hello ##1}
+%         \input{input_externalize.tex} % you can put in this file regular LaTeX code to share with the main document
+%         \begin{document}%
+%         \robExtMainContent% This macro will be replaced with (notably) the code for the figure
+%         \end{document}
+%       },
+%       % The dependency files needed to compile the file
+%       % (included when computing the hash). Separate them with commas.
+%       dependencies={input_externalize.tex},
+%     },
+%   }
+% \end{codeexample}
+% % For the example to work:
+% \robExtConfigure{%
+%   presetTikz/.style={
+%     % We define the code that wraps all our figures
+%     defineTemplate={
+%       \documentclass{standalone} % standalone ensures that the pdf output size matches the content
+%       \usepackage{tikz} % Loads any package you need to compile your pictures
+%       % You can define macros, just make sure to double the number of sharps
+%       % as otherwise they will be understood as options of the preset.
+%       \def\sayHello##1{Hello ##1}
+%       \begin{document}%
+%       \robExtMainContent% This macro will be replaced with (notably) the code for the figure
+%       \end{document}
+%     },
+%     % The dependency files needed to compile the file
+%     % (included when computing the hash). Separate them with commas.
+%     dependencies={input_externalize.tex},
+%   },
+% }
+
+% (see the comments for details)
+
+% Then, if needed, create the dependency files, and use this preset as follows in your code:
+
+% \begin{codeexample}[width=0pt]
+% See that the baseline is respected %
+% \begin{robExtern}{presetTikz}%
+%   \begin{tikzpicture}[baseline,anchor=base]%
+%     \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
+%   \end{tikzpicture}
+% \end{robExtern}
+% \end{codeexample}
+
+% Note that one might be tempted to move |\begin{tikzpicture}| inside the template to save a bit of typing. However, our library is actually replacing |\robExtMainContent| with the content wrapped around some code\footnote{Basically creating a box in order to compute the depth of the content, and write it to a tex file to use for later.} that need to wrap the whole content. While we provide other macros that don't add this wrapping code\footnote{But then we need to manually add this box if we want to compute the appropriate depth, and we will need to redefine the command to disable externalization.}, it is actually simpler, more configurable, and more typing-friendly, to define an environment that automatically picks the right preset and adds |\begin{tikzpicture}| automatically for us:
+
+% \begin{codeexample}[width=0pt]
+%   \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{% = 2 optional arguments + the body (b), cf xparse
+%     \begin{robExtern}{presetTikz,#2}%
+%       \begin{tikzpicture}[#1]%
+%         #3
+%       \end{tikzpicture}%
+%     \end{robExtern}%
+%   }{}
+% \end{codeexample}
+
+% This way, in your code you can just use:
+% {
+%   \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{%
+%     \begin{robExtern}{presetTikz,#2}%
+%       \begin{tikzpicture}[#1]%
+%         #3%
+%       \end{tikzpicture}%
+%     \end{robExtern}%
+%   }{}
+% \begin{codeexample}[width=0pt]
+% See the respected baseline: %
+% \begin{mytikzpicture}[baseline,anchor=base]
+%   \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
+% \end{mytikzpicture}
+% \end{codeexample}
+% }
+    
+% By choosing the name |tikzpicture| instead of |mytikzpicture|, you would actually override \tikzname's macro, which should be perfectly fine if you want to externalize \tikzname's pictures by default. Because this usecase will likely be important, we actually provide a command that defines a similar environment, except that it uses a preset called |presetTikzDefault| (this style is populated with a very simple template, but you surely want to quickly override it with your own template by just creating a new preset called |presetTikzDefault|):
+
+% \begin{codeexample}[width=0pt]
+% %% We override the default tikzpicture environment:
+% \robExtExternalizeAllTikzpictures
+
+% \begin{tikzpicture}[baseline,anchor=base]
+%   \node[draw,rounded corners,fill=pink!60]{Hello World!};
+% \end{tikzpicture}
+% \end{codeexample}
+
+% Note that doing that could be problematic if you use packages that use |tikzpicture| relying on |remember picture| and |overlays|. For this reason it's certainly safer to just define a different |mytikzpicture| environment, or overwrite only the environment that are safe to override.
+
+% \subsection{For non-\LaTeX{} code}
+
+% Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside macros and some environments (e.g. align) as some characters are removed (e.g. percent symbol). For this reason, we sometimes need to separate the time where we define the code and where we insert it, and we provide therefore different commands to deal with non-\LaTeX{} code.
+
+% The following code will name a template |pythonMatplotlib| (see how we use |ROBEXTMAINCONTENT| as a placeholder for the content), define a preset based on this template, and :
+
+% \begin{codeexample}[width=0pt]
+% % We define our python template:
+% \begin{robExtNamedTemplate}[pythonMatplotlib]
+% import matplotlib.pyplot as plt
+% import sys
+% ROBEXTMAINCONTENT
+% plt.savefig(sys.argv[1]+".pdf")
+% \end{robExtNamedTemplate}
+
+% % We define a reusable preset, note that we specify the compilation command:
+% \robExtConfigure{
+%   presetMatplot/.style={
+%     defineTemplateFromName=pythonMatplotlib,
+%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
+%   },
+% }
+
+% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
+
+% % We draw our code:
+% \begin{robExtCode}{presetMatplot,include graphics args={width=.5\linewidth}}
+% year = [2014, 2015, 2016, 2017, 2018, 2019]  
+% tutorial_count = [39, 117, 111, 110, 67, 29]
+% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+% plt.xlabel('Year')  
+% plt.ylabel('Number of futurestud.io Tutorials') 
+% \end{robExtCode}
+% \end{codeexample}
+
+% Note that for the fundamental reasons mentioned above, the above code can't work inside a macro. If we still want to include the result in a macro, we can separate the definition of the code and its usage:
+% \begin{codeexample}[width=0pt]
+% % We define our python template:
+% \begin{robExtNamedTemplate}[pythonMatplotlib]
+% import matplotlib.pyplot as plt
+% import sys
+% ROBEXTMAINCONTENT
+% plt.savefig(sys.argv[1]+".pdf")
+% \end{robExtNamedTemplate}
+
+% % We define a reusable preset, note that we specify the compilation command:
+% \robExtConfigure{
+%   presetMatplot/.style={
+%     defineTemplateFromName=pythonMatplotlib,
+%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
+%   },
+% }
+
+% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
+
+% % We define our code (implicitely giving it a default name, that can be changed
+% % if multiple codes are inserted in the same macro)
+% \begin{robExtNamedContent}
+% year = [2014, 2015, 2016, 2017, 2018, 2019]  
+% tutorial_count = [39, 117, 111, 110, 67, 29]
+
+% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+% plt.xlabel('Year')  
+% plt.ylabel('Number of futurestud.io Tutorials') 
+% \end{robExtNamedContent}
+
+% Inside a macro: %
+% \fbox{\robExternPrev{presetMatplot,include graphics args={width=.7\linewidth}}}
+% \end{codeexample}
+
+% \subsection{Example of more advanced setup}
+
+% We can actually do many more things. For instance, here we define another preset that compiles the document with python and matplotlib, and displays the important lines of the code above the result, inside a figure with a customizable caption:
+
+% \begin{codeexample}[vbox]
+% % Define the template. Lines with TEMPLATECODE
+% % will be removed later.  
+% \begin{robExtNamedTemplate}[pythonMatplotlib]
+% import matplotlib.pyplot as plt # TEMPLATECODE
+% import sys # TEMPLATECODE
+% ROBEXTMAINCONTENT
+% plt.savefig(sys.argv[1]+".pdf") # TEMPLATECODE
+% \end{robExtNamedTemplate}
+
+% \robExtConfigure{
+%   % More complex version that displays both the code and the result:
+%   presetMatplotAdvanced/.style={
+%     /robExt/caption/.code={\gdef\mycaption{##1}}, % Provide a key to change the caption
+%     defineTemplateFromName=pythonMatplotlib,
+%     % This command compiles the image, and creates a file removing all the lines from the code
+%     % containing TEMPLATECODE (useful not to display action of saving the file etc)
+%     % This might not be portable to windows without installing cygwin, but one can replace sed
+%     % with some python code doing the same for a more portable code.
+%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName" %
+%       && sed '/TEMPLATECODE/d' "\robExtFinalFile" > "\robExtFinalPrefixedName.codeonly.py"},
+%     custom include command={%
+%       \begin{figure}[H] % Use H mostly to avoid compilation error in documentation
+%         \centering
+%         % Note that this will display the template around the code. We could avoid this by putting in our
+%         % template a part that creates a new file whose name is the basename of the current (script) file
+%         % and that contains all its code except for the template (to differentiate between template and
+%         % non-template, we could add a special comment on lines to remove)
+%         \verbatiminput{\robExtAddPrefixPathAndName{\robExtFinalName.codeonly.py}}
+%         \includegraphics[width=.6\textwidth]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+%         \caption{\mycaption}
+%       \end{figure}
+%     },
+%   },
+% }
+
+% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
+
+% \begin{robExtCode}{presetMatplotAdvanced, caption={Here is my caption for the figure}}
+% year = [2014, 2015, 2016, 2017, 2018, 2019]  
+% tutorial_count = [39, 117, 111, 110, 67, 29]
+
+% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+% plt.xlabel('Year')  
+% plt.ylabel('Number of futurestud.io Tutorials') 
+% \end{robExtCode}
+% \end{codeexample}
+
+% \section{Manual}
+
+% TODO: the example above already provide a nice view of the main functions, the |set subfolder={robustExternalize/}| option might be an important additionnal configuration option that allows you to put the cached pictures in a subfolder.
+
+% \section{Operations on the cache}
+
+% \subsection{Cleaning the cache}
+
+% You might want to clean the cache. Of course you can remove all generated files, but if you want to keep the picture in use in the latest version of the document, we provide a python script (automatically generated in the root folder) to do this. Just install python3 and run:\\
+
+% |python3 robExt-remove-old-figures.py|\\
+
+% You will then be prompted for a confirmation after providing the list of files that will be removed.
+
+% \subsection{Listing all figures in use}
+
+% After the compilation of the document, a file |robExt-all-figures.txt| is created with the list of the |.tex| file of all figures used in the current document.
+
+% \subsection{Manually compiling the figures}
+
+% When enabling the manual mode (useful if we don't want to enable |-shell-escape|):
+
+% |\robExtConfigure{|\\
+% |  enable manual mode|\\
+% |}|\\
+
+% the library creates a file |robExt-compile-missing-figures.sh| that contains the instructions to build the figures that are not yet in the cache. On Linux (or on Windows with bash/cygwin/… installed) you can easily execute them using:
+
+% |bash robExt-compile-missing-figures.sh|\\
+
+% \section{TODO and known bugs:}
+
+% \begin{itemize}
+% \item Solve problem with disable externalization not working with tikz pictures
+% \item See how to deal with overlays, maybe get inspired by https://github.com/sasozivanovic/memoize that seems to define a padding around the box
+% \item See how to deal with label references
+% \item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
+% \item Some commands like mkdir might not be super compatible with Windows, I need to see how to improve compatibility between OS
+% \item The documentation is still sparse.
+% \item I just discovered the very interesting https://github.com/sasozivanovic/memoize, not sure how it compares. The approaches seems very different.
+% \item I don't think this package can directly externalize remember picture pictures.
+% \end{itemize}
+% % %% This picture will NOT be externalized .
+% % \message{YYYYYYYYYYYYYY Next one:}
+% % \begin{tikzpicture}[baseline,anchor=base][disable externalization]
+% %   \node[draw,rounded corners,fill=pink!60]{Hello World!};
+% % \end{tikzpicture}
+
+\section{Documentation}
+
+\subsection{Placeholders}
+
+Placeholders are the main concept allowing this library to generate the content of a source file based on a template (a template will itself be a placeholder containing other placeholders). A placeholder is a special strings like |[°COLOR°IMAGE°]| inserted for instance in a template, that will be later given a value. This value will be used to replace (recursively) the placeholder in the template. For instance, if a placeholder |[°LIKES°]| contains |I like ._FRUIT_. and ._VEGETABLE_.]|, if the placeholder |._FRUIT_.]| contains |oranges| and if the placeholder |..VEGETABLE..]| contains |salad|, then evaluating |[°LIKES°]| will output |I like oranges and salad.|
+
+% Note that the usage of underscore in only a convention, as any name can be used for the placeholder. There is however one rule to follow: the name of a placeholder should be made to avoid ambiguities when replacing the string, notably its name should not contain the name of another placeholder. For instance, if we define a placeholder called |NAME| containing |Foo| and a placeholder named |FULL°NAME| containing |Foo Bar|, then when evaluating the string |My name is FULL°NAME|, we have no way to know if the user wants to get |My name is FULL°Foo| or |My name is Foo Bar|. For this reason, \textbf{we advice users to start and end their placeholder names using, respectively, |[°| and |°]|}, while using only upper case letters and |°| inside the placeholder name (this also improves readability).
+
+\subsubsection{Reading a placeholder}
+
+\begin{pgfmanualentry}
+  \extractcommand\getPlaceholder\opt{\oarg{new placeholder name}}\marg{name placeholder or string}\@@
+  \extractcommand\getPlaceholderInResult\opt{\oarg{new placeholder name}}\marg{name placeholder or string}\@@
+  \pgfmanualbody
+
+  Get the value of a placeholder after replacing (recursively) all the inner placeholders. |\getPlaceholderInResult| puts the resulting string in a \LaTeX{} 3 string |\l_robExt_result_str|, while |\getPlaceholder| directly outputs this string. You can also put inside the argument
+  any arbitrary string, allowing you, for instance, to concatenate multiple placeholders, copy a placeholder etc. Note that you will get a string, but this string will not be evaluated by \LaTeX{} (see |\evalPlaceholder| for that), for instance math will not be interpreted:
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__MY_PLACEHOLDER__}{Hello __NAME__, I am a template $\delta_n$.}
+  \placeholderFromContent{__NAME__}{Alice __NICKNAME__}
+  \placeholderFromContent{__NICKNAME__}{the great}
+  The placeholder evaluates to:\\
+  \texttt{\getPlaceholder{__MY_PLACEHOLDER__}}\\
+  Combining placeholders produces:\\
+  \texttt{\getPlaceholder{In ``__MY_PLACEHOLDER__'', the name is __NAME__.}}
+\end{codeexample}
+You can also specify the optional argument in order to additionally define a new placeholder containing the resulting string (but you might prefer to use its alias |\setPlaceholderRec| described below):
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__MY_PLACEHOLDER__}{Hello __NAME__, I am a template $\delta_n$.}
+  \placeholderFromContent{__NAME__}{Alice __NICKNAME__}
+  \placeholderFromContent{__NICKNAME__}{the great}
+  \getPlaceholderInResult[__NEW_PLACEHOLDER__]{In ``__MY_PLACEHOLDER__'', the name is __NAME__.}
+  \printAllPlaceholders
+\end{codeexample}
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholder\marg{name placeholder or string}\@@
+  \pgfmanualbody
+
+  Evaluate the value of a placeholder after replacing (recursively) all the inner placeholders. You can also put inside any arbitrary string.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__MY_PLACEHOLDER__}{Hello __NAME__, I am a template $\delta_n$.}
+  \placeholderFromContent{__NAME__}{Alice __NICKNAME__}
+  \placeholderFromContent{__NICKNAME__}{the great}
+  % The placeholder evaluates to \texttt{\getPlaceholder{__MY_PLACEHOLDER__}}.
+  The placeholder evaluates to:\\
+  \evalPlaceholder{__MY_PLACEHOLDER__}\\
+  Combining placeholders produces:\\
+  \evalPlaceholder{In ``__MY_PLACEHOLDER__'', the name is __NAME__.}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\subsubsection{List and debug placeholders}
+
+It can sometimes be handy to list all placeholders, print their contents etc. We list here commands that are mostly useful for debugging purposes.
+
+\begin{pgfmanualentry}
+  \extractcommand\printAllPlaceholders\@@
+  \pgfmanualbody
+
+  Prints the verbatim content of all defined placeholders (without performing any replacement of inner placeholders). This is mostly for debugging purposes.
+\begin{codeexample}[width=0pt,vbox]
+\placeholderFromContent{__LIKES__}{Hello __NAME__ I am a really basic template $\delta_n$.}
+\placeholderFromContent{__NAME__}{Alice}    
+\printAllPlaceholders
+\end{codeexample}
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\printPlaceholderNoReplacement\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  Prints the verbatim content of a given placeholder, without evaluating it and \textbf{without replacing inner placeholders: it is used mostly for debugging purposes} and will be used in this documentation to display the content of the placeholder for educational purposes. The stared version prints it inline.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__LIKES__}{Hello NAME I am a really basic template $\delta_n$.}
+  \placeholderFromContent{NAME}{Alice}    
+  The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__}.\\
+  The (unexpanded) template contains \printPlaceholderNoReplacement*{__LIKES__}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholderNoReplacement\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  Evaluates the content of a given placeholder as a \LaTeX{} code, \textbf{without replacing the placeholders contained inside (mostly used for debugging purposes).}
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__LIKES__}{Hello NAME I am a really basic template $\delta_n$.}
+  \placeholderFromContent{NAME}{Alice}
+  The (unexpanded) template evaluates to ``\evalPlaceholderNoReplacement{__LIKES__}''.
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\getPlaceholderNoReplacement\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  Like |\evalPlaceholderNoReplacement| except that it only outputs the string without evaluating the macros inside.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__LIKES__}{Hello NAME I am a really basic template $\delta_n$.}
+  \placeholderFromContent{NAME}{Alice}
+  The (unexpanded) template contains \texttt{\getPlaceholderNoReplacement{__LIKES__}}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\subsubsection{Setting a value to a placeholder}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderFromContent\marg{name placeholder}\marg{content placeholder}\@@
+  \extractcommand\setPlaceholder\marg{name placeholder}\marg{content placeholder}\@@
+  \pgfmanualbody
+
+  |\placeholderFromContent| (and its alias |\setPlaceholder|) is useful to set a value to a given placeholder.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromContent{__LIKES__}{Hello I am a basic template with math $\delta_n$ and macros \hello}
+  The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__} and %
+  after evaluation and setting the value of hello,%
+  \def\hello{Hello my friend!}%
+  you get ``\evalPlaceholder{__LIKES__}''.
+\end{codeexample}
+  As you can see, \textbf{the precise content is not exactly identical to the original string}: \LaTeX{} comments are removed, spaces are added after macros, newlines are removed etc. While this is usually not an issue when dealing with \LaTeX{} code, it causes some troubles when dealing with non-\LaTeX{} code. For this reason, we define \textbf{other commands} (see for instance |PlaceholderFromCode| below) that can accept verbatim content; the downside being that \LaTeX{} forbids usage of these verbatim commands inside other macros, so you should always define them at the top level (this seems to be fundamental to how \LaTeX{} works, as any input to a macro gets interpreted first as a \LaTeX{} string, losing all comments for instance). Note that this is not as restrictive as it may sound, as it is always possible to define the needed placeholders before any macro, while using them inside the macro, possibly combining them with other placeholders (defined either before or inside the macro).
+\end{pgfmanualentry}
+
+But before seeing how to define placeholder containing arbitrary code, let us first see how we can define a placeholder recursively, by giving it a value based on its previous value (useful for instance in order to add stuff to it):
+
+\begin{pgfmanualentry}
+  \extractcommand\setPlaceholderRec\marg{new placeholder}\marg{content with placeholder}\@@
+  \pgfmanualbody
+
+  |\setPlaceholderRec{foo}{bar}| is actually an alias for |\getPlaceholderInResult[foo]{bar}|. Note that contrary to |\setPlaceholder|, it recursively replaces all inner placeholders. This is particularly useful to add stuff to an existing (or not) placeholder:
+\begin{codeexample}[width=0pt,vbox]
+\setPlaceholderRec{__MY_COMMAND__}{pdflatex}
+\setPlaceholderRec{__MY_COMMAND__}{__MY_COMMAND__ myfile}
+\printAllPlaceholders
+\end{codeexample}
+Not that the if the placeholder content contains at the end the placeholder name, we will automatically remove it to avoid infinite recursion at evaluation time. This has the benefit that you can add something to a placeholder even if this placeholder does not exists yet (in which case it will be understood as the empty string):
+\begin{codeexample}[width=0pt,vbox]
+\setPlaceholderRec{__COMMAND_ARGS__}{__COMMAND_ARGS__ -l}
+\setPlaceholderRec{__COMMAND_ARGS__}{__COMMAND_ARGS__ -s}
+\printAllPlaceholders
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
+  \pgfmanualbody
+  This command will update (inplace) the content of a macro by first replacing recursively the placeholders, and finally by expanding the  \LaTeX{} macros.
+\begin{codeexample}[width=0pt,vbox]
+\def\mymacro{Initial value}    
+\placeholderFromContent{__MACRO_NOT_EVALUATED__}{\mymacro}
+\placeholderFromContent{__MACRO_EVALUATED__}{\mymacro}
+\evalPlaceholderInplace{__MACRO_EVALUATED__}
+\printAllPlaceholders
+\def\mymacro{Final value}    
+Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_EVALUATED__}.
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractenvironement{PlaceholderFromCode}\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  This environment is useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside, possibly inserting other simpler placeholders inside that you can define inside the macros).
+% \begin{codeexample}[width=0pt,vbox]
+%   \placeholderFromContent{__PYTHON_CODE__}{}
+%   The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__} and %
+%   after evaluation (no replacement), you get ``\evalPlaceholderNoReplacement{__LIKES__}''.
+% \end{codeexample}
+
+\begin{codeexample}[width=0pt,vbox]
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b
+\end{PlaceholderFromCode}
+\printAllPlaceholders
+\end{codeexample}
+
+Note that |PlaceholderFromCode| should not be used inside other macros or inside some environments (notably the ones that need to evaluate the body of the environment, e.g. using |+b| argument or |environ|) as verbatim content is parsed first by the macro, meaning that some characters might be changed or removed. For instance, any percent character would be considered as a comment, removing the rest of the line. However, this should not be be problem if you use it outside of any macro or environment, or if you load it from a file. For instance this code:
+\begin{verbatim}
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderFromCode}
+\printAllPlaceholders
+\end{verbatim}
+would produce:
+
+{
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderFromCode}
+\begin{codeexample}[width=0pt,vbox]
+\printAllPlaceholders
+\end{codeexample}
+}
+Note that of course, you can define a placeholder before a macro and call it inside (explaining how we can generate this documentation).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderPathFromFilename\marg{name placeholder}\marg{filename}\@@
+  \pgfmanualbody
+
+  |\placeholderPathFromFilename{__MYLIB__}{mylib.py}| will copy |mylib.py| in the cache (setting its hash depending on its content), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the library in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderPathFromFilename{__MYLIB__}{mylib.py}
+  \printAllPlaceholders
+  You can also get the path relative to the root folder:\\
+  \robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}
+\end{codeexample}
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderFromFilename\marg{name placeholder}\marg{filename}\@@
+  \pgfmanualbody
+
+  |\placeholderFromFilename{__MYLIB__}{mylib.py}| will set the content of the placeholder |__MYLIB__| to the content of |mylib.py|.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromFilename{__MYLIB__}{mylib.py}
+  \printAllPlaceholders
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderPathFromContent\marg{name placeholder}\opt{\oarg{suffix}}\marg{content}\@@
+  \pgfmanualbody
+
+  |\placeholderPathFromContent{__MYLIB__}{some content}| will copy |some content| in a file in the cache (setting its hash depending on its content, the filename will end with |suffix| that defaults to |.tex|), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the file in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderPathFromContent{__MYLIB__}[.py]{some contents b}
+  \printAllPlaceholders
+  You can also get the path relative to the root folder:\\
+  \robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+  As a sanity check, this file contains
+  \verbatiminput{\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractenvironement{PlaceholderPathFromCode}\opt{\oarg{suffix}}\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  This environment is similar to |\placeholderPathFromContent| except that it accepts verbatim code (therefore \LaTeX{} comments, newlines etc. will not be removed). However, due to \LaTeX{} limitations, this environment cannot be used inside macros or some environments, or this property will not be preserved.
+  For instance, if you create your placeholder using:
+\begin{verbatim}
+\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderPathFromCode}
+\end{verbatim}
+%% The code cannot be placed inside codeexample as it needs to parse the body:
+\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderPathFromCode}
+You can then use it like:
+\begin{codeexample}[width=0pt,vbox]
+\printAllPlaceholders
+You can also get the path relative to the root folder:\\
+\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+As a sanity check, this file contains
+\verbatiminput{\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}}
+\end{codeexample}
+\end{pgfmanualentry}
+ 
+\begin{pgfmanualentry}
+  \extractcommand\placeholderFromFilename\marg{name placeholder}\marg{filename}\@@
+  \pgfmanualbody
+
+  |\placeholderFromFilename{__MYLIB__}{mylib.py}| will set the content of the placeholder |__MYLIB__| to the content of |mylib.py|.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromFilename{__MYLIB__}{mylib.py}
+  \printAllPlaceholders
+\end{codeexample}
+\end{pgfmanualentry}
+
 
 
 \end{document}
