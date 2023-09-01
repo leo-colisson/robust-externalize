@@ -18,17 +18,25 @@
 %% Then, the library will hash everything to create a unique name (of the content, the template code, and the set of dependency filenames),
 %% it will create a file "MD5.tex" containing the pre-template+content+post-template, and it will compile it.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Utils %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 %%% Utils:
 % https://tex.stackexchange.com/questions/690700/latex3-elegant-way-to-forward-a-variable-outside-of-the-group
 % modified to deal with csname instead
-\def\keepaftergroup#1{%
+\def\robExtKeepaftergroup#1{%
    %\global \expandafter \expandafter \let \csname x:#1\endcsname =\csname #1\endcsname
    \global \expanded{\noexpand \let \expandafter\noexpand\csname x:#1\endcsname =\expandafter\noexpand\csname #1\endcsname}
    \aftergroup\let
    \expandafter\aftergroup\csname #1\endcsname%
    \expandafter\aftergroup \csname x:\string#1\endcsname
 }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% SCRIPTS %%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 %%% Create scripts to remove useless files:
 %%% Note that we don't override the script if it exists on purpose (the user might have changed it to fits his needs)
@@ -81,41 +89,45 @@ if __name__ == '__main__':
 
 \ExplSyntaxOn
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Paths %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \def\robExtPrefixFilename{robExt-}
 
 \NewExpandableDocumentCommand{\robExtAddPrefixPathAndName}{m}{%
-  \ifdefined\robExtPrefixPath%
-    \robExtPrefixPath%
+  \ifdefined\robExtCacheFolder%
+    \robExtCacheFolder%
   \fi\robExtPrefixFilename#1%
 }
 
 \NewExpandableDocumentCommand{\robExtAddPrefixPath}{m}{%
-  \ifdefined\robExtPrefixPath%
-    \robExtPrefixPath%
+  \ifdefined\robExtCacheFolder%
+    \robExtCacheFolder%
   \fi#1%
 }
 
 
 \NewDocumentCommand{\robExtCheckIfPrefixFolderExists}{}{
   % Check if the output directory exists
-  \ifdefined\robExtPrefixPath
+  \ifdefined\robExtCacheFolder
     \sys_if_shell_unrestricted:TF{
       \ifdefined\robExtDoNotMkdirFolder\else
         \ifdefined\robExtManualMode
-          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtCacheFolder.}
         \else
-          \sys_shell_now:x {mkdir ~ -p ~ \robExtPrefixPath}
+          \sys_shell_now:x {mkdir ~ -p ~ \robExtCacheFolder}
         \fi
       \fi
     }{
-      \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtPrefixPath.}
+      \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtCacheFolder.}
     }
   \fi
 }
 
 \NewExpandableDocumentCommand{\robExtGetPrefixPath}{}{%
-  \ifdefined\robExtPrefixPath%
-    \robExtPrefixPath%
+  \ifdefined\robExtCacheFolder%
+    \robExtCacheFolder%
   \fi%
 }
 
@@ -128,6 +140,11 @@ if __name__ == '__main__':
 %% to find the subfolder (seems to work for input/includegraphics/...), or if it's
 %% better to hardcode the subfolder.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Setup new commands and variables %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\cs_generate_variant:Nn\seq_remove_all:Nn { NV }
 \cs_generate_variant:Nn\tl_rescan:nn { nv }
 \cs_generate_variant:Nn\tl_set_rescan:Nnn { Nnv }
 %\cs_generate_variant:Nn\tl_set_rescan:cnn { cnv }
@@ -163,10 +180,11 @@ if __name__ == '__main__':
 \str_new:N \l_robExt_currentCompilationCommand
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Deal with placeholders
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Placeholders are strings like "MYLIBRARY" or "MAINCONTENT" that will be replaced by a given content.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Placeholders %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Placeholders are strings like "__MYLIBRARY__" or "__MAINCONTENT__" that will be replaced by a given content.
 %% In practice:
 %% - for every placeholder MYPLACEHOLDER, a macro \l_robExt_placeholder_MYPLACEHOLDER_str is created, containing
 %%   the string to use to replace it
@@ -200,13 +218,27 @@ if __name__ == '__main__':
   \tl_set_eq:Nc \l_robExt_tmp_str { l_robExt_placeholder_#2_str }
   \tl_replace_all:Nnn \l_robExt_tmp_str {^^J} { \par }
   \tl_replace_all:Nnn \l_robExt_tmp_str { ~ } { \  }
-  %\show\l_robExt_tmp_str
   \IfBooleanTF{#1}{\texttt{\use:c{l_robExt_placeholder_#2_str}}}{\begin{flushleft}\ttfamily%
       \l_robExt_tmp_str
     \end{flushleft}%
   }
 }
 \let\printPlaceholderNoReplacement\robExtPrintPlaceholderNoReplacement
+
+\NewDocumentCommand{\robExtPrintAllPlaceholdersExceptDefaults}{s}{
+  List ~ of ~ placeholders:\\
+  \seq_map_inline:Nn \l_robExt_placeholders_seq {
+    % We hide the elements starting with __ROBEXT_
+    \str_if_in:nnTF { ##1 } { __ROBEXT_ } {
+      \IfBooleanTF {#1} {
+        - ~ Placeholder ~ called ~ \texttt{\tl_to_str:n {##1}} ~ defined ~ by ~ default ~ (we ~ hide ~ the ~ definition ~ to ~ save ~ space)\\
+      }{}
+    }{
+      - ~ Placeholder ~ called ~ \texttt{\tl_to_str:n {##1}} ~ contains: \robExtPrintPlaceholderNoReplacement{##1}
+    }
+  }
+}
+\let\printAllPlaceholdersExceptDefaults\robExtPrintAllPlaceholdersExceptDefaults
 
 \NewDocumentCommand{\robExtPrintAllPlaceholders}{}{
   List ~ of ~ placeholders:\\
@@ -234,10 +266,19 @@ if __name__ == '__main__':
 % Make sure that the placeholder is in the list \l_robExt_placeholders_seq.
 % This should automatically be called by other tools
 \NewDocumentCommand{\robExtAddPlaceholderToList}{m}{
+  % Make sure we have a string here:
+  \str_set:Nn \l_robExt_tmp_str { #1 }
   % First we remove existing occurrences (useful to avoid listing the same macro more than once
   % if we redefine a macro):
-  \seq_remove_all:Nn \l_robExt_placeholders_seq { #1 }
-  \seq_put_left:Nn \l_robExt_placeholders_seq { #1 }
+  \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+  \seq_put_left:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+}
+
+\NewDocumentCommand{\robExtRemovePlaceholder}{m}{
+  % This seems to be required to ensure catcodes are correct before removing the elements:
+  \str_set:Nn \l_robExt_tmp_str { #1 }
+  \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+  \expandafter \let \csname l_robExt_placeholder_#1_str \endcsname \undefined 
 }
 
 
@@ -250,6 +291,7 @@ if __name__ == '__main__':
   \robExtAddPlaceholderToList{#1}
 }
 \let\placeholderFromContent\robExtPlaceholderFromContent
+\let\robExtSetPlaceholder\robExtPlaceholderFromContent
 \let\setPlaceholder\robExtPlaceholderFromContent
 
 % Usage:
@@ -260,6 +302,12 @@ if __name__ == '__main__':
 % HELPERFUNCTION will contain at the end "def ..."
 % This environment cannot be placed inside any other macro/align/...
 \NewDocumentEnvironment{RobExtPlaceholderFromCode}{m}{
+  %% Environments can't use verbatim yet: https://github.com/latex3/latex3/issues/591
+  % Might be related: https://tex.stackexchange.com/questions/633523/saving-the-body-of-an-environment-to-a-file-verbatim-using-xparse
+  %% Here is the first part:
+  %% https://tex.stackexchange.com/a/680259/116348 might work and be more efficient, but it might be less reliable
+  %% and definitely more complicated and error prone. Instead, we write to a file and read the result.
+  %% TODO: try to do it using verbatim, might be trivial or complicated, not sure, maybe see https://tex.stackexchange.com/questions/555359/reading-lines-verbatim-into-a-sequence-variable
   \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
 }{
   \XSIMfilewritestop
@@ -272,10 +320,9 @@ if __name__ == '__main__':
   \str_set_eq:cN {l_robExt_placeholder_#1_str} \l_robExt_tmp
   \robExtAddPlaceholderToList{#1}
   %% Otherwise they will be lost when the environment ends
-  \keepaftergroup{l_robExt_placeholders_seq}
-  %\show\l_robExt_placeholders_seq
+  \robExtKeepaftergroup{l_robExt_placeholders_seq}
   %% for other variable
-  \keepaftergroup{l_robExt_placeholder_#1_str}
+  \robExtKeepaftergroup{l_robExt_placeholder_#1_str}
 }
 \let\PlaceholderFromCode\RobExtPlaceholderFromCode
 \let\endPlaceholderFromCode\endRobExtPlaceholderFromCode
@@ -307,10 +354,10 @@ if __name__ == '__main__':
 \let\placeholderPathFromFilename\robExtPlaceholderPathFromFilename
 
 %% Usage:
-%% \placeholderFromFilename{MYLIB}{mylib.py}
+%% \placeholderFromFileContent{MYLIB}{mylib.py}
 %% This will set MYLIB to the content of the file mylib.py
 %% Tested!
-\NewDocumentCommand{\robExtPlaceholderFromFilename}{mm}{
+\NewDocumentCommand{\robExtPlaceholderFromFileContent}{mm}{
   \ior_open:Nn \g_robExt_read_ior {#2}
   %% Put the file in l_robExt_tmp_contain_file
   \str_clear_new:N \l_robExt_tmp_contain_file
@@ -321,7 +368,7 @@ if __name__ == '__main__':
   \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_tmp_contain_file
   \robExtAddPlaceholderToList{#1}
 }
-\let\placeholderFromFilename\robExtPlaceholderFromFilename
+\let\placeholderFromFileContent\robExtPlaceholderFromFileContent
 
 
 %% Usage:
@@ -374,10 +421,9 @@ if __name__ == '__main__':
   \str_set:cx { l_robExt_placeholder_#2_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
   \robExtAddPlaceholderToList{#2}
   %% Otherwise they will be lost when the environment ends
-  \keepaftergroup{l_robExt_placeholders_seq}
-  %\show\l_robExt_placeholders_seq
+  \robExtKeepaftergroup{l_robExt_placeholders_seq}
   %% for other variable
-  \keepaftergroup{l_robExt_placeholder_#2_str}
+  \robExtKeepaftergroup{l_robExt_placeholder_#2_str}
 }
 \let\PlaceholderPathFromCode\RobExtPlaceholderPathFromCode
 \let\endPlaceholderPathFromCode\endRobExtPlaceholderPathFromCode
@@ -388,9 +434,10 @@ if __name__ == '__main__':
 %%% the result will be in \robExtResult
 \cs_set:Nn \__replace_until_impossible:N {
   \str_set_eq:NN \l_robext_tmp_before \l_robExt_result_str
-  % \show \l_robext_tmp_before
   \seq_map_inline:Nn \l_robExt_placeholders_seq {
+    \message{ replacing ##1 }
     \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
+    \message{done}
   }
   % We compare the result
   \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
@@ -406,7 +453,6 @@ if __name__ == '__main__':
   \str_set:Nx \l_robExt_result_str { #2 }
   \__replace_until_impossible:N { }
   \tl_if_blank:nTF {#1} {} {
-    %\show\l_robExt_result_str
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
     % we remove the name of the placeholder at the end
     \str_remove_all:Nn \l_robExt_result_str { #1 }
@@ -442,64 +488,37 @@ if __name__ == '__main__':
 }
 \let\evalPlaceholderInplace\robExtEvalPlaceholderInplace
 
-
-% %% Usage:
-% %% \begin{placeholderPathFromCode}{MYLIBPATH}
-% %% def my_helper_function(bla):
-% %%   return bla + 1
-% %% \end{placeholderFromCode}
-% %% This will copy the code in a new file in the cache, and set MYLIBPATH to the name of the file in the cache like
-% %% MYLIBPATH = robExt-abcmylib.py
-% %% This environment cannot be nested inside macro and some environments.
-% \NewDocumentEnvironment{robExtPlaceholderPathFromCode}{m}{
-%   \XSIMfilewritestart{robExt-tmp-file-you-can-remove.tmp}
-% }{
-%   \XSIMfilewritestop
-%   \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-%   %% Put the file in l_robExt_tmp_contain_file
-%   \str_clear_new:N \l_robExt_tmp_contain_file
-%   \ior_str_map_inline:Nn \g_robExt_read_ior {
-%     \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
-%   }
-%   %% computes the new filename based on the md5
-%   \str_clear_new:N \l_robExt_tmp_filename
-%   \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#1}
-%   %% Writes the content to the file
-%   \robExtCheckIfPrefixFolderExists
-%   \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
-%   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
-%   \iow_close:N \g_robExt_write_iow
-%   %% sets the template name to the relative path to the file
-%   \str_gset:cx {l_robExt_placeholder_#2_str} {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-%   \robExtAddPlaceholderToList{#1}
-% }
-% \let\placeholderFromFileContent\robExtPlaceholderFromFileContent
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% \NewDocumentCommand{\robExtDefineTemplate}{m}{
-%   % #1 = file name, #2 = what to write
-%   \tl_rescan:nn {
-%     \char_set_catcode_active:N \&
-%     %\int_step_inline:nnn {1} {255} {\char_set_catcode_active:n {#1}}
-%   } { \l_robExt_template { #1 }}
-% }
-
-
-\NewDocumentCommand{\robExtDefineTemplate}{m}{
-  % #1 = file name, #2 = what to write
-  \str_set:Nn \l_robExt_template { #1 }
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Dependencies %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\NewDocumentCommand{\robExtResetDependencies}{m}{
+  \seq_clear:N \l_robExt_dependencies
 }
 
-\NewDocumentCommand{\robExtDefineTemplateFromName}{m}{
-  % #1 = file name, #2 = what to write
-  \str_set:Nx \l_robExt_template {\use:c{l_robExt_template_named_#1}}
-  %\str_set:Nc \l_robExt_template {l_robExt_template_named_#1}
+\NewDocumentCommand{\robExtAddDependency}{m}{
+  \seq_put_left:Nx \l_robExt_dependencies {#1}
 }
 
-\NewDocumentCommand{\robExtDefineContentFromName}{m}{
-  \str_set:Nx \l_robExt_content_named {\use:c{l_robExt_content_named#1}}
+\NewDocumentCommand{\robExtDebugDependency}{}{
+  \show\l_robExt_dependencies
 }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Externalization %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The idea is to populate a placeholder called __ROBEXT_TEMPLATE__ that will contain the file to generate
+%% together with a placeholder called __ROBEXT_COMPILATION_COMMAND__ that will contain the command to compile the file
+
+\NewDocumentCommand{\robExtSetCompilationCommand}{m}{
+  \robExtSetPlaceholder{__ROBEXT_COMPILATION_COMMAND__} {#1}
+}
+
+\NewDocumentCommand{\robExtAddArgumentToCompilationCommand}{m}{
+  \robExtSetPlaceholderRec{__ROBEXT_COMPILATION_COMMAND__} {__ROBEXT_COMPILATION_COMMAND__ ~ "#1"}
+}
+
+
 
 
 %% The role of this is to set \l_robExt_final_file to the final content of the file.
@@ -545,294 +564,6 @@ if __name__ == '__main__':
   \str_replace_all:NnV \l_robExt_final_file { ## } \c_hash_str
 }
 
-
-%% This variation is used mostly for non-latex stuff (e.g. you want to create a figure using python)
-%% Because it's fundamentally impossible to read non-latex code inside a macro or align environment
-%% (latex will lose all comments etc... that might not be actual comments), we do it in two parts.
-%% This is the 0 part, to create a string containing the code (also useful for templates)
-%% The first argument is the name of the string
-% \NewDocumentEnvironment{robExtCodeToString}{m}{% Ins
-% \begin{filecontents}[overwrite,noheader]{robExt-tmp-file.tex}}{
-% \end{filecontents}
-%   \ior_str_get:Nc \g_robExt_read_ior { #1 }
-% }
-
-%% Environments can't use verbatim yet: https://github.com/latex3/latex3/issues/591
-% Might be related: https://tex.stackexchange.com/questions/633523/saving-the-body-of-an-environment-to-a-file-verbatim-using-xparse
-% \NewDocumentEnvironment{robExtCodeToString}{m+v}{
-%   \str_set:cn { #1 } { #2 }
-% }{}
-
-\NewDocumentCommand{\robExtCodeToStr} { m+v }
-{
-  \str_set:cn { #1 } { #2 }
-}
-
-% % You can use the above to associate (almost) arbitrary text with a global
-% % variable.
-% \takeverbatim {
-% verbatim text that can include anything you like ($#%^_/)
-% but NOT a closing brace.
-% }
-
-%% Here is the first part:
-%% https://tex.stackexchange.com/a/680259/116348 might work and be more efficient, but it might be less reliable
-%% and definitely more complicated and error prone. Instead, we write to a file and read the result.
-%% TODO: try to do it using verbatim, might be trivial or complicated, not sure, maybe see https://tex.stackexchange.com/questions/555359/reading-lines-verbatim-into-a-sequence-variable
-% \NewDocumentEnvironment{robExtNamedContent}{O{}}{%
-% \begin{robExtCodeToString}{l_robExt_content_named_#1}%
-% }{
-% \end{robExtCodeToString}
-% }
-
-\NewDocumentEnvironment{robExtNamedTemplate}{O{default}}{
-  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
-}{
-  \XSIMfilewritestop
-  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-  \str_gclear:c {l_robExt_template_named_#1}
-  %% Loop on all lines of the file:
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_gput_right:cx {l_robExt_template_named_#1} {\tl_to_str:N{##1}^^J}
-  }
-}
-
-\NewDocumentEnvironment{robExtNamedContent}{O{}}{
-  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
-}{
-  \XSIMfilewritestop
-  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-  \str_gclear:c {l_robExt_content_named#1}
-  %% Loop on all lines of the file:
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_gput_right:cx {l_robExt_content_named#1} {\tl_to_str:N{##1}^^J}
-  }
-}
-
-%% does robExtNamedContent + \robExternPrev (not sure how to avoid code duplication, I get error because
-%% of verbatim stuff) TODO: using \blabla \endblabla it should work.
-\NewDocumentEnvironment{robExtCode}{m}{
-  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
-}{
-  \XSIMfilewritestop
-  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-  \str_gclear:c {l_robExt_content_named}
-  %% Loop on all lines of the file:
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_gput_right:cx {l_robExt_content_named} {\tl_to_str:N{##1}^^J}
-  }
-  \robExternPrev{#1}
-}
-
-% \robExtEmptyCode{bla} is an equivalent to
-% \begin{robExtCode}{bla}\end{robExtCode}
-% except that it does not give an error when it is inside a macro (no xsim)
-\NewDocumentCommand{\robExtEmpty}{m}{
-  \str_gclear:c {l_robExt_content_named}
-  \robExternPrev{#1}
-}
-
-\NewDocumentEnvironment{robExtEmptyCode}{+b}{
-  \robExtEmpty{#1}
-}{}
-
-
-% \begin{robExtCopyInCacheAndCreatePlaceholderWithPath}{MYLIBRARYPATH} ... \end{robExtNamedTemplate}
-% will create a new file in the cache with ..., and will create a new placeholder MYLIBRARYPATH containing the path of this file (relative to
-% the cache folder) . You can also change the suffix, that defaults to default.tex.
-\NewDocumentEnvironment{robExtCopyInCacheAndCreatePlaceholderWithPath}{O{default.tex}m}{
-  \XSIMfilewritestart*{robExt-tmp-file-you-can-remove.tmp}
-}{
-  \XSIMfilewritestop
-  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-  %% Put the file in l_robExt_tmp_contain_file
-  \str_clear_new:N \l_robExt_tmp_contain_file
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
-  }
-  %% computes the new filename based on the md5
-  \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#1}
-  %% Writes the content to the file
-  \robExtCheckIfPrefixFolderExists
-  \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
-  \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
-  \iow_close:N \g_robExt_write_iow
-  %% sets the template name to the relative path to the file
-  \str_gset:cx {l_robExt_template_named_#2} {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-  \robExtAddPlaceholderFromTemplateName{#2}{#2}
-}
-
-% Like robExtCopyInCacheAndCreatePlaceholderWithPath but input is a path:
-% Usage: \robExtCopyFileInCacheAndCreatePlaceholderWithPath{MYLIBPATH}{mylib.py}
-% and then add in your code MYLIBPATH to get the path to this file (relative to the cache file)
-\NewDocumentCommand{\robExtCopyFileInCacheAndCreatePlaceholderWithPath}{mm}{
-  \ior_open:Nn \g_robExt_read_ior {#2}
-  %% Put the file in l_robExt_tmp_contain_file
-  \str_clear_new:N \l_robExt_tmp_contain_file
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
-  }
-  %% computes the new filename based on the md5
-  \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{l_robExt_tmp_contain_file}#2}
-  %% Writes the content to the file
-  \robExtCheckIfPrefixFolderExists
-  \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\l_robExt_tmp_filename_no_prefix}}
-  \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
-  \iow_close:N \g_robExt_write_iow
-  %% sets the template name to the relative path to the file
-  \str_gset:cx {l_robExt_template_named_#1} {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-  \robExtAddPlaceholderFromTemplateName{#1}{#1}
-}
-
-% Like robExtCopyInCacheAndCreatePlaceholderWithPath but input is a path:
-% Usage: \robExtNamedTemplateFromFile{contentOfMyLib}{mylib.py}
-% and then add in your code MYLIBPATH to get the path to this file (relative to the cache file)
-% todo: to test
-\NewDocumentCommand{\robExtNamedTemplateFromFile}{mm}{
-  \ior_open:Nn \g_robExt_read_ior {#2}
-  %% Put the file in l_robExt_tmp_contain_file
-  \str_clear_new:N \l_robExt_tmp_contain_file
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
-  }
-  %% sets the template name to the relative path to the file
-  \str_gset:cV {l_robExt_template_named_#1} \l_robExt_tmp_contain_file
-}
-
-%% Create a placeholder from a text:
-%% Usage:
-%% \begin{robExtNewPlaceholder}{MYPLACEHOLDER}
-%% my content
-%% \end{robExtNewPlaceholder}
-\NewDocumentEnvironment{robExtNewPlaceholder}{m}{\robExtNamedTemplate[template#1]}{\endrobExtNamedTemplate\robExtAddPlaceholderFromTemplateName{#1}{template#1}}
-
-
-
-%% Here is the second part, that assumes that somehow the content string is in
-%% \l_robExt_content_named_NAMEOFTHECONTENT
-%% TODO: Merge this with the normal version, as we do not replace the same set of variables.
-\NewDocumentCommand{\robExtFinalContentFileNamed}{O{default}}{
-  \str_if_empty:NTF \l_robExt_template {
-    \PackageError{robExt}{Your ~ template ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
-  }{}
-  % \str_if_empty:cTF {l_robExt_content_named#1} {
-  %   \PackageError{robExt}{Your ~ content ~ is ~ empty. ~ Make ~ sure ~ to ~ define ~ one}{}
-  % }{}
-  % Copy the template:
-  \str_set:NV \l_robExt_final_file \l_robExt_template
-  \str_set:Nx \l_robExt_tmp {\use:c{l_robExt_content_named#1}}
-  %%% For a mysterious reason, if we define:
-  %% \str_replace_all:NnV \l_robExt_final_file {\robExtMainContentNoBox} \l_robExt_tmp
-  %%% the replacement will occur in the file only if \robExtMainContentNoBox
-  %%% is followed by a space... since I don’t know how to avoid that issue, I prefer to
-  %%% avoid using this shape, and I use pure letters instead.
-  %% We define a macro to do one round of replacement. We will iterate it until the string converges.
-  \cs_set:Nn \__robext_replacement:n {
-    % We store the initial value
-    \str_set_eq:NN \l_robExt_final_file_before_change \l_robExt_final_file
-    % We perform one round of replacement
-    \ifdefined\robExtLatexMode
-      %% This must come before ROBEXTMAINCONTENT as it contains a subsequence
-      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
-      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTMAINCONTENT } {
-        %% We save the height/depth of the content by using a savebox:
-        ROBEXTCREATEOUTFILE%
-        \newsavebox\boxRobExt%
-        \savebox{\boxRobExt}{%
-          ROBEXTMAINCONTENTNOBOX%
-        }%
-        \usebox{\boxRobExt}%
-        ROBEXTWRITEDEPTHTOOUTFILE%
-      }%
-      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENTNOBOX } \l_robExt_tmp
-      \ifdefined\robExtDefinedVariables%
-        \str_replace_all:NnV \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } \robExtDefinedVariables
-      \else
-        \str_replace_all:Nnx \l_robExt_final_file { ROBEXTDEFINEDVARIABLES } {}
-      \fi
-      % Useful in cases where we want to manually add the boxRobExt where we need it to be
-      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTCREATEOUTFILE } {
-        %% We save the height/depth of the content by using a savebox:
-        \newwrite\writeRobExt%
-        \immediate\openout\writeRobExt=\jobname-out.tex%
-      }%
-      \str_replace_all:Nnn \l_robExt_final_file { ROBEXTWRITEDEPTHTOOUTFILE } {
-        \immediate\write\writeRobExt{%
-          \string\def\string\robExtWidth{\the\wd\boxRobExt}%
-          \string\def\string\robExtHeight{\the\ht\boxRobExt}%
-          \string\def\string\robExtDepth{\the\dp\boxRobExt}%
-        }%
-      }%
-      % Needed to be able to define stuff like \def\sayBye#1{Bye #1}.
-      % Just, if you use it inside a template style, you might need to double the # into ##
-      \str_replace_all:NnV \l_robExt_final_file { #### } \c_hash_str
-    \else
-      \str_replace_all:NnV \l_robExt_final_file { ROBEXTMAINCONTENT } \l_robExt_tmp
-    \fi
-    \str_replace_all:NnV \l_robExt_final_file { ROBEXTWAYBACK } \robExtPrefixPathWayBack
-    \ifdefined\robExtAdditionalReplacements%
-      \robExtAdditionalReplacements
-    \fi
-    % We compare the result
-    \str_compare:eNeTF \l_robExt_final_file_before_change = \l_robExt_final_file {
-      % The strings are equal: no need to restart
-    }{
-      % The strings are different: we restart
-      \__robext_replacement:n {}
-    }
-  }
-  % We call the recursive function
-  \__robext_replacement:n {}
-}
-
-\NewDocumentCommand{\robExtReplaceInFileFromTemplateName}{mm}{
-  \str_replace_all:Nnx \l_robExt_final_file { #1 } {\use:c{l_robExt_template_named_#2}}
-}
-
-\NewDocumentCommand{\robExtReplaceInFileFromNamedOutput}{mm}{
-  %%% We create a new temporary variable holding the content of the file:
-  \ior_open:Nn \g_robExt_read_ior {robExt-tmp-file-you-can-remove.tmp}
-  \str_gclear:c {l_robExt_template_named_#1}
-  %% Loop on all lines of the file:
-  \ior_str_map_inline:Nn \g_robExt_read_ior {
-    \str_gput_right:cx {l_robExt_template_named_#1} {\tl_to_str:N{##1}^^J}
-  }
-
-  \str_replace_all:Nnx \l_robExt_final_file { #1 } {\use:c{blenderpointNamedOutputFilename#2}}
-}
-
-
-\NewDocumentCommand{\robExtResetDependencies}{m}{
-  \seq_clear:N \l_robExt_dependencies
-}
-
-\NewDocumentCommand{\robExtAddDependency}{m}{
-  \seq_put_left:Nx \l_robExt_dependencies {#1}
-}
-
-\NewDocumentCommand{\robExtDebugDependency}{}{
-  \show\l_robExt_dependencies
-}
-
-%% Note that the compilation command does not need to be identical to the host compilation command. This way we don't need to
-%% remove all the cache just because we compile the main document with a different command.
-\NewDocumentCommand{\robExtSetCompilationCommand}{O{pdflatex ~ -shell-escape ~ -halt-on-error ~ "\robExtFinalFile"}}{
-  % Note that \l_robExt_final_file is not yet defined (we need the hash to get the filename... and the filename to get the hash: so in the deps file we
-  % only put \robExtFinaFile as a placeholder.
-  \str_set:Nn \l_robExt_currentCompilationCommand {#1}
-}
-\robExtSetCompilationCommand
-\def\robExtDebugCurrentCompilationCommand{\show\l_robExt_currentCompilationCommand}
-
-\NewDocumentCommand{\robExtAddArgumentToCompilationCommand}{m}{
-  % Note that \l_robExt_final_file is not yet defined (we need the hash to get the filename... and the filename to get the hash: so in the deps file we
-  % only put \robExtFinaFile as a placeholder.
-  \str_put_right:Nn \l_robExt_currentCompilationCommand {~ "#1"}
-}
-
-
 %% Alias of robExtFinalFile to \robExtSourceFile, as I don't like anymore the name I chose
 %\def\robExtSourceFile{\robExtFinalFile}
 
@@ -844,70 +575,82 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtWriteFile}{m}{
   %%% First we get all dependencies stored in \l_robExt_dependencies to create a csv-like file:
   \str_clear:N \l_robExt_dependencies_mdfive
+  %% Make sure to remove these placeholders as they should not be replaced.
+  %% Not that we cannot just give them their final value here, as it cannot yet be determined without
+  %% first computing the md5 hash.
+  \robExtRemovePlaceholder{__ROBEXT_SOURCE_FILE__}
+  \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PDF__}
+  \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PREFIX__}
+  \message{Step 7.1}%
   %%% We rescan the string in order to evaluate stuff like \myframes into "12,45,56".
-  \ifdefined\robExtDoNotRescanFirstTime\else
-    %%% However we cannot rescan all tokens (not those depending on the md5) as this will be known later
-    %% order matters: finalfile must be expanded before its alias, or \noexpand\noexpand\robExtFinalFile will
-    %% appear
-    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalFile } {\noexpand\robExtFinalFile}
-    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtSourceFile } {\noexpand\robExtFinalFile}
-    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalPdfFile } {\noexpand\robExtFinalPdfFile}
-    \str_replace_all:Nnn \l_robExt_currentCompilationCommand { \robExtFinalPrefixedName } {\noexpand\robExtFinalPrefixedName}
-    %\show\l_robExt_currentCompilationCommand
-    \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand {} \l_robExt_currentCompilationCommand%
-    %\show\l_robExt_currentCompilationCommand
+  \robExtGetPlaceholderInResult{__ROBEXT_COMPILATION_COMMAND__}
+  \message{Step 7.1.1}%
+  \ifdefined\robExtDoNotRescanFirstTime
+    \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_result_str
+  \else
+    \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand  {} { \l_robExt_result_str }
   \fi%
-  % We first add on the first line the compilation command, and on the second line the current picture.
-  \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
+  \message{Step 7.2}%
+  %% We get the template
+  \robExtGetPlaceholderInResult{__ROBEXT_TEMPLATE__}
+  \str_set_eq:NN \l_robExt_final_file_minus_hash_str \l_robExt_result_str
+  \message{Step 7.3}%
+  % We first add on the first line the compilation command, and on the second line the template file.
+  \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file_minus_hash_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
   \seq_map_inline:Nn \l_robExt_dependencies {
     \str_put_right:Nx \l_robExt_dependencies_mdfive {\file_mdfive_hash:n{##1},##1^^J} %% ^^J is a newline
   }
   %%
   %% Compute the final hash (the hash of all dependencies, including the current picture that is on the first line):
   %% The last newline is needed as the write operation automatically adds a newline.
-  \tl_set:Nx \robExtFinalName {\pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
+  \tl_set:Nx \robExtFinalHash {\pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
   %% We add the figure in the list of files.
-  \iow_now:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixName{\robExtFinalName.tex}^^J}
-  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.tex}}{
-    \message{The\space file\space \robExtAddPrefixPathAndName{\robExtFinalName.tex} \space already\space exists.^^J}
+  \iow_now:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixName{\robExtFinalHash.tex}^^J}
+  %% We can now set the placeholders, and recompute the final value of the file:
+  \robExtPlaceholderFromContent{__ROBEXT_SOURCE_FILE__}{\robExtAddPrefixName{\robExtFinalHash.tex}}
+  \robExtEvalPlaceholderInplace{__ROBEXT_SOURCE_FILE__}
+  \robExtPlaceholderFromContent{__ROBEXT_OUTPUT_PDF__}{\robExtAddPrefixName{\robExtFinalHash.pdf}}
+  \robExtEvalPlaceholderInplace{__ROBEXT_OUTPUT_PDF__}
+  \robExtPlaceholderFromContent{__ROBEXT_OUTPUT_PREFIX__}{\robExtAddPrefixName{\robExtFinalHash}}
+  \robExtEvalPlaceholderInplace{__ROBEXT_OUTPUT_PREFIX__}
+  \robExtGetPlaceholderInResult{__ROBEXT_TEMPLATE__}
+  \str_set_eq:NN \l_robExt_final_file_str \l_robExt_result_str
+  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalHash.tex}}{
+    \message{The\space file\space \robExtAddPrefixPathAndName{\robExtFinalHash.tex} \space already\space exists.^^J}
   }{
-    \str_if_empty:NTF \l_robExt_final_file {
+    \str_if_empty:NTF \l_robExt_final_file_str {
       \PackageError{robExt}{You ~ are ~ writing ~ an ~ empty ~ tex ~ file, ~ that ~ will ~ fail ~ to ~ compile. ~ Make ~ sure ~ you ~ defined ~ a ~ template.}{}
     }{
       % Check if the output directory exists
       \robExtCheckIfPrefixFolderExists
-      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.deps}}
+      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalHash.deps}}
       \iow_now:NV \g_robExt_write_iow \l_robExt_dependencies_mdfive
       \iow_close:N \g_robExt_write_iow
       %% Save the final file:
-      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalName.tex}}
-      \iow_now:NV \g_robExt_write_iow \l_robExt_final_file
+      \iow_open:Nx \g_robExt_write_iow {\robExtAddPrefixPathAndName{\robExtFinalHash.tex}}
+      \iow_now:NV \g_robExt_write_iow \l_robExt_final_file_str
       \iow_close:N \g_robExt_write_iow
-      \message{Source ~ saved ~ in ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex}.}
+      \message{Source ~ saved ~ in ~ \robExtAddPrefixPathAndName{\robExtFinalHash.tex}.}
     }
   }
 }
 
 % https://tex.stackexchange.com/questions/133324/shell-escape-with-latex-3
 % We need shell escape to work (but it's enabled by default on overleaf!)
-% TODO: add more configuration options, deal with lualatex pdflatex, xelatex etc. Also, think about the number of compilations.
-% TODO: deal with depth
+% Think about the number of compilations.
 \NewDocumentCommand{\robExtCompileFile}{m}{
-  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{
-    \message{No ~ need ~ to ~ recompile ~ \robExtAddPrefixPathAndName{\robExtFinalName.pdf}^^J}
+  \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}{
+    \message{No ~ need ~ to ~ recompile ~ \robExtAddPrefixPathAndName{\robExtFinalHash.pdf}^^J}
   }{
-    \str_set:NV \l_robExt_finalCompilationCommand {\l_robExt_currentCompilationCommand} %
-    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
-    %% FinalFile is a quite stupid name, let’s create a more meaningful alias
-    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtSourceFile } {\robExtAddPrefixName{\robExtFinalName.tex}}
-    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPdfFile } {\robExtAddPrefixName{\robExtFinalName.pdf}}
-    \str_replace_all:Nnx \l_robExt_finalCompilationCommand { \robExtFinalPrefixedName } {\robExtAddPrefixName{\robExtFinalName}}
-    %% We rescan the string in order to evaluate stuff like \myframes into "12,45,56":
-    \ifdefined\robExtDoNotRescanSecondTime\else
-      \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand {} \l_robExt_finalCompilationCommand%
+    \robExtGetPlaceholderInResult{__ROBEXT_COMPILATION_COMMAND__}
+    \ifdefined\robExtDoNotRescanSecondTime
+      \str_set_eq:NN \l_robExt_finalCompilationCommand \l_robExt_result_str
+    \else
+      \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand  {} { \l_robExt_result_str }
     \fi%
-    \ifdefined\robExtPrefixPath
-      \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtPrefixPath ~ && ~ }
+    % Make sure this command is run from the cache folder
+    \ifdefined\robExtCacheFolder
+      \str_put_left:Nx \l_robExt_finalCompilationCommand {cd ~ \robExtCacheFolder ~ && ~ }
     \fi
     \ifdefined\robExtManualMode
       \message{[robExt] Manual mode enabled: please, manually compile the images using \l_robExt_finalCompilationCommand or run 'bash \robExtAddPrefixName{compile-missing-figures.sh}'.}
@@ -917,41 +660,43 @@ if __name__ == '__main__':
         \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l_robExt_finalCompilationCommand.}
         \sys_shell_now:x {\l_robExt_finalCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
       }{
-        \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
+        \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
       }
     \fi
   }
 }
 
 \def\robExtIncludeGraphicsArgs{}
+%%% This command is not meant to be called by the end user. It will be called after the compilation to include
+%%% the compiled file back into the original file.
 \NewDocumentCommand{\robExtIncludeFile}{m}{%
   \ifdefined\robExtIncludeCommandAdvanced%
     \robExtIncludeCommandAdvanced%
   \else%
     {%
-      \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}{%
-        \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}{%
+      \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}{%
+        \file_if_exist:xTF{\robExtAddPrefixPathAndName{\robExtFinalHash-out.tex}}{%
           \kern0pt%Without the kern, the next unskip would eat spaces before... and we don't want that. See also
           % https://tex.stackexchange.com/questions/104034/when-is-it-good-practice-to-use-unskip
-          \input{\robExtAddPrefixPathAndName{\robExtFinalName-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
+          \input{\robExtAddPrefixPathAndName{\robExtFinalHash-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
         }{}%
         \ifdefined\robExtIncludeCommand%
           \robExtIncludeCommand%
         \else%
           \ifdefined\robExtDepth%
-            \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}}%
+            \raisebox{-\robExtDepth}{\includegraphics[]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}}%
           \else%
             \expanded{%
-              \noexpand\includegraphics[\robExtIncludeGraphicsArgs]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+              \noexpand\includegraphics[\robExtIncludeGraphicsArgs]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
             }%
           \fi%
         \fi%
       }{
         \ifdefined\robExtManualMode
-          \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ \ifdefined\robExtPrefixPath cd \robExtPrefixPath; \fi bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}}
-          \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ or ~ use ~ the ~ bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}
+          \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ \robExtAddPrefixPathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}}
+          \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddPrefixPathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \robExtAddPrefixName{compile-missing-figures.sh}}
         \else
-          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddPrefixPathAndName{\robExtFinalName.tex} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
+          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddPrefixPathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
         \fi
       }
     }%
@@ -995,12 +740,28 @@ if __name__ == '__main__':
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% We create interface into pgfkeys in order to allow easier creation of content via style
 \pgfkeys{
   /robExt/.cd,
-  defineTemplate/.code={\robExtDefineTemplate{#1}},
-  defineTemplateFromName/.code={\robExtDefineTemplateFromName{#1}},
-  define content from name/.code={\robExtDefineContentFromName{#1}},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Interface to change placeholders %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  set placeholder/.code 2 args={\robExtSetPlaceholder{#1}{#2}},
+  set placeholder rec/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}},
+  set placeholder eval/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}\robExtEvalPlaceholderInplace{#1}},
+  set placeholder from content/.code 2 args={\robExtPlaceholderFromContent{#1}{#2}},
+  set placeholder path from filename/.code 2 args={\robExtPlaceholderPathFromFilename{#1}{#2}},
+  set placeholder from file content/.code 2 args={\robExtPlaceholderFromFileContent{#1}{#2}},
+  set placeholder path from content/.code n args={3}{\robExtPlaceholderPathFromContent{#1}[#3]{#2}},
+  eval placeholder in place/.code={\robExtEvalPlaceholderInplace{#1}},
+  % Interface to set template
+  set template/.style={
+    set placeholder={__ROBEXT_TEMPLATE__}{#1},
+  },
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Configure dependencies %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Auxiliary command:
   dependenciesList/.code={\robExtAddDependency{#1}},
   % Usage like: dependencies={input_externalize.tex,input_b.tex}
   % They should be relative to the main file when using the subfolder option.
@@ -1011,71 +772,91 @@ if __name__ == '__main__':
   add dependencies/.style={
     dependenciesList/.list={#1}
   },
-  include command advanced/.code={\def\robExtIncludeCommandAdvanced{#1}},
-  include command/.code={\def\robExtIncludeCommand{#1}},
-  set compilation command/.code={\robExtSetCompilationCommand[#1]},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Compilation command %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  set compilation command/.code={\robExtSetCompilationCommand{#1}},
   compile with python/.style={
-    set compilation command={python3 "\robExtSourceFile"}
+    set compilation command={python3 "__ROBEXT_SOURCE_FILE__"}
   },
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={
     add argument to compilation command/.list={#1}
   },
-  % This adds arguments like add key value to compilation command={mykey=myvalue} will add to the compilation command two arguments: "mykey" "myvalue"
-  % This is useful for scripts that are called like myscript key1 arg1 key2 arg2 key3 arg3, which is a simple way to pass multiple arguments to a script
-  % like a python script
+  % This adds arguments like add key value to compilation command={mykey=myvalue} will add to the
+  % compilation command two arguments: "mykey" "myvalue"
+  % This is useful for scripts that are called like myscript key1 arg1 key2 arg2 key3 arg3, which is a
+  % simple way to pass multiple arguments to a script like a python script
   add key value argument to compilation command/.code args={#1=#2}{\robExtAddArgumentToCompilationCommand{#1}\robExtAddArgumentToCompilationCommand{#2}},
   add key and file argument to compilation command aux/.style args={#1=#2}{
-    add key value argument to compilation command={{#1}={\ifdefined\robExtPrefixPathWayBack\robExtPrefixPathWayBack\fi#2}},
+    add key value argument to compilation command={{#1}={\ifdefined\robExtCacheFolderWayBack\robExtCacheFolderWayBack\fi#2}},
   },
   add key and file argument to compilation command/.style={
     add key and file argument to compilation command aux/.list={#1},
     add dependencies={#1},
   },
+  %% Configure the latex compilation engine
   use latexmk/.style={
-    set compilation command={latexmk -shell-escape -halt-on-error "\robExtFinalFile"},
+    set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
   },
   use lualatex/.style={
-    set compilation command={lualatex -shell-escape -halt-on-error "\robExtFinalFile"},
+    set placeholder={__ROBEXT_LATEX_ENGINE__}{lualatex},
   },
   use xelatex/.style={
-    set compilation command={xelatex -shell-escape -halt-on-error "\robExtFinalFile"},
+    set placeholder={__ROBEXT_LATEX_ENGINE__}{xelatex},
   },
+  %%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Inclusion command %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Configure the command to include the compiled file back into the main file
+  % By default, include command does a bit of logic before running the actual command, notably to
+  % input the -out.tex file in order to pass information from the compiled file to the current file.
+  % If you want to do everything by yourself, use:
   custom include command advanced/.code={\def\robExtIncludeCommandAdvanced{#1}},
+  % The default include command includes the pdf, making sure it is raised depending on its depth,
+  % but you can override it:
   custom include command/.code={\def\robExtIncludeCommand{#1}},
   %% Use this when we do not want to include anything (e.g. the video will be processed later in the chain):
   do not include/.style={
-    custom include command={}%
+    custom include command advanced={}%
   },
+  %% If you do or do not want to ask latex to run the compilation commands itself (for instance for security
+  %% reasons, you can use these commands and run the command manually later):
   enable manual mode/.code={\def\robExtManualMode{}},
   disable manual mode/.code={\let\robExtManualMode\undefined},
-  generate final content/.code={\robExtFinalContentFile{#1}},
-  generate named final content/.code={\robExtFinalContentFileNamed[#1]},
+  %% Arguments to include graphics
+  include graphics args/.code={\def\robExtIncludeGraphicsArgs{#1}},
+  %% The role of this command is to set \l_robExt_result_str, that will contain the final string.
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Configuration of the cache %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %% Configure the prefix (default to "robExt-")
   set filename prefix/.code={\def\robExtPrefixFilename{#1}},
   % first argument is subfolder, second is how to get from subfolder to the folder containing the source:
   % set subfolder and way back={robustExternal/}{../}
-  set subfolder and way back/.code 2 args={\def\robExtPrefixPath{#1}\def\robExtPrefixPathWayBack{#2}},
+  set subfolder and way back/.code 2 args={\def\robExtCacheFolder{#1}\def\robExtCacheFolderWayBack{#2}},
   % By default we put everything in robustExternalize
   % Change this before starting to cache any library, and if you change it mid-document, be aware
   % that you will not be able to refer to elements in the old folder.
   set subfolder and way back={robustExternalize/}{../},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Disable externalization %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %% Note: this does not work reliably for now
+  %% TODO: fix this!
   disable externalization/.code={\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
-  command if no externalization/.code={#1},
-  include graphics args/.code={\def\robExtIncludeGraphicsArgs{#1}},
-  enable latex mode/.code={\def\robExtLatexMode{}},
-  disable latex mode/.code={\let\robExtLatexMode\undefined},
-  % Use like
-  %   defined variables={
-  %     \string\setcounter{framenumber}{\theframenumber}
-  %   }
-  defined variables/.code={%
-    \edef\robExtDefinedVariables{#1}%
-  },
+  command if no externalization/.code={\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Run code before/after inclusion %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% todo: make sure that commands can be added instead of replaced
   execute before each externalization/.code={\def\robExtExecuteBefore{#1}},
   execute after each externalization/.code={\def\robExtExecuteAfter{#1}},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%% Get the name of the produced file for later use %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Here, we provide a way to put the prefixed name into a new global macro
   %%% Use like 'name output=VideoA'. This creates a few macros like:
   %%% \blenderpointNamedOutputFilenameVideoA containing thehashthatisusedforthename
@@ -1085,97 +866,105 @@ if __name__ == '__main__':
   name input/.style={name output with ext={#1}{.tex}},
   % like name output but adds the extension like name output with ext={VideoA}{.mp4}
   name output with ext/.code 2 args={%
-    \def\robExtExecuteNamedOutput{%
-      %%% only the filename (without extension)
-      \expandafter\xdef\csname blenderpointNamedOutputFilename#1\endcsname{\robExtPrefixFilename\robExtFinalName#2}%
-      %%% the filename and the robExt path (without extension)
-      \expandafter\xdef\csname blenderpointNamedOutputFullPath#1\endcsname{\robExtAddPrefixPathAndName{\robExtFinalName#2}}%
-    }%
+    \robExtSetPlaceholder{__#1__}{\robExtPrefixFilename\robExtFinalHash#2}
+    \robExtEvalPlaceholderInplace{__#1__}
+    \robExtSetPlaceholder{__#1_FULL_PATH__}{\robExtAddPrefixPathAndName{\robExtFinalHash#2}}
+    \robExtEvalPlaceholderInplace{__#1_FULL PATH__}
   },
+  %% Todo: for this to work, be will need to make the definition either global (not trivial, need to define
+  %% a new list of global placeholders), or at least go past the groups
 }
 
-%%% Get the values of the named outputs
-%\def\robExtGetNamedOutputFilename#1{\csname blenderpointNamedOutputFilename#1\endcsname}
-%\def\robExtGetNamedOutputFullPath#1{\csname blenderpointNamedOutputFullPath#1\endcsname}
-\def\robExtGetNamedOutputFilename#1{\csname blenderpointNamedOutputFilename#1\endcsname}
-\def\robExtGetNamedOutputFullPath#1{\csname blenderpointNamedOutputFullPath#1\endcsname}
-
+% Not really made for the end user
+% It assumes that __ROBEXT_COMPILATION_COMMAND__ and __ROBEXT_TEMPLATE__ is set
+\NewDocumentCommand{\robExtEvaluateCompileAndInclude}{}{%
+  \ifdefined\robExtDisableExternalization%
+    \pgfkeys{/robExt/.cd,command if no externalization}%
+  \else%
+    \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
+    \robExtWriteFile{}%
+    \robExtCompileFile{}%
+    \robExtIncludeFile{}%
+    \ifdefined\robExtExecuteNamedOutput\robExtExecuteNamedOutput\fi%
+    \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
+  \fi%
+}
 
 %% #1: Arguments, #2: content to externalize
-\NewDocumentCommand{\robExt}{O{}m}{%
+\NewDocumentCommand{\robExtCacheMe}{O{}m}{%
   {% Group
     \pgfkeys{%
       /robExt/.cd,
+      set placeholder={__ROBEXT_MAIN_CONTENT__}{#2},
       #1,
     }%
-    \ifdefined\robExtDisableExternalization%
-      \pgfkeys{/robExt/.cd,command if no externalization={#2}}%
-    \else%
-      %
-      \pgfkeys{%
-        /robExt/.cd,
-        generate final content={#2}
-      }%
-      \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
-      \robExtWriteFile{}%
-      \robExtCompileFile{}%
-      \robExtIncludeFile{}%
-      \ifdefined\robExtExecuteNamedOutput\robExtExecuteNamedOutput\fi%
-      \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
-    \fi%
+    \robExtEvaluateCompileAndInclude%
   }%
 }
+\let\cacheMe\robExtCacheMe
 
 %% #1: Arguments, #2: content to externalize
 % \NewDocumentEnvironment{robExtern}{O{}+b}{%
 %   \robExt[#1]{#2}%
 % }{}
 
-\NewDocumentEnvironment{robExtern}{m+b}{%
-  \robExt[#1]{#2}%
+\NewDocumentEnvironment{RobExtCacheMe}{m+b}{%
+  \robExtCacheMe[#1]{#2}%
 }{}
+\let\CacheMe\RobExtCacheMe
+\let\endCacheMe\endRobExtCacheMe
 
-%%% This command is mostly useful if you want to compile non-latex files (e.g. python code) as there is NO way
-%%% to write arbitrary code if the code is in an align environment or a macro (the
-%%% macro will remove the tokens like newline, latex comments etc... making it impossible to recover them even using
-%%% advanced rescan stuff). This can also be useful when some LaTeX commands make a difference between \end {frame}
-%%% and \end{frame} (looking at you beamer, in [fragile] mode, you cannot have \end {frame}, and
-%%% latex automatically adds a space, not sure how to prevent this)
-%%% Therefore, instead we first create a file outside any macro, and we read that file
-%%% to put it into a variable, and later we will read that file.
-%%% Since our code is now fundamentally separated in two pieces (the code and the insertion of the code),
-%%% one can give a name to the string in order to insert it easily. I wanted at some points to
-%%% create a kind of queue where the insertion command would just take the last code, but it is actually
-%%% not a great idea as it's easy to mess-up things if the code is not local (for instance if I comment the
-%%% insertion but not the code, it would replace content in later paragraphs).
-%%% We could avoid using an intermediate file using:
-%%% https://tex.stackexchange.com/questions/680240/put-in-a-latex3-string-the-exact-input-string-to-write-in-a-file
-%%% but it's significantly more complicated than \filecontents, and I'd say \filecontents is more reliable
-%%% and gives better errors.
-%%% TODO: write an example how to apply it to https://timodenk.com/blog/exporting-matplotlib-plots-to-latex/
-\NewDocumentCommand{\robExternPrev}{O{}m}{%
-  {% Group
-    \pgfkeys{%
-      /robExt/.cd,
-      #2,
-    }%
-    \ifdefined\robExtDisableExternalization%
-      \pgfkeys{/robExt/.cd,command if no externalization={#2}}%
-    \else%
-      \pgfkeys{%
-        /robExt/.cd,
-        generate named final content/.expanded={#1}
-      }%
-      \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
-      \robExtWriteFile{}%
-      \robExtCompileFile{}%
-      \robExtIncludeFile{}%
-      \ifdefined\robExtExecuteNamedOutput%\show\robExtExecuteNamedOutput%
-        \robExtExecuteNamedOutput
-      \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
-    \fi%
-  }%
+\NewDocumentEnvironment{RobExtCacheMeCode}{m}{%
+  \RobExtPlaceholderFromCode{__ROBEXT_MAIN_CONTENT__}%
+}{%
+  \endRobExtPlaceholderFromCode\robExtEvaluateCompileAndInclude%
 }
+\let\CacheMeCode\RobExtCacheMeCode
+\let\endCacheMeCode\endRobExtCacheMeCode
+
+
+
+% %%% This command is mostly useful if you want to compile non-latex files (e.g. python code) as there is NO way
+% %%% to write arbitrary code if the code is in an align environment or a macro (the
+% %%% macro will remove the tokens like newline, latex comments etc... making it impossible to recover them even using
+% %%% advanced rescan stuff). This can also be useful when some LaTeX commands make a difference between \end {frame}
+% %%% and \end{frame} (looking at you beamer, in [fragile] mode, you cannot have \end {frame}, and
+% %%% latex automatically adds a space, not sure how to prevent this)
+% %%% Therefore, instead we first create a file outside any macro, and we read that file
+% %%% to put it into a variable, and later we will read that file.
+% %%% Since our code is now fundamentally separated in two pieces (the code and the insertion of the code),
+% %%% one can give a name to the string in order to insert it easily. I wanted at some points to
+% %%% create a kind of queue where the insertion command would just take the last code, but it is actually
+% %%% not a great idea as it's easy to mess-up things if the code is not local (for instance if I comment the
+% %%% insertion but not the code, it would replace content in later paragraphs).
+% %%% We could avoid using an intermediate file using:
+% %%% https://tex.stackexchange.com/questions/680240/put-in-a-latex3-string-the-exact-input-string-to-write-in-a-file
+% %%% but it's significantly more complicated than \filecontents, and I'd say \filecontents is more reliable
+% %%% and gives better errors.
+% %%% TODO: write an example how to apply it to https://timodenk.com/blog/exporting-matplotlib-plots-to-latex/
+% \NewDocumentCommand{\robExternPrev}{O{}m}{%
+%   {% Group
+%     \pgfkeys{%
+%       /robExt/.cd,
+%       #2,
+%     }%
+%     \ifdefined\robExtDisableExternalization%
+%       \pgfkeys{/robExt/.cd,command if no externalization={#2}}%
+%     \else%
+%       \pgfkeys{%
+%         /robExt/.cd,
+%         generate named final content/.expanded={#1}
+%       }%
+%       \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
+%       \robExtWriteFile{}%
+%       \robExtCompileFile{}%
+%       \robExtIncludeFile{}%
+%       \ifdefined\robExtExecuteNamedOutput%\show\robExtExecuteNamedOutput%
+%         \robExtExecuteNamedOutput
+%       \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
+%     \fi%
+%   }%
+% }
 
 \NewDocumentCommand{\robExtConfigure}{m}{%
   \pgfkeys{
@@ -1183,107 +972,169 @@ if __name__ == '__main__':
   }%
 }
 
-%%%%%%% Integration with famous languages
 
-%%%% Python
-%% Todo: this is not tested yet!!!
-%% We provide a basic library that can be included in any python script with TEMPLATEROBEXTPYTHONLIB
-%% and a preset presetBlenderpointMoviepy that basically load this library, run an arbitrary python code, and creates the pdf if needed to
-%% certify that the command has run successfully.
-%% You can add arguments using e.g. "add key value argument to compilation command={key1=value1}".
-%% To recover the arguments we provide an helper functions "parse_args()" that outputs a dictionary
-%% args = parse_args()
-%% args["key1"]
 
-\robExtConfigure{
-  presetBlenderpointMoviepy/.style={
-    defineTemplateFromName=templateRobExtPython,
-    compile with python,
-  }
-}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Default placeholders %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% We create here a few placeholders useful later
 
-\begin{robExtNamedTemplate}[templateRobExtPythonLib]
-def parse_args():
-    args = {}
-    if len(sys.argv) % 2 == 0:
-        print("Error: the number of arguments must be even, as tuples of name and value")
-        exit(1)
-    for i in range(0,len(sys.argv)-1,2):
-        args[sys.argv[i+1]] = sys.argv[i+2]
-    return args
+%%%% For LaTeX codes
 
-def get_cache_folder():
-    '''
-    Path of the cache folder. Warning: this works only when the python script
-    is located in this cache folder (that should be true when it's called from LaTeX)
-    '''
-    return os.path.abspath(os.path.dirname(__file__)) 
+\setPlaceholder{__ROBEXT_LATEX_OPTIONS__}{}
+\setPlaceholder{__ROBEXT_DOCUMENT_CLASS__}{standalone}
+\setPlaceholder{__ROBEXT_PREAMBULE__}{}
 
-def get_file_base():
-    '''
-    Outputs the base of the files (i.e. something like robExt-somehash, without any extension)
-    '''
-    return os.path.splitext(os.path.basename(sys.argv[0]))[0] # __file__ does not work as it refers to the library
+\begin{PlaceholderFromCode}{__ROBEXT_LATEX__}
+\documentclass[__ROBEXT_LATEX_OPTIONS__]{__ROBEXT_DOCUMENT_CLASS__}
+__ROBEXT_PREAMBULE__
+\begin{document}%
+%% The main content: most of the time you want to set __ROBEXT_MAIN_CONTENT__ instead 
+%% since __ROBEXT_MAIN_CONTENT_WRAPPED__ will wrap it inside a box to compute its
+%% depth.
+__ROBEXT_MAIN_CONTENT_WRAPPED__
+\end{document}
+\end{PlaceholderFromCode}
 
-def get_filename_from_extension(extension):
-    '''
-    If you want to create a file with extension 'extension' (with the appropriate base name), this command
-    is for you. For instance get_filename_from_extension(".mp4") would return something like
-    robExt-somehash.mp4
-    the extension can also be like get_filename_from_extension("-out.tex") etc.
-    '''
-    return os.path.join(get_cache_folder(), get_file_base() + extension)
+\begin{PlaceholderFromCode}{__ROBEXT_MAIN_CONTENT_WRAPPED__}
+__ROBEXT_CREATE_OUT_FILE__%
+\newsavebox\boxRobExt%
+\savebox{\boxRobExt}{%
+  __ROBEXT_MAIN_CONTENT__%
+}%
+\usebox{\boxRobExt}%
+__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
+\end{PlaceholderFromCode}
 
-def finished_with_no_error():
-    '''
-    Call this at the end of your script. This creates the path of the final pdf file that should be
-    created (otherwise robust-externalize will think that the compilation failed)
-    '''
-    if not os.path.exists(get_filename_from_extension(".pdf")):
-        # we create an empty path
-        with open(get_filename_from_extension(".pdf"), 'w') as f:
-            pass
-\end{robExtNamedTemplate}
+\begin{PlaceholderFromCode}{__ROBEXT_CREATE_OUT_FILE__}
+%% We save the height/depth of the content by using a savebox:
+\newwrite\writeRobExt%
+\immediate\openout\writeRobExt=\jobname-out.tex%
+\end{PlaceholderFromCode}
 
-%% Use in your code TEMPLATEROBEXTPYTHONLIB to include the above library
-\robExtAddPlaceholderFromTemplateName{TEMPLATEROBEXTPYTHONLIB}{templateRobExtPythonLib}
+\begin{PlaceholderFromCode}{__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__}
+\immediate\write\writeRobExt{%
+  \string\def\string\robExtWidth{\the\wd\boxRobExt}%
+  \string\def\string\robExtHeight{\the\ht\boxRobExt}%
+  \string\def\string\robExtDepth{\the\dp\boxRobExt}%
+}%
+\end{PlaceholderFromCode}
+\setPlaceholder{__ROBEXT_FINAL_COMPILATION_COMMAND__}{cd ~ __ROBEXT_CACHE_FOLDER__ ~ && ~ __ROBEXT_COMPILATION_COMMAND__}
 
-%% We create a python template with some helper functions to parse args, get path of output files etc.
-\begin{robExtNamedTemplate}[templateRobExtPython]
-TEMPLATEROBEXTPYTHONLIB
+%% Make sure to evaluate these inline in your style:
+\setPlaceholder{__ROBEXT_SOURCE_FILE__}{\robExtSourceFile}
+\setPlaceholder{__ROBEXT_OUTPUT_PDF__}{\robExtAddPrefixName{\robExtFinalHash.pdf}}
+\setPlaceholder{__ROBEXT_OUTPUT_PREFIX__}{\robExtAddPrefixName{\robExtFinalHash}}
+\setPlaceholder{__ROBEXT_WAY_BACK__}{\robExtCacheFolderWayBack}
+\setPlaceholder{__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
+
+
+%% Compilation commands
+\setPlaceholder{__ROBEXT_COMPILATION_COMMAND_LATEX__}{__ROBEXT_LATEX_ENGINE__ ~ __ROBEXT_COMPILATION_COMMAND_OPTIONS__ ~ "__ROBEXT_SOURCE_FILE__"}
+\setPlaceholder{__ROBEXT_COMPILATION_COMMAND_OPTIONS__}{-shell-escape ~ -halt-on-error}
+\setPlaceholder{__ROBEXT_LATEX_ENGINE__}{pdflatex}
+
+% %%%%%%% Integration with famous languages
+
+% %%%% Python
+% %% Todo: this is not tested yet!!!
+% %% We provide a basic library that can be included in any python script with TEMPLATEROBEXTPYTHONLIB
+% %% and a preset presetBlenderpointMoviepy that basically load this library, run an arbitrary python code, and creates the pdf if needed to
+% %% certify that the command has run successfully.
+% %% You can add arguments using e.g. "add key value argument to compilation command={key1=value1}".
+% %% To recover the arguments we provide an helper functions "parse_args()" that outputs a dictionary
+% %% args = parse_args()
+% %% args["key1"]
+
+% \robExtConfigure{
+%   presetBlenderpointMoviepy/.style={
+%     defineTemplateFromName=templateRobExtPython,
+%     compile with python,
+%   }
+% }
+
+% \begin{robExtNamedTemplate}[templateRobExtPythonLib]
+% def parse_args():
+%     args = {}
+%     if len(sys.argv) % 2 == 0:
+%         print("Error: the number of arguments must be even, as tuples of name and value")
+%         exit(1)
+%     for i in range(0,len(sys.argv)-1,2):
+%         args[sys.argv[i+1]] = sys.argv[i+2]
+%     return args
+
+% def get_cache_folder():
+%     '''
+%     Path of the cache folder. Warning: this works only when the python script
+%     is located in this cache folder (that should be true when it's called from LaTeX)
+%     '''
+%     return os.path.abspath(os.path.dirname(__file__)) 
+
+% def get_file_base():
+%     '''
+%     Outputs the base of the files (i.e. something like robExt-somehash, without any extension)
+%     '''
+%     return os.path.splitext(os.path.basename(sys.argv[0]))[0] # __file__ does not work as it refers to the library
+
+% def get_filename_from_extension(extension):
+%     '''
+%     If you want to create a file with extension 'extension' (with the appropriate base name), this command
+%     is for you. For instance get_filename_from_extension(".mp4") would return something like
+%     robExt-somehash.mp4
+%     the extension can also be like get_filename_from_extension("-out.tex") etc.
+%     '''
+%     return os.path.join(get_cache_folder(), get_file_base() + extension)
+
+% def finished_with_no_error():
+%     '''
+%     Call this at the end of your script. This creates the path of the final pdf file that should be
+%     created (otherwise robust-externalize will think that the compilation failed)
+%     '''
+%     if not os.path.exists(get_filename_from_extension(".pdf")):
+%         # we create an empty path
+%         with open(get_filename_from_extension(".pdf"), 'w') as f:
+%             pass
+% \end{robExtNamedTemplate}
+
+% %% Use in your code TEMPLATEROBEXTPYTHONLIB to include the above library
+% \robExtAddPlaceholderFromTemplateName{TEMPLATEROBEXTPYTHONLIB}{templateRobExtPythonLib}
+
+% %% We create a python template with some helper functions to parse args, get path of output files etc.
+% \begin{robExtNamedTemplate}[templateRobExtPython]
+% TEMPLATEROBEXTPYTHONLIB
   
-ROBEXTMAINCONTENT
+% ROBEXTMAINCONTENT
 
-finished_with_no_error()
+% finished_with_no_error()
 
-\end{robExtNamedTemplate}
+% \end{robExtNamedTemplate}
 
 
-%%%%%%% Integration with existing libraries:
+% %%%%%%% Integration with existing libraries:
 
-%%%%% Replace tikzpicture:
+% %%%%% Replace tikzpicture:
 
-% We provide a default preset for the above command for tizk... but people surely need to override it very quickly:
-\robExtConfigure{%
-  presetTikzDefault/.style={
-    % We define the code that wraps all our figures
-    defineTemplate={
-      \documentclass{standalone}
-      \usepackage{tikz}
-      \begin{document}%
-      \robExtMainContent% This macro will be replaced with (notably) the code for the figure
-      \end{document}
-    },
-  },
-}
+% % We provide a default preset for the above command for tizk... but people surely need to override it very quickly:
+% \robExtConfigure{%
+%   presetTikzDefault/.style={
+%     % We define the code that wraps all our figures
+%     defineTemplate={
+%       \documentclass{standalone}
+%       \usepackage{tikz}
+%       \begin{document}%
+%       \robExtMainContent% This macro will be replaced with (notably) the code for the figure
+%       \end{document}
+%     },
+%   },
+% }
 
-\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
-  \DeclareDocumentEnvironment{tikzpicture}{O{}O{}b}{%
-    \begin{robExtern}{presetTikzDefault,##2}%
-      \begin{tikzpicture}[##1]%
-        ##3%
-      \end{tikzpicture}%
-    \end{robExtern}%
-  }{}%
-}
+% \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
+%   \DeclareDocumentEnvironment{tikzpicture}{O{}O{}b}{%
+%     \begin{robExtern}{presetTikzDefault,##2}%
+%       \begin{tikzpicture}[##1]%
+%         ##3%
+%       \end{tikzpicture}%
+%     \end{robExtern}%
+%   }{}%
+% }
 
