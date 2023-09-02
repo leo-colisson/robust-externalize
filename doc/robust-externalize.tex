@@ -25,7 +25,37 @@
 \usepackage{verbatim}
 \usepackage{mathtools}
 \usepackage{float} %figure inside minipage
+
+
 \usepackage{listings}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+
+
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
 
@@ -607,9 +637,10 @@ Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_E
 
 \begin{pgfmanualentry}
   \extractenvironement{PlaceholderFromCode}\marg{name placeholder}\@@
+  \extractenvironement{setPlaceholderCode}\marg{name placeholder}\@@
   \pgfmanualbody
 
-  This environment is useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside, possibly inserting other simpler placeholders inside that you can define inside the macros).
+  These two (aliased) environments are useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside).
 % \begin{codeexample}[width=0pt,vbox]
 %   \placeholderFromContent{__PYTHON_CODE__}{}
 %   The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__} and %
@@ -764,35 +795,6 @@ This content is cached $\delta$.
 \end{codeexample}
 \end{pgfmanualentry}
 
-
-\begin{pgfmanualentry}
-  \extractenvironement{CacheMeCode}\marg{preset style}\@@
-  \pgfmanualbody
-  Like |CacheMe|, except that the code is read verbatim by \LaTeX{}. This way, you can put non-\LaTeX{} code inside safely, but you will not be able to use it inside a macro or some environments that read their body.
-\begin{codeexample}[width=0pt,vbox]
-\end{codeexample}
-\end{pgfmanualentry}
-
-% \begin{PlaceholderFromCode}{__MY_MATHPLOTLIB_TEMPLATE__}
-% import matplotlib.pyplot as plt
-% import sys
-% __ROBEXT_MAIN_CONTENT__
-% plt.savefig("__ROBEXT_OUTPUT_PDF__")  
-% \end{PlaceholderFromCode}
-
-% \begin{CacheMeCode}{set template={__MY_MATHPLOTLIB_TEMPLATE__}
-%     set compilation command={python "__ROBEXT_SOURCE_FILE__"},
-%     custom include command={%
-%       \includegraphics[width=4cm,angle=45]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
-%     },
-%   }
-% year = [2014, 2015, 2016, 2017, 2018, 2019]  
-% tutorial_count = [39, 117, 111, 110, 67, 29]
-% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-% plt.xlabel('Year')  
-% plt.ylabel('Number of futurestud.io Tutorials') 
-% \end{CacheMeCode}
-
 \begin{pgfmanualentry}
   \extractcommand\robExtConfigure\marg{preset style}\@@
   \pgfmanualbody
@@ -838,6 +840,160 @@ This content is cached $\delta$.
 This content is cached $\delta$.    
 \end{CacheMe}
 \end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractenvironement{CacheMeCode}\marg{preset style}\@@
+  \pgfmanualbody
+  Like |CacheMe|, except that the code is read verbatim by \LaTeX{}. This way, you can put non-\LaTeX{} code inside safely, but you will not be able to use it inside a macro or some environments that read their body. Here is an example where we define an environment that automatically import matplotlib, save the figure, and insert it into a figure. Note that we define in this example new commands to type |set caption=foo| instead of |set placeholder={__FIG_CAPTION__}{foo}|.
+%% codeexample cannot deal with verbatim content
+
+\begin{lstlisting}[language={[LaTeX]{TeX}}]
+%% Define the python code to use as a template
+%% (impossible to define it in \robExtConfigure directly since
+%% it is a verbatim environment)
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE__}
+import matplotlib.pyplot as plt
+import sys
+__ROBEXT_MAIN_CONTENT__
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+% Create a new preset called matplotlib
+\robExtConfigure{
+  matplotlib figure/.style={
+    set template={__MY_MATPLOTLIB_TEMPLATE__},
+    set compilation command={python "__ROBEXT_SOURCE_FILE__"},
+    set caption/.style={
+      set placeholder={__FIG_CAPTION__}{##1}
+    },
+    set label/.style={
+      set placeholder={__FIG_LABEL__}{##1}
+    },
+    set includegraphics options/.style={
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+    },
+    set caption={},
+    set label={},
+    set includegraphics options={width=1cm},
+    custom include command={%
+      \evalPlaceholder{%
+        \begin{figure}
+          \centering
+          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+          \caption{__FIG_CAPTION__a}
+          \label{__FIG_LABEL__}
+        \end{figure}%
+      }%
+    },
+  },
+}
+
+%% Use it
+\begin{CacheMeCode}{matplotlib figure, set includegraphics options={width=.8\linewidth}, set caption={Hello}}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials') 
+\end{CacheMeCode}    
+\end{lstlisting}
+
+%% Define the python code to use as a template
+%% (impossible to define it in \robExtConfigure directly since
+%% it is a verbatim environment)
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE__}
+import matplotlib.pyplot as plt
+import sys
+__ROBEXT_MAIN_CONTENT__
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+% Create a new preset called matplotlib
+\robExtConfigure{
+  matplotlib figure/.style={
+    set template={__MY_MATPLOTLIB_TEMPLATE__},
+    set compilation command={python "__ROBEXT_SOURCE_FILE__"},
+    set caption/.style={
+      set placeholder={__FIG_CAPTION__}{##1}
+    },
+    set label/.style={
+      set placeholder={__FIG_LABEL__}{##1}
+    },
+    set includegraphics options/.style={
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+    },
+    set caption={},
+    set label={},
+    set includegraphics options={width=1cm},
+    custom include command={%
+      \evalPlaceholder{%
+        \begin{figure}
+          \centering
+          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+          \caption{__FIG_CAPTION__}
+          \label{__FIG_LABEL__}
+        \end{figure}%
+      }%
+    },
+  },
+}
+
+%% Use it
+\begin{CacheMeCode}{matplotlib figure, set includegraphics options={width=.8\linewidth}, set caption={An example to show how matplotlib pictures can be inserted}}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials') 
+\end{CacheMeCode}
+
+Note that as we explained it before, due to \LaTeX{} limitations, it is impossible to call |CacheMeCode| inside macros and inside some environments that evaluate their body. To avoid that issue, it is always possible to define the macro before and call it inside. We will exemplify this on the previous example, but note that \textbf{this example this is only for educational purposes} since the environment |figure| does not evaluate its body, and |CacheMeCode| can therefore safely be used inside without using this trickery:
+\begin{lstlisting}[language={[LaTeX]{TeX}}]
+%% Define the python code to use as a template
+%% (impossible to define it in \robExtConfigure directly since
+%% it is a verbatim environment)
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE__}
+import matplotlib.pyplot as plt
+import sys
+__ROBEXT_MAIN_CONTENT__
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+% Create a new preset called matplotlib
+\robExtConfigure{
+  matplotlib/.style={
+    set template={__MY_MATPLOTLIB_TEMPLATE__},
+    set compilation command={python "__ROBEXT_SOURCE_FILE__"},
+    set includegraphics options/.style={
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+    },
+    set includegraphics options={width=1cm},
+    custom include command={%
+      \evalPlaceholder{%
+        \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+      }%
+    },
+  },
+}
+
+
+%% You cannot use CacheMeCode inside some macros or environments due to fundamental LaTeX limitations.
+%% But you can always define them before, and call them inside:
+\begin{SetPlaceholderCode}{__TMP__}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials') 
+\end{SetPlaceholderCode}    
+
+\begin{figure}
+  \centering
+  \cacheMe[matplotlib, set includegraphics options={width=.8\linewidth}, set caption={Hello}]{__TMP__}
+  \caption{An example to show how code can be inserted into macros or environments that evaluate their contents (this trick is actually not needed for figures)}
+\end{figure}
+\end{lstlisting}
 \end{pgfmanualentry}
 
 

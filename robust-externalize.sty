@@ -302,6 +302,9 @@ if __name__ == '__main__':
 % HELPERFUNCTION will contain at the end "def ..."
 % This environment cannot be placed inside any other macro/align/...
 \NewDocumentEnvironment{RobExtPlaceholderFromCode}{m}{
+  % % debug part
+  % \str_set:Nn \l_test_str {#1}
+  % \show\l_test_str
   %% Environments can't use verbatim yet: https://github.com/latex3/latex3/issues/591
   % Might be related: https://tex.stackexchange.com/questions/633523/saving-the-body-of-an-environment-to-a-file-verbatim-using-xparse
   %% Here is the first part:
@@ -326,6 +329,8 @@ if __name__ == '__main__':
 }
 \let\PlaceholderFromCode\RobExtPlaceholderFromCode
 \let\endPlaceholderFromCode\endRobExtPlaceholderFromCode
+\let\SetPlaceholderCode\RobExtPlaceholderFromCode
+\let\endSetPlaceholderCode\endRobExtPlaceholderFromCode
 
 %% Usage:
 %% \placeholderPathFromFilename{MYLIBPATH}{mylib.py}
@@ -435,9 +440,7 @@ if __name__ == '__main__':
 \cs_set:Nn \__replace_until_impossible:N {
   \str_set_eq:NN \l_robext_tmp_before \l_robExt_result_str
   \seq_map_inline:Nn \l_robExt_placeholders_seq {
-    \message{ replacing ##1 }
     \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
-    \message{done}
   }
   % We compare the result
   \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
@@ -450,7 +453,7 @@ if __name__ == '__main__':
 }
 
 \NewDocumentCommand{\robExtGetPlaceholderInResult}{O{}m}{
-  \str_set:Nx \l_robExt_result_str { #2 }
+  \str_set:Nn \l_robExt_result_str { #2 }
   \__replace_until_impossible:N { }
   \tl_if_blank:nTF {#1} {} {
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
@@ -476,6 +479,7 @@ if __name__ == '__main__':
 %%% Evaluate a string by replacing the placeholders until there is none left
 %%% the result will be in \robExtResult
 \NewDocumentCommand{\robExtEvalPlaceholder}{m}{
+  \str_set:Nn \l_test_str {#1}
   \robExtGetPlaceholderInResult{#1}
   \tl_rescan:nv {} { l_robExt_result_str }
 }
@@ -917,7 +921,12 @@ if __name__ == '__main__':
 \NewDocumentEnvironment{RobExtCacheMeCode}{m}{%
   \RobExtPlaceholderFromCode{__ROBEXT_MAIN_CONTENT__}%
 }{%
-  \endRobExtPlaceholderFromCode\robExtEvaluateCompileAndInclude%
+  \endRobExtPlaceholderFromCode%
+  \pgfkeys{%
+    /robExt/.cd,
+    #1,
+  }%
+  \robExtEvaluateCompileAndInclude%
 }
 \let\CacheMeCode\RobExtCacheMeCode
 \let\endCacheMeCode\endRobExtCacheMeCode
