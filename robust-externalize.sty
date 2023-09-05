@@ -1100,6 +1100,15 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
     add to preamble={\usepackage{tikz}},
     add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}},
     add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{tikzpicture}},
+    % To avoid infinite recursion when using \robExtExternalizeAllTikzpictures, we need to redefine tikzpicture
+    command if no externalization/.code={%
+      % robExtExternalizeAllTikzpictures does a backup of tikzpicture to avoid infinite recursion in that case
+      \ifdefined\robExtTikzPictureOrig%
+        \let\tikzpicture\robExtTikzPictureOrig%
+        \let\endtikzpicture\endrobExtTikzPictureOrig%
+      \fi%
+      \evalPlaceholder{__ROBEXT_MAIN_CONTENT__}%
+    },
   },
 }
 
@@ -1391,6 +1400,9 @@ touch "${outputPdf}"
 % }
 
 \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
+  %% We need to save the tikzpicture environment to avoid infinite recursion if we disable externalization
+  \let\robExtTikzPictureOrig\tikzpicture%
+  \let\endrobExtTikzPictureOrig\endtikzpicture%
   \DeclareDocumentEnvironment{tikzpicture}{O{}O{}b}{%
     \begin{CacheMe}{tikz,##2}[##1]%
         ##3%

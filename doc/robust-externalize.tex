@@ -103,8 +103,13 @@
 
 This library allows you to cache not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
 \begin{codeexample}[width=0pt,vbox]
+  \robExtConfigure{
+    tikz/.append style={
+      add to preamble={\usepackage{pifont}}
+    }
+  }
   The next picture is cached %
-  \begin{tikzpictureC}[baseline=(A.base)][add to preamble={\usepackage{pifont}}]
+  \begin{tikzpictureC}[baseline=(A.base)]
     \node[fill=red, rounded corners](A){My node that respects baseline \ding{164}.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC} and you can see that overlay and depth works.
@@ -190,6 +195,25 @@ So during the first compilation, we lost a x2 factor (roughly an additional time
 
 \paragraph{Can I extend it easily?} We tried to take a quite modular approach in order to allow easy extensions. Internally, to support a new cache scheme, we only expect a string containing the program (possibly produced using a template), a list of dependencies, a command to compile this program (e.g. producing a pdf and possibly a tex file with the properties (depth…) of the pdf), and a command to load the result of the compilation into the final document (called after loading the previously mentioned optional tex file). Thanks to pgfkeys, it is then possible to create simple pre-made settings to automatically apply when needed.
 
+\paragraph{How does it compare with \url{https://github.com/sasozivanovic/memoize}?} I recently became aware of the great \url{https://github.com/sasozivanovic/memoize}. While me aim to solve a similar goal, our approaches are quite different. While we focus on purity, and therefore create a different file for each picture, the above project puts all pictures in a single file and compile them all at once to avoid losing time to run the latex command for each picture (this mostly makes a difference for the first compilation). Our understanding of the main differences is the following:
+
+Pros of \url{https://github.com/sasozivanovic/memoize}:
+\begin{itemize}
+\item The above library is likely to be quicker on the first run since it packs everything in a single file (so you save the time to run latex for each picture). On the other hand, we can load in the preamble exactly what is needed for the picture (we do not load all the preamble of the main file), so our startup time is not huge (it adds .5s per picture in my tests when using the |zx-calculus| library), and you can still commit the cached file to help with recompiling the document elsewhere.
+\item It seems to be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz picture are automatically memoized (we provide |\robExtExternalizeAllTikzpictures| for that, but you still need to specify the preamble once).
+\end{itemize}
+
+Cons of \url{https://github.com/sasozivanovic/memoize}:
+\begin{itemize}
+\item The purity is not enforced so strongly since all images are in the same file. Notably, the hash only depends on the picture, but not on its context. So for instance if you define |\def\mycolor{blue}| before the picture, and use |\mycolor| inside the picture, if you change later the color to, say, |\def\mycolor{red}|, the picture will not be recompiled (so cleaning the cache and recompiling would produce a different result). In our case, the purity is always strictly enforced (unless you choose not to).
+\item As a result, the above library has poor support for contexts (in our case, you can easily, for instance, make a picture depend on the current page, and recompile the picture only if the current page changes: you can also do it the other way, and change some counters, say, depending on the cached file).
+\item The above library only focuses on \LaTeX{} while our library works for any language
+\item The above library can only produce pdf formats, while we can generate any format (text, tex, jpg\dots{} and even videos that I include in my beamer presentation).
+\item We have an arguably more complete documentation.
+\end{itemize}
+
+Note that |remember picture| is not working in both libraries.
+
 \section{Quickstart}
 
 \subsection{Installation}
@@ -198,9 +222,6 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 
 |\usepackage{robust-externalize}|
 
-\subsection{Usage}
-
-\subsubsection{For \LaTeX{} based content}
 
 \subsection{Caching a tikz picture}
 
@@ -240,7 +261,7 @@ I am a cached picture: \begin{CacheMe}{tikz}[baseline=(A.base)]
 \end{CacheMe}.
 \end{codeexample}
 
-Since |CacheMe| is more general as it applies also to non-tikz pictures (just replace |tikz| with the style of your choice), we will use this syntax from now.
+Since |CacheMe| is more general as it applies also to non-tikz pictures (just replace |tikz| with the style of your choice), we will mostly use this syntax from now.
 
 \subsection{Custom preamble}
 
@@ -290,6 +311,53 @@ then you can add it as a dependency this way (here we use the |latex| preset tha
 Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache folder (containing the |.tex| that will be cached) to the root folder, and will be replaced when creating the file. This way, you can easily input files contained in the root folder. You can also create your own placeholders, read more below.
 
 You can note that we used |add dependencies={common_inputs.tex}|: this allows us to recompile the files if |common_inputs.tex| changes. If you do not want this behavior (e.g. |common_inputs.tex| changes too often and you do not want to recompile everything at every change), you can remove this line, but beware: if you do a breaking changes in |common_inputs.tex| (e.g.\ redefine |42| to |43|), then the previously cached picture will not be recompiled! (So you will still read 42 instead of 43.)
+
+\subsection{Disabling externalization}
+
+You can use |disable externalization| to disable externalization (which is particularly practical if you set |\robExtExternalizeAllTikzpictures|: \tikz[remember picture,baseline=(pointtome1.base)] \node[rounded corners, fill=orange](pointtome1){Point to me if you can};.
+
+\begin{codeexample}[width=0pt,vbox]
+  % In theory all pictures should be externalized (so remember picture should fail)
+  \robExtExternalizeAllTikzpictures
+  % But we can disable it temporarily
+  \begin{tikzpicture}[remember picture][disable externalization]
+    \node[rounded corners, fill=red](A){This figure is not externalized.
+      This way, it can use remember picture.};
+    \draw[->,overlay] (A) to[bend right] (pointtome1);
+  \end{tikzpicture}\\
+
+  % You can also disable it globally/in a group:
+  {
+    \robExtConfigure{disable externalization}
+    
+    \begin{tikzpicture}[remember picture]
+      \node[rounded corners, fill=red](A){This figure is not externalized.
+        This way, it can use remember picture.};
+      \draw[->,overlay] (A.west) to[bend left] (pointtome1);
+    \end{tikzpicture}\\
+
+    \begin{tikzpicture}[remember picture]
+      \node[rounded corners, fill=red](A){This figure is not externalized.
+        This way, it can use remember picture.};
+      \draw[->,overlay] (A.east) to[bend right] (pointtome1);
+    \end{tikzpicture}\\
+  }
+  
+  \begin{tikzpicture}
+    \node[rounded corners, fill=green](A){This figure is externalized, but cannot use remember picture.};
+  \end{tikzpicture}
+\end{codeexample}
+
+
+\subsection{Feeding data from the main document to the picture}
+
+You can feed data from the main document to the cached file using placeholders, since |set placeholder eval={__foo__}{\bar}| will evaluate |\bar| and put the result in |__foo__|. For instance, if the picture depends on the current page, you can do:
+
+\begin{codeexample}[width=0pt,vbox]
+\begin{tikzpictureC}[][set placeholder eval={__thepage__}{\thepage}]
+  \node[rounded corners, fill=red]{The current page is __thepage__.};
+\end{tikzpictureC}
+\end{codeexample}
 
 \subsection{Feeding data back into the main document}
 
@@ -655,121 +723,6 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{CacheMeNoContent}}
 \end{codeAndResult}
 
-% % We define our code (implicitely giving it a default name, that can be changed
-% % if multiple codes are inserted in the same macro)
-% \begin{robExtNamedContent}
-% year = [2014, 2015, 2016, 2017, 2018, 2019]  
-% tutorial_count = [39, 117, 111, 110, 67, 29]
-
-% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-% plt.xlabel('Year')  
-% plt.ylabel('Number of futurestud.io Tutorials') 
-% \end{robExtNamedContent}
-
-% Inside a macro: %
-% \fbox{\robExternPrev{presetMatplot,include graphics args={width=.7\linewidth}}}
-% \end{codeexample}
-
-% \subsection{Example of more advanced setup}
-
-% We can actually do many more things. For instance, here we define another preset that compiles the document with python and matplotlib, and displays the important lines of the code above the result, inside a figure with a customizable caption:
-
-% \begin{codeexample}[vbox]
-% % Define the template. Lines with TEMPLATECODE
-% % will be removed later.  
-% \begin{robExtNamedTemplate}[pythonMatplotlib]
-% import matplotlib.pyplot as plt # TEMPLATECODE
-% import sys # TEMPLATECODE
-% ROBEXTMAINCONTENT
-% plt.savefig(sys.argv[1]+".pdf") # TEMPLATECODE
-% \end{robExtNamedTemplate}
-
-% \robExtConfigure{
-%   % More complex version that displays both the code and the result:
-%   presetMatplotAdvanced/.style={
-%     /robExt/caption/.code={\gdef\mycaption{##1}}, % Provide a key to change the caption
-%     defineTemplateFromName=pythonMatplotlib,
-%     % This command compiles the image, and creates a file removing all the lines from the code
-%     % containing TEMPLATECODE (useful not to display action of saving the file etc)
-%     % This might not be portable to windows without installing cygwin, but one can replace sed
-%     % with some python code doing the same for a more portable code.
-%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName" %
-%       && sed '/TEMPLATECODE/d' "\robExtFinalFile" > "\robExtFinalPrefixedName.codeonly.py"},
-%     custom include command={%
-%       \begin{figure}[H] % Use H mostly to avoid compilation error in documentation
-%         \centering
-%         % Note that this will display the template around the code. We could avoid this by putting in our
-%         % template a part that creates a new file whose name is the basename of the current (script) file
-%         % and that contains all its code except for the template (to differentiate between template and
-%         % non-template, we could add a special comment on lines to remove)
-%         \verbatiminput{\robExtAddCachePathAndName{\robExtFinalName.codeonly.py}}
-%         \includegraphics[width=.6\textwidth]{\robExtAddCachePathAndName{\robExtFinalName.pdf}}%
-%         \caption{\mycaption}
-%       \end{figure}
-%     },
-%   },
-% }
-
-% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
-
-% \begin{robExtCode}{presetMatplotAdvanced, caption={Here is my caption for the figure}}
-% year = [2014, 2015, 2016, 2017, 2018, 2019]  
-% tutorial_count = [39, 117, 111, 110, 67, 29]
-
-% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-% plt.xlabel('Year')  
-% plt.ylabel('Number of futurestud.io Tutorials') 
-% \end{robExtCode}
-% \end{codeexample}
-
-% \section{Manual}
-
-% TODO: the example above already provide a nice view of the main functions, the |set subfolder={robustExternalize/}| option might be an important additionnal configuration option that allows you to put the cached pictures in a subfolder.
-
-% \section{Operations on the cache}
-
-% \subsection{Cleaning the cache}
-
-% You might want to clean the cache. Of course you can remove all generated files, but if you want to keep the picture in use in the latest version of the document, we provide a python script (automatically generated in the root folder) to do this. Just install python3 and run:\\
-
-% |python3 robExt-remove-old-figures.py|\\
-
-% You will then be prompted for a confirmation after providing the list of files that will be removed.
-
-% \subsection{Listing all figures in use}
-
-% After the compilation of the document, a file |robExt-all-figures.txt| is created with the list of the |.tex| file of all figures used in the current document.
-
-% \subsection{Manually compiling the figures}
-
-% When enabling the manual mode (useful if we don't want to enable |-shell-escape|):
-
-% |\robExtConfigure{|\\
-% |  enable manual mode|\\
-% |}|\\
-
-% the library creates a file |robExt-compile-missing-figures.sh| that contains the instructions to build the figures that are not yet in the cache. On Linux (or on Windows with bash/cygwin/… installed) you can easily execute them using:
-
-% |bash robExt-compile-missing-figures.sh|\\
-
-% \section{TODO and known bugs:}
-
-% \begin{itemize}
-% \item Solve problem with disable externalization not working with tikz pictures
-% \item See how to deal with overlays, maybe get inspired by https://github.com/sasozivanovic/memoize that seems to define a padding around the box
-% \item See how to deal with label references
-% \item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
-% \item Some commands like mkdir might not be super compatible with Windows, I need to see how to improve compatibility between OS
-% \item The documentation is still sparse.
-% \item I just discovered the very interesting https://github.com/sasozivanovic/memoize, not sure how it compares. The approaches seems very different.
-% \item I don't think this package can directly externalize remember picture pictures.
-% \end{itemize}
-% % %% This picture will NOT be externalized .
-% % \message{YYYYYYYYYYYYYY Next one:}
-% % \begin{tikzpicture}[baseline,anchor=base][disable externalization]
-% %   \node[draw,rounded corners,fill=pink!60]{Hello World!};
-% % \end{tikzpicture}
-
 \section{Documentation}
 
 \subsection{How it works}
@@ -1009,7 +962,12 @@ Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_E
   \extractkey/robExt/set placeholder eval=\marg{name placeholder}\marg{content placeholder}\@nil
   \makeatother%
   \pgfmanualbody
-  Alias for |\setPlaceholderRec{#1}{#2}\evalPlaceholderInplace{#1}|: set and evaluate recursively the placeholders and macros.
+  Alias for |\setPlaceholderRec{#1}{#2}\evalPlaceholderInplace{#1}|: set and evaluate recursively the placeholders and macros. This can be practical to pass the value of a counter/macro to the template (of course, if this value is fixed, you can also directly load it from the preambule):
+\begin{codeexample}[width=0pt,vbox]
+\begin{CacheMe}{tikz, set placeholder eval={__thepage__}{\thepage}}
+  \node[rounded corners, fill=red]{The current page is __thepage__.};
+\end{CacheMe}
+\end{codeexample}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1529,9 +1487,10 @@ If needed, you can configure the cache:
   You can customize it the way you want, just be make sure that going to the second arguments after going to the first argument leads you back to the original position.
 \end{pgfmanualentry}
 
-\subsubsection{Customize or disable externalization}
+\newpage
+\subsubsection{Customize or disable externalization}\label{sec:disableExternalization}
 
-You might want (sometimes or always) to disable externalization:
+You might want (sometimes or always) to disable externalization, for instance to use |remember picture| \tikz[remember picture,baseline=(pointtome.base)] \node[rounded corners, fill=orange](pointtome){Point to me if you can};, even if you used |\robExtExternalizeAllTikzpictures|:
 
 \begin{pgfmanualentry}
   \makeatletter%
@@ -1540,7 +1499,34 @@ You might want (sometimes or always) to disable externalization:
   \extractkey/robExt/enable externalization\@nil
   \makeatother%
   \pgfmanualbody
-  Enable or disable externalization. \textbf{TODO: NOTE THAT THIS HAS NOT YET BEEN TESTED AND IS LIKELY BROKEN}
+  Enable or disable externalization.
+  \begin{codeexample}[width=0pt,vbox]
+    % In theory all pictures should be externalized (so remember picture should fail)
+    \robExtExternalizeAllTikzpictures
+    % But we can disable it temporarily
+    \begin{tikzpicture}[remember picture][disable externalization]
+      \node[rounded corners, fill=red](A){This figure is not externalized.
+        This way, it can use remember picture.};
+      \draw[->,overlay] (A) to[bend right] (pointtome);
+    \end{tikzpicture}\\
+
+    % You can also disable it globally/in a group:
+    {
+      \robExtConfigure{disable externalization}
+      
+      \begin{tikzpicture}[remember picture]
+        \node[rounded corners, fill=red](A){This figure is not externalized.
+          This way, it can use remember picture.};
+        \draw[->,overlay] (A.west) to[bend left] (pointtome);
+      \end{tikzpicture}\\
+
+      \begin{tikzpicture}[remember picture]
+        \node[rounded corners, fill=red](A){This figure is not externalized.
+          This way, it can use remember picture.};
+        \draw[->,overlay] (A.east) to[bend right] (pointtome);
+      \end{tikzpicture}
+    }
+  \end{codeexample}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1549,7 +1535,7 @@ You might want (sometimes or always) to disable externalization:
   \extractkey/robExt/command if no externalization\@nil
   \makeatother%
   \pgfmanualbody
-  You can easily change the command to run if externalization is disabled using by setting the code of this key. By default, it is configured as:\\
+  You can easily change the command to run if externalization is disabled using by setting the \textbf{.code} of this key. By default, it is configured as:\\
   |command if no externalization/.code={\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}}|
 \end{pgfmanualentry}
 
@@ -1904,7 +1890,7 @@ in order to automatically load |tikz| and add the surrounding |tikzpicture| (not
 \end{codeexample}
 
 
-\subsection{Maintaining a clean cache}
+\subsection{Operations on the cache}
 
 Every time we compile a document, we create automatically a bunch of files:
 \begin{itemize}
@@ -1915,9 +1901,53 @@ Every time we compile a document, we create automatically a bunch of files:
 \item |\jobname-robExt-tmp-file-you-can-remove.tmp| is a temporary file. Feel free to remove it.
 \end{itemize}
 
+We go over some of these scripts.
+
+\subsubsection{Cleaning the cache}
+
+You might want to clean the cache. Of course you can remove all generated files, but if you want to keep the picture in use in the latest version of the document, we provide a python script (automatically generated in the root folder) to do this. Just install python3 and run:\\
+
+|python3 robExt-remove-old-figures.py|\\
+
+You will then be prompted for a confirmation after providing the list of files that will be removed.
+
+\subsubsection{Listing all figures in use}
+
+After the compilation of the document, a file |robExt-all-figures.txt| is created with the list of the |.tex| file of all figures used in the current document.
+
+\subsubsection{Manually compiling the figures}
+
+When enabling the manual mode (useful if we don't want to enable |-shell-escape|):
+
+|\robExtConfigure{|\\
+|  enable manual mode|\\
+|}|\\
+
+the library creates a file |robExt-compile-missing-figures.sh| that contains the instructions to build the figures that are not yet in the cache (each line contains the compilation command to run). On Linux (or on Windows with bash/cygwin/… installed, it possibly even work out of the box without) you can easily execute them using:
+
+|bash robExt-compile-missing-figures.sh|\\
+
+
 \subsection{How to debug}
 
 If for some reasons you are unable to understand why a build fails, first check if you compiled your document with |-shell-escape| (not that this must appear \textbf{before} the filename). Then, you can look at the log file to get more advices: when a cached document is compiled, we always write the full compilation command before compiling the file in the log file. This way, you can easily check the content of the file and see why it fails to compile.
+
+\section{TODO and known bugs:}
+
+\begin{itemize}
+\item Solve problem with disable externalization not working with tikz pictures
+\item See how to deal with label references inside pictures
+\item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
+\item While the code should be compatible with Windows and Mac, I should try it. If any of you is using Windows or Mac, please let me know if it works for you!
+\item I just discovered the very interesting https://github.com/sasozivanovic/memoize, not sure how it compares. The approaches seems very different.
+\item I don't think this package can directly externalize remember picture pictures.
+\end{itemize}
+% %% This picture will NOT be externalized .
+% \message{YYYYYYYYYYYYYY Next one:}
+% \begin{tikzpicture}[baseline,anchor=base][disable externalization]
+%   \node[draw,rounded corners,fill=pink!60]{Hello World!};
+% \end{tikzpicture}
+
 
 \end{document}
 % Local Variables:
