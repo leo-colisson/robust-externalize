@@ -1,0 +1,16 @@
+tests/
+old/
+*.log
+robExt*
+*.ind
+*.out
+*.toc
+*.synctex.gz
+*.ilg
+*tmp-file-you-can-remove.tmp
+*compile-missing-figures.sh
+*all-figures.txt
+*.aux
+*.idx
+*debug*
+*backup*
