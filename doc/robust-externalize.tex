@@ -1603,6 +1603,21 @@ with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
         f.write(f"Hello {i}, we are on page __thepage__\n")
 \end{CacheMeCode}
 \end{codeAndResult}
+
+You can also disable the externalization on all elements that use a common preset, for instance you can disable externalization on all |bash| instances (useful if you are on Windows for instance):
+\begin{codeAndResult}
+\robExtConfigure{
+  % bash code will not be compiled (useful on windows for instance)
+  bash/.append style={
+    disable externalization
+  },
+}
+\begin{CacheMeCode}{bash, verbatim output}
+# $outputTxt contains the path of the file that will be printed via \verbatiminput
+uname -srv > "${outputTxt}"
+\end{CacheMeCode}
+\end{codeAndResult}
+
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
