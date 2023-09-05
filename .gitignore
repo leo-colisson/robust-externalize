@@ -14,3 +14,7 @@ robExt*
 *.idx
 *debug*
 *backup*
+*.fdb_latexmk
+*.fls
+*.zip
+build_ctan/

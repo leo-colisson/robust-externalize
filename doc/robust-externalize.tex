@@ -88,7 +88,7 @@
   {\Large\bfseries Cache anything (\tikzname, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2023/03/22-unstable}\\[3mm]
+  {Léo Colisson \quad Version 2023/09/06}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -97,11 +97,11 @@
 
 \bigskip
 
-\textbf{WARNING: This library is very young and has not been tested extensively. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder.}
+\textbf{WARNING: This library is young and has not been tested extensively (and is an important rewrite of a previous version), notably on windows. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}, or let us know if it works!}
 
 \section{A taste of this library}
 
-This library allows you to cache not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
+This library allows you to cache any language: not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
     tikz/.append style={
@@ -116,7 +116,7 @@ This library allows you to cache not only \LaTeX{} documents and \tikzname{} ima
 \end{codeexample}
 
 
-but also arbitrary code (e.g.\ python). You can also define arbitrary compilation command and inclusion command to fit you need, and create new presets, to obtain:
+\noindent but also arbitrary code (e.g.\ python). You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
 
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result, set title={The for loop}}
@@ -125,8 +125,10 @@ for name in ["Alice", "Bob"]:
 \end{CacheMeCode}
 \end{codeAndResult}
 
-Actually, we also provide this style by default, and explain how to write it yourself, you just make sure to load:\\ |\usepackage{pythonhighlight}|\\
+Actually, we also provide this style by default (and explain how to write it yourself), you just make sure to load:\\ |\usepackage{pythonhighlight}|\\
 |\usepackage{tcolorbox}|
+
+To achieve a pleasant and configurable interface, we introduced placeholders, that can be of independent interest.
 
 \section{Introduction}
 
@@ -2038,6 +2040,9 @@ You might often get an error |! Missing $ inserted.|: this is typically when a p
 \item Deal with remember picture
 \end{itemize}
 
+\section{Acknowledgments}
+
+I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much!
 
 \end{document}
 % Local Variables:
