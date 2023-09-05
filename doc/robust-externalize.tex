@@ -18,6 +18,22 @@
 \makeatother
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
+
+%% For verbatim environments:
+
+\NewDocumentEnvironment{codeAndResult}{}{\XSIMfilewritestart{\jobname-codeAndResult-tmp-file-you-can-remove.tmp}}%
+{%
+  \XSIMfilewritestop%
+  \par
+  \medskip
+  \noindent\colorbox{graphicbackground}{\noindent\begin{minipage}{1.0\linewidth}
+  {\input{\jobname-codeAndResult-tmp-file-you-can-remove.tmp}}
+  \end{minipage}}
+  % I don't know why, but sometimes this prints nothing, while input works:
+  %{\codeexample[width=0pt, leave comments, vbox, from file={\jobname-codeAndResult-tmp-file-you-can-remove.tmp}]}%
+  {\codeexample[code only, from file={\jobname-codeAndResult-tmp-file-you-can-remove.tmp}]}%
+}
+
 \usepackage{makeidx} % Produces an index of commands.
 \makeindex % Useful or not index will be created
 \usepackage{alertmessage} % For warning, info...
@@ -25,7 +41,8 @@
 \usepackage{verbatim}
 \usepackage{mathtools}
 \usepackage{float} %figure inside minipage
-
+\usepackage{pythonhighlight}
+\usepackage{tcolorbox}
 
 \usepackage{listings}
 \definecolor{codegreen}{rgb}{0,0.6,0}
@@ -75,17 +92,41 @@
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
+
 \tableofcontents
 
 \bigskip
 
 \textbf{WARNING: This library is very young and has not been tested extensively. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder.}
 
+\section{A taste of this library}
+
+This library allows you to cache not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
+\begin{codeexample}[width=0pt,vbox]
+  The next picture is cached %
+  \begin{tikzpictureC}[baseline=(A.base)][add to preamble={\usepackage{pifont}}]
+    \node[fill=red, rounded corners](A){My node that respects baseline \ding{164}.};
+    \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
+  \end{tikzpictureC} and you can see that overlay and depth works.
+\end{codeexample}
+
+but also arbitrary code (e.g.\ python). You can also define arbitrary compilation command and inclusion command to fit you need, and create new presets, to obtain:
+
+\begin{codeAndResult}
+\begin{CacheMeCode}{python print code and result, set title={The for loop}}
+for name in ["Alice", "Bob"]:
+    print(f"Hello {name}")
+\end{CacheMeCode}
+\end{codeAndResult}
+
+Actually, we also provide this style by default, and explain how to write it yourself, you just make sure to load:\\ |\usepackage{pythonhighlight}|\\
+|\usepackage{tcolorbox}|
+
 \section{Introduction}
 
 \subsection{Why do I need to cache (a.k.a. externalize) parts of my document?}
 
-One often wants to cache (i.e.\ store pre-compiled parts of the document, like figures) operations that are long to do: For instance, TikZ is great, but TikZ figures often takes time to compile (it can easily take a few seconds per picture). This can become really annoying with documents containing many pictures, as the compilation can take multiple minutes: for instance my thesis needed roughly 30mn to compile as it contains many tiny figures, and LaTeX needs to compile the document multiple times before converging to the final result. But even on much smaller documents you can easily reach a few minutes of compilation, which is not only high to get a useful feedback in real time, but worse, when using online \LaTeX{} providers (e.g. overleaf), this can be a real pain as you are unable to process your document due to timeouts.
+One often wants to cache (i.e.\ store pre-compiled parts of the document, like figures) operations that are long to do: For instance, TikZ is great, but TikZ figures often take time to compile (it can easily take a few seconds per picture). This can become really annoying with documents containing many pictures, as the compilation can take multiple minutes: for instance my thesis needed roughly 30mn to compile as it contains many tiny figures, and LaTeX needs to compile the document multiple times before converging to the final result. But even on much smaller documents you can easily reach a few minutes of compilation, which is not only high to get a useful feedback in real time, but worse, when using online \LaTeX{} providers (e.g. overleaf), this can be a real pain as you are unable to process your document due to timeouts.
 
 Similarly, you might want to cache the result of some codes, for instance a text or an image generated via python and matplotlib, without manually compiling them externally.
 
@@ -94,7 +135,7 @@ Similarly, you might want to cache the result of some codes, for instance a text
 \tikzname{} has an externalize library to pre-compile these images on the first run. Even if this library is quite simple to use, it has multiple issues:
 \begin{itemize}
 \item If you add a picture before existing pre-compiled pictures, the pictures that are placed after will be recompiled from scratch. This can be mitigated by manually adding a different prefix to each picture, but it is highly not practical to use.
-\item To compile each picture, TikZ's externalize library reads the document's preambule and needs to process (quickly) the whole document. In large documents (or in documents relying on many packages), this can result in a significant loading time, sometimes much bigger than the time to compile the document without the externalize library: for instance, if the document takes 10 seconds to be processed, and if you have 200 pictures that take 1s each to be compiled, the first compilation with the TikZ's externalize library will take roughly half an hour instead of 3mn without the library. And if you add a single picture at the beginning of the document… you need to restart everything from scratch. For these reasons, I was not even able to compile my thesis with TikZ's external library in a reasonable time.
+\item To compile each picture, TikZ's externalize library reads the document's preamble and needs to process (quickly) the whole document. In large documents (or in documents relying on many packages), this can result in a significant loading time, sometimes much bigger than the time to compile the document without the externalize library: for instance, if the document takes 10 seconds to be processed, and if you have 200 pictures that take 1s each to be compiled, the first compilation with the TikZ's externalize library will take roughly half an hour instead of 3mn without the library. And if you add a single picture at the beginning of the document… you need to restart everything from scratch. For these reasons, I was not even able to compile my thesis with TikZ's external library in a reasonable time.
 \item  If two pictures share the same code, it will be compiled twice
 \item Little purity is enforced: if a macro changes before a pre-compiled picture that uses this macro, the figure will not be updated. This can result in different documents depending on whether the cache is cleared or not.
 \item As far as I know, it is made for TikZ picture mostly, and is not really made for inserting other stuff, like matplotlib images generated from python etc...
@@ -103,16 +144,24 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \subsection{FAQ}
 
+\paragraph{What is supported?}
+
+You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also feed data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}).
+
 \paragraph{What is not supported?}
 
-We don't support (yet) overlays, remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks). See other limitations and known bugs at the end of this documentation. Note that this library is quite young, so expect untested things.
+We do not yet support remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks). Note that this library is quite young, so expect untested things.
+
+\paragraph{What OS are supported?}
+
+I tested the library mostly on Linux systems, but the library should work on all OS. Please let me know if it fails for you.
 
 \paragraph{Do I need to compile using -shell-escape?}
 
 Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
-\item If images are all already cached, you don't need to enable \texttt{-shell-escape}.
-\item You can choose not to compile non-cached content, and display a dummy content instead until you choose to compile them.
+\item If images are all already cached, you don't need to enable \texttt{-shell-escape} (this might be interesting e.g. to send the files a pre-cached document to the arxiv or to a publisher: just make sure to include the cache folder).
+\item You can choose to display a dummy content until you choose to compile them.
 \item You can compile manually the images: all the commands that are left to be executed are listed in \texttt{robExt-compile-missing-figures.sh} and you can just run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
 \end{itemize}
 
@@ -137,6 +186,8 @@ So during the first compilation, we lost a x2 factor (roughly an additional time
 
 \paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command and the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
 
+\paragraph{What if I don't want purity for all files?} If you do not want your files to be recompiled if you modify a given file, then just do not add this file to the list of dependencies.
+
 \paragraph{Can I extend it easily?} We tried to take a quite modular approach in order to allow easy extensions. Internally, to support a new cache scheme, we only expect a string containing the program (possibly produced using a template), a list of dependencies, a command to compile this program (e.g. producing a pdf and possibly a tex file with the properties (depth…) of the pdf), and a command to load the result of the compilation into the final document (called after loading the previously mentioned optional tex file). Thanks to pgfkeys, it is then possible to create simple pre-made settings to automatically apply when needed.
 
 \section{Quickstart}
@@ -151,172 +202,458 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 
 \subsubsection{For \LaTeX{} based content}
 
-% In theory, if you only care about \tikzname's picture (and if you are not afraid of breaking figures using |overlay| and |remember pictures|, possibly defined by other packages), you can just do:
+\subsection{Caching a tikz picture}
 
-% \begin{codeexample}[width=0pt]
-% %% We override the default tikzpicture environment
-% %% to externalize all pictures  
-% \robExtExternalizeAllTikzpictures
+If you only care about \tikzname's picture, you have 3 options:
+\begin{enumerate}
+\item Call once |\robExtExternalizeAllTikzpictures| that will redefine |tikzpicture| to use our library (\textbf{not recommended}, as our library does not handle some cases like |remember picture|).
+\item Use |tikzpictureC| instead of |tikzpicture| (this is mostly done to easily convert existing code to this library, but works only for |tikz| pictures).
+\item Use the more general |CacheMe| environment, that can cache \tikzname, \LaTeX{}, python, and much more.
+\end{enumerate}
 
-% \begin{tikzpicture}[baseline,anchor=base]
-%   \node[draw,rounded corners,fill=pink!60]{Hello World!};
-% \end{tikzpicture}
-% \end{codeexample}
+These 3 options are illustrated below (note that the newly defined |tikzpicture| and |tikzpictureC| accept a second optional argument that contains the options to pass to |CacheMe| after loading the |tikz| preset):
 
-% \noindent and all tikzpictures created using |\begin{tikzpicture}...| will be ``externalized''. However, by default the \LaTeX{} template used to compile these pictures is empty, so you will quickly want to populate the template (for instance to load packages, define custom macros possibly shared with the main document etc.). So let's step back and see how we can define an arbitrary template.
+Option 1:
+\begin{codeexample}[width=0pt]
+%% We override the default tikzpicture environment
+%% to externalize all pictures
+%% Warning: it will cause troubles with pictures relying on |remember pictures|
+\robExtExternalizeAllTikzpictures
 
-% If you want to compile a \LaTeX{} code, say a \tikzname{} picture, you first need to define the \LaTeX{} template that will wrap all your code\footnote{While you could use the same preambule as the main project, for instance using a shared \texttt{\textbackslash input\{input.tex\}} file, this is not recommended as it will not only be longer to load (some packages are useless to build your average tikzpictures), but it also harms purity or efficiency: if you choose to track this common input (i.e.\ dependency), then it will recompile the pictures every time you change \texttt{input.tex}, and if you don't track this dependency, then you might skip a needed recompilation leading to a different outcome after invalidating the cache.}. Because you might want to mix different templates in a document (e.g.\ for tikz pictures, matplotlib python code, tikz-cd or zx diagrams…), we like to define them into a preset that is just a set of configuration options\footnote{Internally this is just a pgfkeys style, if you don't want to define presets, you can just write the configuration outside of the preset… but this is not recommended, except for some specific configuration options like \texttt{disable externalization} that you way want to apply globally.}). For instance to create a basic preset called |presetTikz|, use:
+I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpicture}.
+\end{codeexample}
 
-% \begin{codeexample}[width=0pt]
-%   \robExtConfigure{%
-%     presetTikz/.style={
-%       % We define the code that wraps all our figures
-%       defineTemplate={
-%         \documentclass{standalone} % standalone ensures that the pdf output size matches the content
-%         \usepackage{tikz} % Loads any package you need to compile your pictures
-%         % You can define macros, just make sure to double the number of sharps
-%         % as otherwise they will be understood as options of the preset.
-%         \def\sayHello##1{Hello ##1}
-%         \input{input_externalize.tex} % you can put in this file regular LaTeX code to share with the main document
-%         \begin{document}%
-%         \robExtMainContent% This macro will be replaced with (notably) the code for the figure
-%         \end{document}
-%       },
-%       % The dependency files needed to compile the file
-%       % (included when computing the hash). Separate them with commas.
-%       dependencies={input_externalize.tex},
-%     },
-%   }
-% \end{codeexample}
-% % For the example to work:
-% \robExtConfigure{%
-%   presetTikz/.style={
-%     % We define the code that wraps all our figures
-%     defineTemplate={
-%       \documentclass{standalone} % standalone ensures that the pdf output size matches the content
-%       \usepackage{tikz} % Loads any package you need to compile your pictures
-%       % You can define macros, just make sure to double the number of sharps
-%       % as otherwise they will be understood as options of the preset.
-%       \def\sayHello##1{Hello ##1}
-%       \begin{document}%
-%       \robExtMainContent% This macro will be replaced with (notably) the code for the figure
-%       \end{document}
-%     },
-%     % The dependency files needed to compile the file
-%     % (included when computing the hash). Separate them with commas.
-%     dependencies={input_externalize.tex},
-%   },
-% }
+Option 2:
+\begin{codeexample}[width=0pt]
+I am a cached picture: \begin{tikzpictureC}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpictureC}.
+\end{codeexample}
 
-% (see the comments for details)
 
-% Then, if needed, create the dependency files, and use this preset as follows in your code:
+Option 3:
+\begin{codeexample}[width=0pt]
+I am a cached picture: \begin{CacheMe}{tikz}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{CacheMe}.
+\end{codeexample}
 
-% \begin{codeexample}[width=0pt]
-% See that the baseline is respected %
-% \begin{robExtern}{presetTikz}%
-%   \begin{tikzpicture}[baseline,anchor=base]%
-%     \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
-%   \end{tikzpicture}
-% \end{robExtern}
-% \end{codeexample}
+Since |CacheMe| is more general as it applies also to non-tikz pictures (just replace |tikz| with the style of your choice), we will use this syntax from now.
 
-% Note that one might be tempted to move |\begin{tikzpicture}| inside the template to save a bit of typing. However, our library is actually replacing |\robExtMainContent| with the content wrapped around some code\footnote{Basically creating a box in order to compute the depth of the content, and write it to a tex file to use for later.} that need to wrap the whole content. While we provide other macros that don't add this wrapping code\footnote{But then we need to manually add this box if we want to compute the appropriate depth, and we will need to redefine the command to disable externalization.}, it is actually simpler, more configurable, and more typing-friendly, to define an environment that automatically picks the right preset and adds |\begin{tikzpicture}| automatically for us:
+\subsection{Custom preamble}
 
-% \begin{codeexample}[width=0pt]
-%   \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{% = 2 optional arguments + the body (b), cf xparse
-%     \begin{robExtern}{presetTikz,#2}%
-%       \begin{tikzpicture}[#1]%
-%         #3
-%       \end{tikzpicture}%
-%     \end{robExtern}%
-%   }{}
-% \end{codeexample}
+Note that the pictures are compiled in a separate document, with a different preamble and class (we use the standalone class). This is interesting to reduce the compilation time of each picture (loading a large preamble is really time consuming) and to avoid unnecessary recompilation (do you want to recompile all your pictures when you add a single new macro?) without sacrificing the purity. But of course, you need to provide the preamble of the pictures. The easiest way is probably to modify the |tikz| preset (you can also modify the |latex| preset if you want the change to apply to all \LaTeX{} documents):
 
-% This way, in your code you can just use:
-% {
-%   \DeclareDocumentEnvironment{mytikzpicture}{O{}O{}b}{%
-%     \begin{robExtern}{presetTikz,#2}%
-%       \begin{tikzpicture}[#1]%
-%         #3%
-%       \end{tikzpicture}%
-%     \end{robExtern}%
-%   }{}
-% \begin{codeexample}[width=0pt]
-% See the respected baseline: %
-% \begin{mytikzpicture}[baseline,anchor=base]
-%   \node[draw,rounded corners,fill=pink!60]{\sayHello{World}!};
-% \end{mytikzpicture}
-% \end{codeexample}
-% }
-    
-% By choosing the name |tikzpicture| instead of |mytikzpicture|, you would actually override \tikzname's macro, which should be perfectly fine if you want to externalize \tikzname's pictures by default. Because this usecase will likely be important, we actually provide a command that defines a similar environment, except that it uses a preset called |presetTikzDefault| (this style is populated with a very simple template, but you surely want to quickly override it with your own template by just creating a new preset called |presetTikzDefault|):
+\begin{codeexample}[width=0pt,vbox]
+  \robExtConfigure{
+    tikz/.append style={
+      add to preamble={\usetikzlibrary{shadows}},
+    },
+  }
 
-% \begin{codeexample}[width=0pt]
-% %% We override the default tikzpicture environment:
-% \robExtExternalizeAllTikzpictures
+  See, tikz's style now packs the |shadows| library by default: %
+  \begin{CacheMe}{tikz}[even odd rule]
+    \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
+  \end{CacheMe}
+\end{codeexample}
 
-% \begin{tikzpicture}[baseline,anchor=base]
-%   \node[draw,rounded corners,fill=pink!60]{Hello World!};
-% \end{tikzpicture}
-% \end{codeexample}
+You can also choose to overwrite it for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
+\begin{codeexample}[width=0pt,vbox]
+  See, you can add something to the preamble of a single picture: %
+  \begin{CacheMe}{tikz, add to preamble={\usetikzlibrary{shadows}}}[even odd rule]
+    \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
+  \end{CacheMe}
+\end{codeexample}
 
-% Note that doing that could be problematic if you use packages that use |tikzpicture| relying on |remember picture| and |overlays|. For this reason it's certainly safer to just define a different |mytikzpicture| environment, or overwrite only the environment that are safe to override.
+Note that if you use the |tikzpictureC| or |tikzpicture| syntax, you want to add the options after the tikz options (leave an empty bracket if there is none):
+\begin{codeexample}[width=0pt,vbox]
+  See, you can add something to the preamble of a single picture: %
+  \begin{tikzpictureC}[even odd rule][add to preamble={\usetikzlibrary{shadows}}]
+    \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
+  \end{tikzpictureC}
+\end{codeexample}
 
-% \subsection{For non-\LaTeX{} code}
+\subsection{Dependencies}\label{sec:dependencies}
 
-% Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside macros and some environments (e.g. align) as some characters are removed (e.g. percent symbol). For this reason, we sometimes need to separate the time where we define the code and where we insert it, and we provide therefore different commands to deal with non-\LaTeX{} code.
+It might be handy to have a file that is loaded in both the main document and in the cached pictures. For instance, if you have a file |common_inputs.tex| that you want to input in both the main file and in the cached files, that contains, say:\\
+|\def\myValueDefinedInCommonInputs{42}|\\
+then you can add it as a dependency this way (here we use the |latex| preset that does not wrap the code inside a |tikzpicture| only to illustrate that we can also cache things that is not generated by tikz):
+\begin{codeexample}[width=0pt,vbox]
+\begin{CacheMe}{latex,
+    add dependencies={common_inputs.tex},
+    add to preamble={\input{__ROBEXT_WAY_BACK__/common_inputs.tex}}}
+  The answer is \myValueDefinedInCommonInputs.
+\end{CacheMe}
+\end{codeexample}
+Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache folder (containing the |.tex| that will be cached) to the root folder, and will be replaced when creating the file. This way, you can easily input files contained in the root folder. You can also create your own placeholders, read more below.
 
-% The following code will name a template |pythonMatplotlib| (see how we use |ROBEXTMAINCONTENT| as a placeholder for the content), define a preset based on this template, and :
+You can note that we used |add dependencies={common_inputs.tex}|: this allows us to recompile the files if |common_inputs.tex| changes. If you do not want this behavior (e.g. |common_inputs.tex| changes too often and you do not want to recompile everything at every change), you can remove this line, but beware: if you do a breaking changes in |common_inputs.tex| (e.g.\ redefine |42| to |43|), then the previously cached picture will not be recompiled! (So you will still read 42 instead of 43.)
 
-% \begin{codeexample}[width=0pt]
-% % We define our python template:
-% \begin{robExtNamedTemplate}[pythonMatplotlib]
-% import matplotlib.pyplot as plt
-% import sys
-% ROBEXTMAINCONTENT
-% plt.savefig(sys.argv[1]+".pdf")
-% \end{robExtNamedTemplate}
+\subsection{Feeding data back into the main document}
 
-% % We define a reusable preset, note that we specify the compilation command:
-% \robExtConfigure{
-%   presetMatplot/.style={
-%     defineTemplateFromName=pythonMatplotlib,
-%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
-%   },
-% }
+For more advanced usage, you might want to compute a data and cache the result in a macro that you could use later. This is possible if you write into the file |\jobname-out.tex| during the compilation of the cached file (by default, we already open |\writeRobExt| to write to this file). This file will be automatically loaded before loading the pdf (but you can customize all these operations, for instance if you do not want to load the pdf at all; the only requirement is that you should generate a |.pdf| file to specify that the compilation is finished).
 
-% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
+For instance:
 
-% % We draw our code:
-% \begin{robExtCode}{presetMatplot,include graphics args={width=.5\linewidth}}
-% year = [2014, 2015, 2016, 2017, 2018, 2019]  
-% tutorial_count = [39, 117, 111, 110, 67, 29]
-% plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-% plt.xlabel('Year')  
-% plt.ylabel('Number of futurestud.io Tutorials') 
-% \end{robExtCode}
-% \end{codeexample}
+\begin{codeexample}[width=0pt,vbox]
+\begin{CacheMe}{latex, add to preamble={\usepackage{tikz}}, do not include pdf}
+We compute this data that is long to compute:
+\pgfmathparse{(1 + sqrt(5))/2}% result is stored in \pgfmathresult
+% We write the result to the -out file (\string\foo writes \foo to the file without evaluating it,
+% so this will write "\gdef\myLongResult{1.61803}"):
+% Note that CacheMe is evaluated in a group, so you want to use \gdef to define it
+% outside of the group
+\immediate\write\writeRobExt{%
+  \string\gdef\string\myLongResult{\pgfmathresult}%
+}
+\end{CacheMe}
 
-% Note that for the fundamental reasons mentioned above, the above code can't work inside a macro. If we still want to include the result in a macro, we can separate the definition of the code and its usage:
-% \begin{codeexample}[width=0pt]
-% % We define our python template:
-% \begin{robExtNamedTemplate}[pythonMatplotlib]
-% import matplotlib.pyplot as plt
-% import sys
-% ROBEXTMAINCONTENT
-% plt.savefig(sys.argv[1]+".pdf")
-% \end{robExtNamedTemplate}
+We computed the cached value \myLongResult.
+\end{codeexample}
 
-% % We define a reusable preset, note that we specify the compilation command:
-% \robExtConfigure{
-%   presetMatplot/.style={
-%     defineTemplateFromName=pythonMatplotlib,
-%     set compilation command={python3 "\robExtFinalFile" "\robExtFinalPrefixedName"},
-%   },
-% }
+\subsection{For non-\LaTeX{} code}
 
-% %%%%%%%%%%%%%%% Above code must be written once, below is used for any drawing
+Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside macros and some environments that parse their body (e.g. align) as some characters are removed (e.g. percent symbols are comments and are removed). For this reason, we sometimes need to separate the time where we define the code and where we insert it (this is done using placeholders, see |PlaceholderFromCode|), and we need to introduce new environments to populate the template (see \cref{sec:placeholders} for more details, to generate them from filename, to get the path of a file etc).
+
+The environment |CacheMeCode| can be used for this purpose.
+
+\subsubsection{Python code}
+
+\paragraph{Generate an image}
+
+For instance, you can use the default |python| template to generate an image with python. The following code:
+
+
+\begin{codeexample}[code only]
+\begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
+import matplotlib.pyplot as plt
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')   
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{CacheMeCode}
+\end{codeexample}
+
+will produce the image visible in \cref{fig:pythonGeneratedImage}. \textbf{Importantly: you do not want to indent the content of CacheMeCode, or the space will also appear in the final code.}
+\begin{figure}
+\centering
+\begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
+import matplotlib.pyplot as plt
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')   
+plt.savefig("__ROBEXT_OUTPUT_PDF__")
+\end{CacheMeCode}
+\caption{Image generated with python.}
+\label{fig:pythonGeneratedImage}
+\end{figure}
+
+\paragraph{Compute a value}
+
+We also provide by default a number of helper functions. For instance, |write_to_out(text)| will write |text| to the |*-out.tex| file that is loaded automatically by \LaTeX{}. This is useful to compute data that is not an image (note that |r"some string"| does not consider backslash as an escape string, which is handy to write \LaTeX{} code in python):
+
+For instance:
+\begin{codeAndResult}
+\begin{CacheMeCode}{python, do not include pdf}
+import math
+write_to_out(r"\gdef\cosComputedInPython{" + str(math.cos(1)) + r"}")
+\end{CacheMeCode}
+
+$\rightarrow$ The cosinus of 1 is \cosComputedInPython.
+\end{codeAndResult}
+
+\paragraph{Improve an existing preset}
+
+If you often use the same code (e.g.\ load matplotlib, save the file etc), you can directly modify the |__ROBEXT_MAIN_CONTENT__| placeholder to add the redundant information (or create a new template from scratch, see below), as this placeholder contains the code typed by the user (this is true for all presets, as |CacheMe*| is in charge of setting this placeholder):
+
+\begin{codeAndResult}
+%% Create your style:
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE_BEFORE__}
+import matplotlib.pyplot as plt
+import sys
+\end{PlaceholderFromCode}
+
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE_AFTER__}
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+\robExtConfigure{
+  my matplotlib/.style={
+    python,
+    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_BEFORE__},
+    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_AFTER__},
+  },
+}
+
+%% Use your style:
+%% See, you don't need to load matplotlib or save the file:
+\begin{CacheMeCode}{my matplotlib, set includegraphics options={width=.5\linewidth}}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')     
+\end{CacheMeCode}
+\end{codeAndResult}
+
+\paragraph{Custom parameters and placeholders}
+
+Let us say that you would like to define a default font size for your figure, but that you would like to allow the user to change this font size. Then, you should create a new placeholder with your default value, and use |set placeholder| to change this value later (see also the documentation of |CacheMeCode| to see how to create a new command to avoid typing |set placeholder|):
+
+\begin{codeAndResult}
+%% Create your style:
+
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE_BEFORE__}
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import sys
+mpl.rcParams['font.size'] = __MY_MATPLOTLIB_FONT_SIZE__
+\end{PlaceholderFromCode}
+
+\begin{PlaceholderFromCode}{__MY_MATPLOTLIB_TEMPLATE_AFTER__}
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+\robExtConfigure{
+  my matplotlib/.style={
+    python,
+    % We create a new placeholder (it is simple enough that you don't need to use PlaceholderFromCode)
+    set placeholder={__MY_MATPLOTLIB_FONT_SIZE__}{12},
+    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_BEFORE__},
+    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_AFTER__},
+  },
+}
+
+%% Use your style:
+%% See, you don't need to load matplotlib or save the file:
+Default font size: \begin{CacheMeCode}{my matplotlib, set includegraphics options={width=.5\linewidth}}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')     
+\end{CacheMeCode}
+
+With font size 16:
+\begin{CacheMeCode}{my matplotlib,
+    set includegraphics options={width=.5\linewidth},
+    set placeholder={__MY_MATPLOTLIB_FONT_SIZE__}{16}}
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')     
+\end{CacheMeCode}
+\end{codeAndResult}
+
+Note that if you manage to move all the code in the template and that the user can configure everything using the options and an empty content, you can use |CacheMeNoContent| that takes no argument and that consider its body as the options.
+
+\paragraph{Custom include command}
+
+There may be some cases where you do not want to include a picture. We already saw the option |do not include pdf| if you do not want to include anything. But you can customize the include function, using notably:\\
+|custom include command={your include command}|
+
+For instance, let us say that you would like to display both the source code used to obtain a given code, together with the output of this code. Then, you can write this style:
+
+\begin{codeexample}[code only]
+{
+%% Create your style:
+\begin{PlaceholderFromCode}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__}
+# File where print("bla") should be redirected
+# get_filename_from_extension("-foo.txt") will give you the path of the file
+# in the cache that looks like robExt-somehash-foo.txt
+print_file = open(get_filename_from_extension("-print.txt"),  "w")
+sys.stdout = print_file
+# This code will read the current code, and extract the lines between
+# that starts with "### CODESTARTSHERE" and "### CODESTOPSHERE", and will write
+# it into the *-code.text (we do not want to print all these functions in
+# the final code)
+with open(get_filename_from_extension("-code.txt"), "w") as f:
+    # The current script has extension .tex
+    with open(get_current_script(), "r") as script:
+        should_write = False
+        for line in script:
+            if line.startswith("### CODESTARTSHERE"):
+                should_write = True
+            elif line.startswith("### CODESTOPSHERE"):
+                should_write = False
+            elif "HIDEME" in line:
+                pass
+            else:
+                if should_write:
+                    f.write(line)
+### CODESTARTSHERE
+\end{PlaceholderFromCode}
+
+
+\begin{PlaceholderFromCode}{__MY_PRINT_BOTH_TEMPLATE_AFTER__}
+### CODESTOPSHERE
+print_file.close()
+\end{PlaceholderFromCode}
+
+\robExtConfigure{
+  my python print both/.style={
+    python,
+    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__},
+    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_AFTER__},
+    set title/.style={
+      set placeholder={__MY_TITLE__}{##1},
+    },
+    set title={Example},
+    custom include command={
+      % Useful to replace __MY_TITLE__:
+      \evalPlaceholder{
+        % \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+        \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
+          \lstinputlisting[frame=single,
+            breakindent=.5\textwidth,
+            frame=single,
+            breaklines=true,
+            style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+          Output: 
+          \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-print.txt}}
+        \end{tcolorbox}
+      }
+    },
+  },
+}
+\end{codeexample}
+
+Once the style is defined (actually we already defined in the library under the name |python print code and result|), you can just write:
+\begin{codeexample}[code only]
+\begin{CacheMeCode}{my python print both, set title={The for loop}}
+for name in ["Alice", "Bob"]:
+    print(f"Hello {name}")
+\end{CacheMeCode}
+\end{codeexample}
+to get:
+{
+%% Create your style:
+\begin{PlaceholderFromCode}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__}
+# File where print("bla") should be redirected
+# get_filename_from_extension("-foo.txt") will give you the path of the file
+# in the cache that looks like robExt-somehash-foo.txt
+print_file = open(get_filename_from_extension("-print.txt"),  "w")
+sys.stdout = print_file
+# This code will read the current code, and extract the lines between
+# that starts with "### CODESTARTSHERE" and "### CODESTOPSHERE", and will write
+# it into the *-code.text (we do not want to print all these functions in
+# the final code)
+with open(get_filename_from_extension("-code.txt"), "w") as f:
+    # The current script has extension .tex
+    with open(get_current_script(), "r") as script:
+        should_write = False
+        for line in script:
+            if line.startswith("### CODESTARTSHERE"):
+                should_write = True
+            elif line.startswith("### CODESTOPSHERE"):
+                should_write = False
+            elif "HIDEME" in line:
+                pass
+            else:
+                if should_write:
+                    f.write(line)
+### CODESTARTSHERE
+\end{PlaceholderFromCode}
+
+
+\begin{PlaceholderFromCode}{__MY_PRINT_BOTH_TEMPLATE_AFTER__}
+### CODESTOPSHERE
+print_file.close()
+\end{PlaceholderFromCode}
+
+\robExtConfigure{
+  my python print both/.style={
+    python,
+    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__},
+    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_AFTER__},
+    set title/.style={
+      set placeholder={__MY_TITLE__}{##1},
+    },
+    set title={Example},
+    custom include command={
+      % Useful to replace __MY_TITLE__:
+      \evalPlaceholder{
+        % \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+        \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
+          % \noindent Code:
+          \lstinputlisting[frame=single,breakindent=.5\textwidth,frame=single,breaklines=true,style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+          Output: 
+          \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-print.txt}}
+        \end{tcolorbox}
+      }
+    },
+  },
+}
+
+%% Use your style:
+\begin{CacheMeCode}{my python print both, set title={The for loop}}
+for name in ["Alice", "Bob"]:
+    print(f"Hello {name}")
+\end{CacheMeCode}
+}
+
+\subsubsection{Other languages}
+
+It is relatively easy to add basic support for a new language. You only need to configure |set compilation command| to your command, |set template| to the file to compile (|__ROBEXT_MAIN_CONTENT__| contains the code typed by the user), and possibly a custom include command with |custom include command| if you do not want to do |\includegraphics| on the final pdf. For instance, to define a basic template for bash, you just need to use:
+
+\begin{codeAndResult}
+% Create your style
+\begin{PlaceholderFromCode}{__MY_BASH_TEMPLATE__}
+# Quit if there is an error
+set -e  
+__ROBEXT_MAIN_CONTENT__
+# Create the pdf file to certify that no compilation error occured
+touch "__ROBEXT_OUTPUT_PDF__"
+\end{PlaceholderFromCode}
+
+\robExtConfigure{
+  my bash/.style={
+    set compilation command={bash "__ROBEXT_SOURCE_FILE__"},
+    set template={__MY_BASH_TEMPLATE__},
+    custom include command={
+      \evalPlaceholder{
+        \verbatiminput{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__-output.txt}
+      }
+    }
+  }
+}
+
+% Use your style
+\begin{CacheMeCode}{my bash}
+# Write the system conf to a file *-output.txt
+uname -srv > "__ROBEXT_OUTPUT_PREFIX__-output.txt"
+\end{CacheMeCode}
+\end{codeAndResult}
+
+
+\paragraph{Code inside a macro}
+
+Due to fundamental \LaTeX{} restrictions, it is impossible to use |CacheMeCode| inside a macro or some environments as \LaTeX{} will strip all lines containing a percent character for instance. The solution here is to define our main content before, and then set it using |set main content| (that simply sets |__ROBEXT_MAIN_CONTENT__|). In this example, we also show how |CacheMeNoContent| can be used when their is no content (the arguments to |CacheMe| are directly given in the body of |CacheMeNoContent|):
+
+\begin{codeAndResult}
+\begin{PlaceholderFromCode}{__TMP_MAIN_CONTENT__}
+import matplotlib.pyplot as plt
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')   
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+\fbox{\begin{CacheMeNoContent}
+  python,
+  set includegraphics options={width=.8\linewidth},
+  set main content={__TMP_MAIN_CONTENT__},
+\end{CacheMeNoContent}}
+\end{codeAndResult}
 
 % % We define our code (implicitely giving it a default name, that can be changed
 % % if multiple codes are inserted in the same macro)
@@ -365,8 +702,8 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 %         % template a part that creates a new file whose name is the basename of the current (script) file
 %         % and that contains all its code except for the template (to differentiate between template and
 %         % non-template, we could add a special comment on lines to remove)
-%         \verbatiminput{\robExtAddPrefixPathAndName{\robExtFinalName.codeonly.py}}
-%         \includegraphics[width=.6\textwidth]{\robExtAddPrefixPathAndName{\robExtFinalName.pdf}}%
+%         \verbatiminput{\robExtAddCachePathAndName{\robExtFinalName.codeonly.py}}
+%         \includegraphics[width=.6\textwidth]{\robExtAddCachePathAndName{\robExtFinalName.pdf}}%
 %         \caption{\mycaption}
 %       \end{figure}
 %     },
@@ -435,11 +772,26 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 
 \section{Documentation}
 
-\subsection{Placeholders}
+\subsection{How it works}
 
-Placeholders are the main concept allowing this library to generate the content of a source file based on a template (a template will itself be a placeholder containing other placeholders). A placeholder is a special strings like |[°COLOR°IMAGE°]| inserted for instance in a template, that will be later given a value. This value will be used to replace (recursively) the placeholder in the template. For instance, if a placeholder |[°LIKES°]| contains |I like ._FRUIT_. and ._VEGETABLE_.]|, if the placeholder |._FRUIT_.]| contains |oranges| and if the placeholder |..VEGETABLE..]| contains |salad|, then evaluating |[°LIKES°]| will output |I like oranges and salad.|
+This library must be able to generate 3 elements for any cached content:
+\begin{itemize}
+\item a source file, that will be compiled, and is obtained by expanding the placeholder |__ROBEXT_TEMPLATE__| (see \cref{sec:placeholders}),
+\item a compilation command obtained by expanding the placeholder |__ROBEXT_COMPILATION_COMMAND__|,
+\item a dependency file, that contains the hash of all the dependencies (see \cref{sec:dependencies} for details) and the compilation command,
+\item an inclusion command (this one is not used during the caching process, it is only used when including the compiled document in the main document), that you can set using |custom include command={your command}|.
+\end{itemize}
 
-% Note that the usage of underscore in only a convention, as any name can be used for the placeholder. There is however one rule to follow: the name of a placeholder should be made to avoid ambiguities when replacing the string, notably its name should not contain the name of another placeholder. For instance, if we define a placeholder called |NAME| containing |Foo| and a placeholder named |FULL°NAME| containing |Foo Bar|, then when evaluating the string |My name is FULL°NAME|, we have no way to know if the user wants to get |My name is FULL°Foo| or |My name is Foo Bar|. For this reason, \textbf{we advice users to start and end their placeholder names using, respectively, |[°| and |°]|}, while using only upper case letters and |°| inside the placeholder name (this also improves readability).
+The hash of all these elements is computed in order to obtain a reference hash, denoted |somehash| that looks like a unique random value (note that |__ROBEXT_OUTPUT_PDF__| and alike are expanded after knowing the hash since they depend on the final hash value). This hash |somehash| will change whenever a dependency changes, or if the compilation command changes, ensuring purity. Then, the dependency file and the source file are written in the cache, by default in |robustExternalize/robExt-somehash.tex| and |robustExternalize/robExt-somehash.deps|. Then, the compilation command will be run from the cache folder. At the end, by default, we check if a file |robustExternalize/robExt-somehash.pdf| exists: if not we abort, otherwise we |\input| the file |robustExternalize/robExt-somehash-out.tex| and we run the include command (that includes the pdf by default). As we saw earlier, this command can be customized to use other files. \textbf{Importantly, all the files created during the compilation must be prefixed by} |robExt-somehash|, which can be obtained at runtime using |__ROBEXT_OUTPUT_PREFIX__|. This way, we can easily clean the cache while ensuring maximum purity.
+
+In the following, we will denote by |*-foo.bar| the file in:\\
+|robustExternalize/robExt-somehash-foo.bar|.
+
+\subsection{Placeholders}\label{sec:placeholders}
+
+Placeholders are the main concept allowing this library to generate the content of a source file based on a template (a template will itself be a placeholder containing other placeholders). A placeholder is a special strings like |__COLOR_IMAGE__| inserted for instance in a string, that will be given a value later. This value will be used to replace (recursively) the placeholder in the template. For instance, if a placeholder |__LIKES__| contains |I like __FRUIT__ and __VEGETABLE__|, if the placeholder |__FRUIT__| contains |oranges| and if the placeholder |__VEGETABLE__| contains |salad|, then evaluating |__LIKES__| will output |I like oranges and salad.|
+
+Note that the usage of underscore in only a convention, as any name can be used for the placeholder. There is however one rule to follow: the name of a placeholder should be made to avoid ambiguities when replacing the string, notably its name should not contain the name of another placeholder. For instance, if we define a placeholder called |NAME| containing |Foo| and a placeholder named |FULL_NAME| containing |Foo Bar|, then when evaluating the string |My name is FULL_NAME|, we have no way to know if the user wants to get |My name is FULL_Foo| or |My name is Foo Bar|. For this reason, \textbf{we advice users to start and end their placeholder names using two underscores} |__|, while using only upper case letters and single underscore |_| inside the placeholder name (this also improves readability). If you are worried about ambiguities like |__PLACEHOLDER1__PLACEHOLDER2__|, you can also use different separators for the beginning and the end like |__PLACEHOLDER1__|, but beware that |[| requires brackets around when used in pgf styles.
 
 Placeholders are local variables (internally just some \LaTeX{} 3 strings). You can therefore define a placeholder in a local group surrounded by brackets |{ ... }| if you want it to have a reduced scope.
 
@@ -583,7 +935,7 @@ Compare with:
   As you can see, \textbf{the precise content is not exactly identical to the original string}: \LaTeX{} comments are removed, spaces are added after macros, some newlines are removed etc. While this is usually not an issue when dealing with \LaTeX{} code, it causes some troubles when dealing with non-\LaTeX{} code. For this reason, we define \textbf{other commands} (see for instance |PlaceholderFromCode| below) that can accept verbatim content; the downside being that \LaTeX{} forbids usage of these verbatim commands inside other macros, so you should always define them at the top level (this seems to be fundamental to how \LaTeX{} works, as any input to a macro gets interpreted first as a \LaTeX{} string, losing all comments for instance). Note that this is not as restrictive as it may sound, as it is always possible to define the needed placeholders before any macro, while using them inside the macro, possibly combining them with other placeholders (defined either before or inside the macro).
 \end{pgfmanualentry}
 
-But before seeing how to define placeholder containing arbitrary code, let us first see how we can define a placeholder recursively, by giving it a value based on its previous value (useful for instance in order to add stuff to it):
+But before seeing how to define placeholder containing arbitrary code, let us first see how we can define a placeholder recursively, by giving it a value based on its previous value (useful for instance in order to add stuff to it).
 
 \begin{pgfmanualentry}
   \extractcommand\setPlaceholderRec\marg{new placeholder}\marg{content with placeholder}\@@
@@ -599,13 +951,38 @@ But before seeing how to define placeholder containing arbitrary code, let us fi
 \setPlaceholderRec{__MY_COMMAND__}{__MY_COMMAND__ myfile}
 \printAllPlaceholdersExceptDefaults
 \end{codeexample}
-Not that the if the placeholder content contains at the end the placeholder name, we will automatically remove it to avoid infinite recursion at evaluation time. This has the benefit that you can add something to a placeholder even if this placeholder does not exists yet (in which case it will be understood as the empty string):
+Note that the if the placeholder content contains at the end the placeholder name, we will automatically remove it to avoid infinite recursion at evaluation time. This has the benefit that you can add something to a placeholder even if this placeholder does not exists yet (in which case it will be understood as the empty string):
 \begin{codeexample}[width=0pt,vbox]
 \setPlaceholderRec{__COMMAND_ARGS__}{__COMMAND_ARGS__ -l}
 \setPlaceholderRec{__COMMAND_ARGS__}{__COMMAND_ARGS__ -s}
 \printAllPlaceholdersExceptDefaults
 \end{codeexample}
 \end{pgfmanualentry}
+
+Note that sometimes, you might not want to use |\setPlaceholderRec| to simply append some data to the placeholder as it will also evaluate the inner placeholders (meaning that you will not be able to redefine them later). For this reason, we also provide functions to add something to the placeholder without evaluating it first:
+\begin{pgfmanualentry}
+  \extractcommand\addToPlaceholder\opt{*}\marg{placeholder}\marg{content to add}\@@
+  \extractcommand\addBeforePlaceholder\opt{*}\marg{placeholder}\marg{content to add}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/add to placeholder=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add to placeholder no space=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before placeholder=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before placeholder no space=\marg{name placeholder}\marg{content to add}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  |\addToPlaceholder{foo}{bar}| adds |bar| at the end of the placeholder |foo| (by default it also adds a space, unless you use the star version), creating it if it does not exist (the |before| variants add the content\dots{} before).
+\begin{codeexample}[width=0pt,vbox]
+\setPlaceholder{__ENGINE__}{pdflatex}
+\setPlaceholder{__COMMAND__}{__ENGINE__ --option}
+\addToPlaceholder{__COMMAND__}{--other}
+\addToPlaceholder*{__COMMAND__}{-option}
+\addBeforePlaceholder{__COMMAND__}{time}
+\printAllPlaceholdersExceptDefaults
+\end{codeexample}
+\end{pgfmanualentry}
+
 
 \begin{pgfmanualentry}
   \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
@@ -697,7 +1074,7 @@ Note that of course, you can define a placeholder before a macro and call it ins
   \placeholderPathFromFilename{__MYLIB__}{mylib.py}
   \printAllPlaceholdersExceptDefaults
   You can also get the path relative to the root folder:\\
-  \robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}
+  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -730,9 +1107,9 @@ Note that of course, you can define a placeholder before a macro and call it ins
   \placeholderPathFromContent{__MYLIB__}[.py]{some contents b}
   \printAllPlaceholdersExceptDefaults
   You can also get the path relative to the root folder:\\
-  \robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
   As a sanity check, this file contains
-  \verbatiminput{\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}}
+  \verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -761,11 +1138,33 @@ You can then use it like:
 \begin{codeexample}[width=0pt,vbox]
 \printAllPlaceholdersExceptDefaults
 You can also get the path relative to the root folder:\\
-\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
 As a sanity check, this file contains
-\verbatiminput{\robExtAddPrefixPath{\getPlaceholderNoReplacement{__MYLIB__}}}
+\verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
 \end{codeexample}
 \end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\copyPlaceholder\marg{new placeholder}\marg{old placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/copy placeholder=\marg{new placeholder}\marg{old placeholder}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  This creates a new placeholder with the content of |old placeholder|. Note that this is different from:\\
+  |\setPlaceholder{new placeholder}{old placeholder}|\\
+  because if we modify |old placeholder|, this will not affect |new placeholder|.
+\begin{codeexample}[width=0pt,vbox]
+  \setPlaceholder{__MY_CONTENT__}{Some content}
+  \copyPlaceholder{__MY_OLD_CONTENT__}{__MY_CONTENT__}
+  \setPlaceholder{__MY_CONTENT__}{The content used to be __MY_OLD_CONTENT__}
+  \printAllPlaceholdersExceptDefaults
+\end{codeexample}
+ It is useful for instance if you want to use a different value for |__ROBEXT_MAIN_CONTENT__|: first copy |__ROBEXT_MAIN_CONTENT__| to another placeholder, say |__NEW_MAIN_CONTENT__|, and then set |__ROBEXT_MAIN_CONTENT__| to point to an arbitrary template that may load |__NEW_MAIN_CONTENT__|.
+\end{pgfmanualentry}
+
 
 \subsection{Caching a content}
 
@@ -787,7 +1186,7 @@ As a sanity check, this file contains
     },
     set compilation command={pdflatex -shell-escape -halt-on-error "__ROBEXT_SOURCE_FILE__"},
     custom include command={%
-      \includegraphics[width=4cm,angle=45]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+      \includegraphics[width=4cm,angle=45]{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}%
     },
   }
 This content is cached $\delta$.    
@@ -824,7 +1223,7 @@ This content is cached $\delta$.
       % \evalPlaceholder avoids the need to play with expandafter, getPlaceholder etc...
       \evalPlaceholder{% 
         \includegraphics[width=4cm,angle=__MY_ANGLE__,origin=c]{%
-          \robExtAddPrefixPathAndName{\robExtFinalHash.pdf}%
+          \robExtAddCachePathAndName{\robExtFinalHash.pdf}%
         }%
       }%
     },
@@ -848,7 +1247,7 @@ This content is cached $\delta$.
   Like |CacheMe|, except that the code is read verbatim by \LaTeX{}. This way, you can put non-\LaTeX{} code inside safely, but you will not be able to use it inside a macro or some environments that read their body. Here is an example where we define an environment that automatically import matplotlib, save the figure, and insert it into a figure. Note that we define in this example new commands to type |set caption=foo| instead of |set placeholder={__FIG_CAPTION__}{foo}|.
 %% codeexample cannot deal with verbatim content
 
-\begin{lstlisting}[language={[LaTeX]{TeX}}]
+\begin{codeexample}[code only]
 %% Define the python code to use as a template
 %% (impossible to define it in \robExtConfigure directly since
 %% it is a verbatim environment)
@@ -880,7 +1279,7 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
       \evalPlaceholder{%
         \begin{figure}
           \centering
-          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}%
           \caption{__FIG_CAPTION__a}
           \label{__FIG_LABEL__}
         \end{figure}%
@@ -897,7 +1296,7 @@ plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)
 plt.xlabel('Year')  
 plt.ylabel('Number of futurestud.io Tutorials') 
 \end{CacheMeCode}    
-\end{lstlisting}
+\end{codeexample}
 
 %% Define the python code to use as a template
 %% (impossible to define it in \robExtConfigure directly since
@@ -930,7 +1329,7 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
       \evalPlaceholder{%
         \begin{figure}
           \centering
-          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+          \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}%
           \caption{__FIG_CAPTION__}
           \label{__FIG_LABEL__}
         \end{figure}%
@@ -948,8 +1347,8 @@ plt.xlabel('Year')
 plt.ylabel('Number of futurestud.io Tutorials') 
 \end{CacheMeCode}
 
-Note that as we explained it before, due to \LaTeX{} limitations, it is impossible to call |CacheMeCode| inside macros and inside some environments that evaluate their body. To avoid that issue, it is always possible to define the macro before and call it inside. We will exemplify this on the previous example, but note that \textbf{this example this is only for educational purposes} since the environment |figure| does not evaluate its body, and |CacheMeCode| can therefore safely be used inside without using this trickery:
-\begin{lstlisting}[language={[LaTeX]{TeX}}]
+Note that as we explained it before, due to \LaTeX{} limitations, it is impossible to call |CacheMeCode| inside macros and inside some environments that evaluate their body. To avoid that issue, it is always possible to define the macro before and call it inside. We will exemplify this on the previous example, but note that \textbf{this example is only for educational purposes} since the environment |figure| does not evaluate its body, and |CacheMeCode| can therefore safely be used inside without using this trickery:
+\begin{codeexample}[code only]
 %% Define the python code to use as a template
 %% (impossible to define it in \robExtConfigure directly since
 %% it is a verbatim environment)
@@ -971,7 +1370,7 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
     set includegraphics options={width=1cm},
     custom include command={%
       \evalPlaceholder{%
-        \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}}%
+        \includegraphics[__INCLUDEGRAPHICS_OPTIONS__]{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}%
       }%
     },
   },
@@ -993,7 +1392,7 @@ plt.ylabel('Number of futurestud.io Tutorials')
   \cacheMe[matplotlib, set includegraphics options={width=.8\linewidth}, set caption={Hello}]{__TMP__}
   \caption{An example to show how code can be inserted into macros or environments that evaluate their contents (this trick is actually not needed for figures)}
 \end{figure}
-\end{lstlisting}
+\end{codeexample}
 \end{pgfmanualentry}
 
 
@@ -1009,7 +1408,7 @@ plt.ylabel('Number of futurestud.io Tutorials')
   Style that alias to |set placeholder={__ROBEXT_TEMPLATE__}{#1}|, in order to define the placeholder that will hold the template of the final file.
 \end{pgfmanualentry}
 
-\subsubsection{Options to configure the compilation command}
+\subsubsection{Options to configure the compilation command}\label{sec:configureCompilationCommand}
 
 \begin{pgfmanualentry}
   \makeatletter%
@@ -1063,7 +1462,7 @@ The inclusion command is the command that is run to include the cached file back
   \makeatother%
   \pgfmanualbody
   Sets the command to run to include the compiled file. You can use:\\
-  |\robExtAddPrefixPathAndName{\robExtFinalHash.pdf}|\\
+  |\robExtAddCachePathAndName{\robExtFinalHash.pdf}|\\
   in order to get the path of the compiled pdf file. Note that we recommend rather to use |custom include command| that automatically checks if the file compiled correctly and that load the |*-out.tex| file if it exists (useful to pass information back to the pdf).
 \end{pgfmanualentry}
 
@@ -1079,10 +1478,11 @@ The inclusion command is the command that is run to include the cached file back
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
-  \extractkey/robExt/do not include\@nil
+  \extractkey/robExt/do not include pdf\@nil
   \makeatother%
   \pgfmanualbody
-  Do not include anything. Useful if you only want to compile the file but use it later.
+  Do not include the pdf. Useful if you only want to compile the file but use it later (note that you should still generate a |.pdf| file, possibly empty, to indicate that the compilation runs smootly). Equivalent to:\\
+  |custom include command={}|
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1163,11 +1563,276 @@ You might want (sometimes or always) to disable externalization:
   By doing |execute after each externalization={some code}|, you will run some code after the externalization. This might be practical for instance to update a counter (e.g. the number of pages\dots) based on the result of the compiled file.
 \end{pgfmanualentry}
 
+\subsubsection{Dependencies}
+
+In order to enforce reproducibility, you should tell what are the files that your code depends on, by adding this file as a dependency. This has the advantage that if this file is changed, your code is automatically recompiled. On the other hand, you might not want this behavior (e.g. if this file often changes in a non-important way): in that case, just don't add the file as a dependency (but keep that in mind as you might not be able to recompile your file if you clear the cache if you introduced breaking changes).
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/dependencies=\marg{list,of,dependencies}\@nil
+  \extractkey/robExt/add dependencies=\marg{list,of,dependencies}\@nil
+  \extractkey/robExt/reset dependencies\@nil
+  \makeatother%
+  \pgfmanualbody
+  Set/add/reset the dependencies (you can put multiple files separated by commas). These files should be relative to the main compiled file. For instance, if you have a file |common_inputs.tex| that you want to input in both the main file and in the cached files, that contains, say:\\
+  |\def\myValueDefinedInCommonInputs{42}|\\
+  then you can add it as a dependency using:
+\begin{codeexample}[width=0pt,vbox]
+\begin{CacheMe}{latex,
+    add dependencies={common_inputs.tex},
+    add to preamble={\input{__ROBEXT_WAY_BACK__/common_inputs.tex}}}
+  The answer is \myValueDefinedInCommonInputs.
+\end{CacheMe}
+\end{codeexample}
+Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache folder (containing the |.tex| that will be cached) to the root folder. This way, you can easily input files contained in the root folder.
+\end{pgfmanualentry}
+
+
 \subsubsection{Pass compiled file to another template}
 
 If your template depends on the result of a previous template, you can set a placeholder using |name output with ext|, but this is likely not working yet.
 
 \textbf{TODO: test, need to have global placeholders, or at least pass the information pass the file.}
+
+\subsection{Default presets}\label{sec:presets}
+
+We provide by default some presets for famous languages (for now \LaTeX{} and python).
+
+\subsubsection{All languages}
+
+First, here are a few options that are available irrespective of the used language.
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/set includegraphics options=\marg{options}\@nil
+  \extractkey/robExt/add to includegraphics options=\marg{options}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Set/add options to the |\includegraphics| run when inserting the pdf (by the default include command). By default it is empty, but the |latex| preset sets it to:\\
+  |trim=__ROBEXT_LATEX_TRIM_LENGTH__ __ROBEXT_LATEX_TRIM_LENGTH__|\\
+  |__ROBEXT_LATEX_TRIM_LENGTH__ __ROBEXT_LATEX_TRIM_LENGTH__|\\
+  in order to remove the margin added in the standalone package options, which is needed to display overlay texts.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/verbatim output\@nil
+  \makeatother%
+  \pgfmanualbody
+  Shortcut for:
+\begin{verbatim}
+custom include command={%
+  \evalPlaceholder{%
+    __ROBEXT_VERBATIM_COMMAND__{%
+      __ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__-output.txt}%
+  }%
+},
+\end{verbatim}
+  i.e.\ instead of printing the pdf we print the content of the file |__ROBEXT_OUTPUT_PREFIX__-output.txt| using the command in |__ROBEXT_VERBATIM_COMMAND__|, that defaults to |\verbatiminput|:
+\begin{codeAndResult}
+\begin{CacheMeCode}{python, verbatim output}
+with open("__ROBEXT_OUTPUT_PREFIX__-output.txt", "w") as f:
+    for i in range(5):
+        f.write(f"Hello {i}\n")
+\end{CacheMeCode}
+\end{codeAndResult}
+\end{pgfmanualentry}
+
+
+\subsubsection{\LaTeX{}}
+
+The |latex| preset is used to cache any \LaTeX{} content, like tikz pictures. Note that as of today, it supports overlay content out of the box (if the overlay is more than 30cm long, you might want to customize a placeholder), but not images that need to use |remember picture|.
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex\@nil
+  \makeatother%
+  \pgfmanualbody
+  This style sets the template |__ROBEXT_LATEX__| and the compilation command:\\ |__ROBEXT_COMPILATION_COMMAND_LATEX__|\\
+  (cf \cref{sec:placeholders} for details), and adds a number of styles described below, to easily configure the most common options. You can use it as follows:
+  \begin{codeexample}[width=0pt,vbox]
+    The next picture is cached %
+    \begin{CacheMe}{latex, add to preamble={\usepackage{tikz}}}
+      \begin{tikzpicture}[baseline=(A.base)]
+        \node[fill=red, rounded corners](A){My node that respects baseline.};
+        \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
+      \end{tikzpicture}
+    \end{CacheMe} and you can see that overlay and depth works.
+  \end{codeexample}
+\end{pgfmanualentry}
+
+To see how to create your own preset or automatically load a library, see \cref{sec:customize}.
+
+The next options can be used after calling the |latex| style:
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/use latexmk\@nil
+  \extractkey/robExt/latex/use lualatex\@nil
+  \extractkey/robExt/latex/use xelatex\@nil
+  \makeatother%
+  \pgfmanualbody
+  Use latexmk/lualatex/xelatex to compile. It is a shortcut for:\\
+  |set placeholder={__ROBEXT_LATEX_ENGINE__}{yourfavoriteengine}|
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/set latex options=\marg{latex options}\@nil
+  \extractkey/robExt/latex/add to latex options=\marg{latex options}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Set/add elements to the set of latex options of the |\documentclass| (it will automatically add a comma before if you add an element). Internally it sets |__ROBEXT_LATEX_OPTIONS__|. By default, it sets:\\
+  |margin=__ROBEXT_LATEX_TRIM_LENGTH__|
+  (where |__ROBEXT_LATEX_TRIM_LENGTH__| is defined as 30cm by default) in order to add a margin that will be trimmed  later in the |\includegraphics|. This is useful not to cut stuff displayed outside of the bounding box (overlays). 
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/set documentclass=\marg{documentclass}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Set the documentclass of the document (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_DOCUMENT_CLASS__|.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/set preamble=\marg{code of preamble}\@nil
+  \extractkey/robExt/latex/add to preamble=\marg{code of preamble}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Set/add element to the preamble (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_DOCUMENT_CLASS__|.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/do not wrap code\@nil
+  \makeatother%
+  \pgfmanualbody
+  By default, the main content is wrapped into a box in order to measure its depth to properly set the baseline. If you do not want to do this wrapping, you can set this option. Internally, it is a shortcut for:\\
+  |set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__}|
+\end{pgfmanualentry}
+
+\subsubsection{Python}
+
+We provide support for python:
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/python\@nil
+  \makeatother%
+  \pgfmanualbody
+  Load the |python| preset (inspect |__ROBEXT_PYTHON__|) for details on the exact template, but note that this template might be subject to changes. We also provide a few helper functions:
+  \begin{itemize}
+  \item |write_to_out(text)| writes |text| to the |*-out.tex| file that will be loaded automatically before running the include function
+  \item |parse_args()| is a function that returns a dictionary mapping some keys to values depending on the called arguments: for instance, if you call the python file with |python script key1 value1 key2 value2|, then the dictionary will map |key1| to |value1| and |key2| to |value2|. You might like this in conjunction with commands presented in \cref{sec:configureCompilationCommand}. Note that if you place placeholders in your code, you might not need this, but this is used if you plan to use your script outside of this library.
+  \item |get_cache_folder()| outputs the cache folder.
+  \item |get_file_base()| outputs the prefix of all files that should be created by this script, that looks like |robExt-somehash|.
+  \item |get_current_script()| returns the current script.
+  \item |get_filename_from_extension(extension)| outputs the prefix |robExt-somehash| concatenated with the extension. You often need this function to get the path of a file that your script is creating, for instance, |get_filename_from_extension("-output.txt")| is the path |*-output.txt| of the file that is read by |verbatim output|.
+  \item |get_verbatim_output()| returns |get_filename_from_extension("-output.txt")|
+  \item |finished_with_no_error()| creates the pdf file if it does not exists (to certify that the compilation ran without issues). The template automatically runs this function at the end. 
+  \end{itemize}
+  We demonstrate its usage on a few examples:
+\begin{codeAndResult}
+\begin{CacheMeCode}{python, verbatim output}
+with open(get_verbatim_output(), "w") as f:
+    for i in range(5):
+        f.write(f"Hello {i}\n")
+\end{CacheMeCode}
+\end{codeAndResult}
+
+\textbf{Importantly: you do not want to indent the whole content of CacheMeCode, or the spaces will also appear in the final code.}
+
+You can also generate some images. This code will produce the image in \cref{fig:pythonGeneratedImage2}:
+\begin{codeexample}[code only]
+\begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
+import matplotlib.pyplot as plt
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')   
+plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{CacheMeCode}
+\end{codeexample}
+{\begin{figure}
+\centering
+\begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
+import matplotlib.pyplot as plt
+year = [2014, 2015, 2016, 2017, 2018, 2019]  
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+plt.xlabel('Year')  
+plt.ylabel('Number of futurestud.io Tutorials')   
+plt.savefig("__ROBEXT_OUTPUT_PDF__")
+\end{CacheMeCode}
+\caption{Image generated with python.}
+\label{fig:pythonGeneratedImage2}
+\end{figure}
+}
+\end{pgfmanualentry}
+
+
+
+
+
+\subsubsection{Bash}
+
+We provide a basic bash template, that sets:
+\begin{verbatim}
+set -e
+outputTxt="__ROBEXT_OUTPUT_PREFIX__-output.txt"
+outputTex="__ROBEXT_OUTPUT_PREFIX__-out.tex"
+outputPdf="__ROBEXT_OUTPUT_PDF__"
+\end{verbatim}
+in order to quit when an error occurs, and to define two variables containing the path to the |pdf| file and to the file that is read by the |verbatim output| setting (that just apply a |\verbatiminput| on that file). Finally, it also creates the file |outputPdf| with |touch| in order to notify that the compilation succeeded.
+
+In practice:
+\begin{codeAndResult}
+\begin{CacheMeCode}{bash, verbatim output}
+# $outputTxt contains the path of the file that will be printed via \verbatiminput
+uname -srv > "${outputTxt}"
+\end{CacheMeCode}
+\end{codeAndResult}
+
+\subsubsection{Verbatim text}
+
+Sometimes, it might be handy to write the text to a file and use it somehow. This is possible using |verbatim text|, that defaults to calling |\verbatiminput| on that file:
+
+\begin{codeAndResult}
+\begin{CacheMeCode}{verbatim text}
+def some_verbatim_fct(a):
+    # See this is a verbatim code where I can use the % symbol
+    return a % b
+\end{CacheMeCode}  
+\end{codeAndResult}
+
+You can also call |verbatim text no include|: it will not include the text, but it sets a macro |\robExtPathToInput| containing the path to the input file. Use it the way you like! For instance, we define here a macro |codeAndResult| that prints the code and runs it (we use a pretty printer from pgf, so you need to load |\usepackage{tikz}\input{pgfmanual-en-macros.tex}| to use it). It is what we use right now in this documentation for verbatim blocks like here. You can obtain a simpler version using:
+
+\begin{codeAndResult}
+\begin{CacheMeCode}{verbatim text no include}
+\NewDocumentCommand{\testVerbatim}{+v}{
+\begin{flushleft}\ttfamily%
+#1
+\end{flushleft}}
+\testVerbatim{Demo % with percent}
+\end{CacheMeCode}
+We will input the file \robExtPathToInput{}:
+\input{\robExtPathToInput}
+This file contains:
+\verbatiminput{\robExtPathToInput}
+\end{codeAndResult}
 
 \subsection{List of special placeholders and presets}\label{sec:placeholders}
 
@@ -1189,10 +1854,13 @@ We also provide a number of predefined placeholders in order to get the name of 
 \item |__ROBEXT_OUTPUT_PREFIX__| contains the prefix that all newly created file should follow, like |robExt-somehash|. If you want to create additional files (e.g. a picture, a video, a console output etc...) make sure to make it start with this string. It will not only help to ensure purity, but it also allows us to garbage collect useless files easily.
 \item |__ROBEXT_WAY_BACK__| contains the path to go back to the main project from the cache folder, like |../| (internally it is equals to the expanded value of |\robExtPrefixPathWayBack|).
 \item |__ROBEXT_CACHE_FOLDER__| contains the path to the cache folder. Since most commands are run from the cache folder, this should not be really useful to the user.
-\item |__ROBEXT_FINAL_COMPILATION_COMMAND__| adds a prefix to |__ROBEXT_COMPILATION_COMMAND__| in order to first go to the cache folder. This is used internally but we do not expect the user of this library to need it.
 \end{itemize}
 
-We can check xxxxx
+You can also use these placeholders to customize the default include function:
+\begin{itemize}
+\item |__ROBEXT_INCLUDEGRAPHICS_OPTIONS__| contains the options given to |\includegraphics| when loading the pdf
+\item |__ROBEXT_INCLUDEGRAPHICS_FILE__| contains the file loaded by |\includegraphics|, defaults to |\robExtAddCachePathAndName{\robExtFinalHash.pdf}|, that is itself equivalent to |__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PDF__| or |__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__.pdf|.
+\end{itemize}
 
 \subsubsection{Placeholders related to \LaTeX{}}
 Some placeholders are reserved only when dealing with \LaTeX{} code:
@@ -1200,7 +1868,7 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 \item |__ROBEXT_LATEX__| is the main entrypoint, containing all the latex template. It internally calls other placeholders listed below.
 \item |__ROBEXT_LATEX_OPTIONS__|: contains the options to compile the document, like |a4paper|. Empty by default.
 \item |__ROBEXT_DOCUMENT_CLASS__|: contains the class of the document. Defaults to |standalone|.
-\item |__ROBEXT_PREAMBULE__|: contains the preambule. Is empty by default.
+\item |__ROBEXT_PREAMBLE__|: contains the preamble. Is empty by default.
 \item |__ROBEXT_MAIN_CONTENT_WRAPPED__|: content inside the |document| environment. It will wrap the actual content typed by the user |__ROBEXT_MAIN_CONTENT__| around a box to compute its depth. If you do not want this behavior, you can set |__ROBEXT_MAIN_CONTENT_WRAPPED__| to be equal to |__ROBEXT_MAIN_CONTENT__|. It calls internally |__ROBEXT_CREATE_OUT_FILE__| and |__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__| to do this computation.
 \item |__ROBEXT_CREATE_OUT_FILE__| creates a new file called |\jobname-out.tex| and open it in the handle called |\writeRobExt|
 \item |__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__| writes the height, depth and width of the box |\boxRobExt| into the filed opened in |\writeRobExt|.
@@ -1209,6 +1877,47 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 \item |__ROBEXT_COMPILATION_COMMAND_OPTIONS__| contains the options used to compile the document (defaults to |-shell-escape -halt-on-error|)
 \end{itemize}
 
+\subsection{Customize presets and create your own style}\label{sec:customize}
+
+Note that you can define your own presets simply by creating a new pgf style (please refer to tikz-pgf's documentation for more details). For instance, we defined the |tikz| style using:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  tikz/.style={
+    latex,
+    add to preamble={\usepackage{tikz}},
+    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}},
+    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{tikzpicture}},
+  },
+}
+\end{codeexample}
+in order to automatically load |tikz| and add the surrounding |tikzpicture| (note that the style is always loaded \textbf{after} the definition of |__ROBEXT_MAIN_CONTENT__|, you can therefore do any postprocessing you like on this placeholder). You can also customize an existing style by adding stuff to it using |.append style|. For instance, here, we add the |shadows| library to the |tikz| preset by default:
+\begin{codeexample}[width=0pt,vbox]
+  \robExtConfigure{
+    tikz/.append style={
+      add to preamble={\usetikzlibrary{shadows}},
+    },
+  }
+  See, tikz's style now packs the |shadows| library by default: %
+  \begin{CacheMe}{tikz}[even odd rule]
+    \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
+  \end{CacheMe}
+\end{codeexample}
+
+
+\subsection{Maintaining a clean cache}
+
+Every time we compile a document, we create automatically a bunch of files:
+\begin{itemize}
+\item the cache is located by default in the |robustExternalize| folder. Feel free to remove this folder if you want to completely clear the cache (but then you need to recompile everything). See below if you want to clean it in a better way.
+\item |\jobname-robExt-all-figures.txt| contains the list of all figures contained in the document. Mostly useful to help the script that remove other figures.
+\item |robExt-remove-old-figures.py| is a python script that will remove all cached files that are not used anymore. Just run |python robExt-remove-old-figures.py| to clean it. You will then see the list of files that the script wants to remove: make sure it does not remove any important data, and press ``y''. Note that it will search for all files that look like |*robExt-all-figures.txt| to see the list of pictures that are still in use, and by default it will only remove the images in the |robustExternalize| folder that start with |robExt-|. If you change the path of the cache or the prefix, edit the script (should not be hard to do).
+\item |\jobname-robExt-compile-missing-figures.sh| contains a list of commands that you need to run to compile the images not yet compiled in the cache (this list will only be created if you enable the manual compilation mode).
+\item |\jobname-robExt-tmp-file-you-can-remove.tmp| is a temporary file. Feel free to remove it.
+\end{itemize}
+
+\subsection{How to debug}
+
+If for some reasons you are unable to understand why a build fails, first check if you compiled your document with |-shell-escape| (not that this must appear \textbf{before} the filename). Then, you can look at the log file to get more advices: when a cached document is compiled, we always write the full compilation command before compiling the file in the log file. This way, you can easily check the content of the file and see why it fails to compile.
 
 \end{document}
 % Local Variables:
