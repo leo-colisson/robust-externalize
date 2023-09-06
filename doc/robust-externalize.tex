@@ -16,6 +16,7 @@
 \makeatletter
   \input{../robust-externalize.sty}
 \makeatother
+  
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
@@ -72,10 +73,8 @@
 \lstset{style=mystyle}
 
 
-
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
-
 
 \begin{document}
 %%% Title: thanks tikzcd for the styling
@@ -88,7 +87,7 @@
   {\Large\bfseries Cache anything (\tikzname, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2023/09/06}\\[3mm]
+  {Léo Colisson \quad Version 1.0}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -97,7 +96,7 @@
 
 \bigskip
 
-\textbf{WARNING: This library is young and has not been tested extensively (and is an important rewrite of a previous version), notably on windows. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}, or let us know if it works!}
+\textbf{WARNING: This library is young and has not been tested extensively (and is an important rewrite of a previous version). Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}, or let us know if it works!}
 
 \section{A taste of this library}
 
@@ -125,8 +124,11 @@ for name in ["Alice", "Bob"]:
 \end{CacheMeCode}
 \end{codeAndResult}
 
-Actually, we also provide this style by default (and explain how to write it yourself), you just make sure to load:\\ |\usepackage{pythonhighlight}|\\
-|\usepackage{tcolorbox}|
+Actually, we also provide this style by default (and explain how to write it yourself), you just make sure to load:
+\begin{verbatim}
+\usepackage{pythonhighlight}
+\usepackage{tcolorbox}
+\end{verbatim}
 
 To achieve a pleasant and configurable interface, we introduced placeholders, that can be of independent interest.
 
@@ -1877,6 +1879,33 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \label{fig:pythonGeneratedImage2}
 \end{figure}
 }
+
+Note that by default, the executable called |python| is run. It seems like on windows |python3| is not created and only |python| exists, while on linux the user can choose whether |python| should point to |python3| or |python2| (on NixOs, I directly have |python| pointing to |python3|, and in ubuntu, you might need to install |python-is-python3| or create a symlink, as explained \href{https://askubuntu.com/questions/1296790/python-is-python3-package-in-ubuntu-20-04-what-is-it-and-what-does-it-actually}{here}). In any case, you can customize the name of the executable by setting something like:
+\begin{verbatim}
+\setPlaceholder{__ROBEXT_PYTHON_EXEC__}{python3}
+\end{verbatim}
+or using the style |force python3| that forces |python3|.
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/python print code and result\@nil
+  \makeatother%
+  \pgfmanualbody
+  This is a demo style that can print a python code and its result.
+\begin{codeAndResult}
+\begin{CacheMeCode}{python print code and result, set title={The for loop}}
+for name in ["Alice", "Bob"]:
+    print(f"Hello {name}")
+\end{CacheMeCode}
+\end{codeAndResult}
+You can set |__ROBEXT_PYTHON_TCOLORBOX_PROPS__| the options of the tcolorbox,\\ |__ROBEXT_PYTHON_CODE_MESSAGE__| and |__ROBEXT_PYTHON_RESULT_MESSAGE__| which are displayed before the corresponding block, |__ROBEXT_PYTHON_LSTINPUT_STYLE__| which contains the default lstinput style and |__MY_TITLE__| (cf |set title|) that contains the title of the box. Make sure to have the following packages to use the default styling:
+\begin{verbatim}
+\usepackage{pythonhighlight}
+\usepackage{tcolorbox}
+\end{verbatim}
 \end{pgfmanualentry}
 
 
@@ -1973,6 +2002,24 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 \item |__ROBEXT_COMPILATION_COMMAND_OPTIONS__| contains the options used to compile the document (defaults to |-shell-escape -halt-on-error|)
 \end{itemize}
 
+\subsubsection{Placeholders related to python}
+
+\begin{itemize}
+\item |__ROBEXT_PYTHON_EXEC__| contains the python executable (defaults to |python|) used to compile
+\item |__ROBEXT_PYTHON__| contains the python template
+\item |__ROBEXT_PYTHON_IMPORT__| can contain import statements
+\item |__ROBEXT_PYTHON_MAIN_CONTENT_WRAPPED__| is used to add all the above functions. You can set it to |__ROBEXT_MAIN_CONTENT__| if you do not want them
+\item |__ROBEXT_PYTHON_FINISHED_WITH_NO_ERROR__| is called at the end to create the pdf file even if it is not created, you can set it to the empty string if you do not want to do that.
+\end{itemize}
+
+\subsubsection{Placeholders related to bash}
+
+\begin{itemize}
+\item |__ROBEXT_BASH_TEMPLATE__| contains the bash template. By default, it sets |set -e|, creates |outputTxt|, |outputTex| and |outputPdf| pointing to the corresponding files, and it created the pdf file at the end.
+\item |__ROBEXT_SHELL__| contains the shell (defaults to |bash|).
+\end{itemize}
+
+
 \subsection{Customize presets and create your own style}\label{sec:customize}
 
 Note that you can define your own presets simply by creating a new pgf style (please refer to tikz-pgf's documentation for more details). For instance, we defined the |tikz| style using:
@@ -2019,7 +2066,7 @@ You might want to clean the cache. Of course you can remove all generated files,
 
 |python3 robExt-remove-old-figures.py|\\
 
-You will then be prompted for a confirmation after providing the list of files that will be removed.
+(on windows, the executable might be called |python|) You will then be prompted for a confirmation after providing the list of files that will be removed.
 
 \subsubsection{Listing all figures in use}
 
@@ -2053,7 +2100,6 @@ You might often get an error |! Missing $ inserted.|: this is typically when a p
 \begin{itemize}
 \item See how to deal with label and references inside pictures (without disabling externalization).
 \item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
-\item While the code should be compatible with Windows and Mac, I should try it. If any of you is using Windows or Mac, please let me know if it works for you!
 \item Deal with remember picture
 \end{itemize}
 

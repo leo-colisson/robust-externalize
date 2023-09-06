@@ -1,3 +1,4 @@
+\ProvidesPackage{robust-externalize}[1.0 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: understand why python scripts with raise NameError("42") do not make latex crash.
 
 \RequirePackage{pgfkeys} % We use the /robExt/... path to store our keys.
@@ -601,20 +602,16 @@ if __name__ == '__main__':
   \robExtEvalPlaceholderInplace{__ROBEXT_WAY_BACK__}
   \setPlaceholder{__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
   \robExtEvalPlaceholderInplace{__ROBEXT_CACHE_FOLDER__}
-  \message{Step 7.1}%
   %%% We rescan the string in order to evaluate stuff like \myframes into "12,45,56".
   \robExtGetPlaceholderInResult{__ROBEXT_COMPILATION_COMMAND__}
-  \message{Step 7.1.1}%
   \ifdefined\robExtDoNotRescanFirstTime
     \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_result_str
   \else
     \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand  {} { \l_robExt_result_str }
   \fi%
-  \message{Step 7.2}%
   %% We get the template
   \robExtGetPlaceholderInResult{__ROBEXT_TEMPLATE__}
   \str_set_eq:NN \l_robExt_final_file_minus_hash_str \l_robExt_result_str
-  \message{Step 7.3}%
   % We first add on the first line the compilation command, and on the second line the template file.
   \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file_minus_hash_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
   \seq_map_inline:Nn \l_robExt_dependencies {
@@ -1157,11 +1154,18 @@ f_out_write.close()
 finished_with_no_error()
 \end{PlaceholderFromCode}
 
+%% On windows, python3 does not exist, and python points to python3. On linux, it seems to depend, at least on
+%% my system it points to python3 as well.
+\setPlaceholder{__ROBEXT_PYTHON_EXEC__}{python}
+
 \robExtConfigure{
   python/.style={
-    set compilation command={python3 "__ROBEXT_SOURCE_FILE__"},
+    set compilation command={__ROBEXT_PYTHON_EXEC__ "__ROBEXT_SOURCE_FILE__"},
     set template={__ROBEXT_PYTHON__},
     print verbatim if no externalization,
+    force python3/.style={
+      set placeholder={__ROBEXT_PYTHON_EXEC__}{python3}
+    },
   }
 }
 
@@ -1198,7 +1202,10 @@ with open(get_filename_from_extension("-code.txt"), "w") as f:
 ### CODESTOPSHERE
 print_file.close()
 \end{PlaceholderFromCode}
-
+\setPlaceholder{__ROBEXT_PYTHON_TCOLORBOX_PROPS__}{colback=red!5!white,colframe=red!75!black}
+\setPlaceholder{__ROBEXT_PYTHON_CODE_MESSAGE__}{}
+\setPlaceholder{__ROBEXT_PYTHON_RESULT_MESSAGE__}{Output:}
+\setPlaceholder{__ROBEXT_PYTHON_LSTINPUT_STYLE__}{frame=single, breakindent=.5\textwidth, frame=single, breaklines=true, style=mypython}
 \robExtConfigure{
   python print code and result/.style={
     python,
@@ -1211,11 +1218,10 @@ print_file.close()
     custom include command={
       % Useful to replace __MY_TITLE__:
       \evalPlaceholder{
-        % \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
-        \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
-          % \noindent Code:
-          \lstinputlisting[frame=single,breakindent=.5\textwidth,frame=single,breaklines=true,style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
-          Output: 
+        \begin{tcolorbox}[title=__MY_TITLE__,__ROBEXT_PYTHON_TCOLORBOX_PROPS__]
+          __ROBEXT_PYTHON_CODE_MESSAGE__%
+          \lstinputlisting[__ROBEXT_PYTHON_LSTINPUT_STYLE__]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+          __ROBEXT_PYTHON_RESULT_MESSAGE__%
           \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-print.txt}}
         \end{tcolorbox}
       }
@@ -1255,9 +1261,11 @@ __ROBEXT_MAIN_CONTENT__
 touch "${outputPdf}"
 \end{PlaceholderFromCode}
 
+\setPlaceholder{__ROBEXT_BASH_SHELL__}{bash}
+
 \robExtConfigure{
   bash/.style={
-    set compilation command={bash "__ROBEXT_SOURCE_FILE__"},
+    set compilation command={__ROBEXT_BASH_SHELL__ "__ROBEXT_SOURCE_FILE__"},
     set template={__ROBEXT_BASH_TEMPLATE__},
     print verbatim if no externalization,
   }
