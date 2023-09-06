@@ -697,7 +697,9 @@ touch "__ROBEXT_OUTPUT_PDF__"
       \evalPlaceholder{%
         \verbatiminput{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__-out.txt}%
       }%
-    }
+    },
+    % Ensure that the code does not break when externalization is disabled
+    print verbatim if no externalization,
   }
 }
 
