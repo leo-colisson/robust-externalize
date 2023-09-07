@@ -16,7 +16,7 @@
 \makeatletter
   \input{../robust-externalize.sty}
 \makeatother
-  
+%\usepackage{zx-calculus}  
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
@@ -87,7 +87,7 @@
   {\Large\bfseries Cache anything (\tikzname, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 1.0}\\[3mm]
+  {Léo Colisson \quad Version 1.0+unstable}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -156,11 +156,11 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \paragraph{What is supported?}
 
-You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also feed data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}).
+You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also feed some data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}). Since v1.1, you can also cache automatically any environment.
 
 \paragraph{What is not supported?}
 
-We do not yet support remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks). Note that this library is quite young, so expect untested things.
+We do not yet support remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks) or links as links are stripped when the pdf is included. I might have some ideas to solve this\footnote{\url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data?noredirect=1#comment1726256_695277}}, meanwhile you can just disable locally the library on problematic figures. Note that this library is quite young, so expect untested things.
 
 \paragraph{What OS are supported?}
 
@@ -170,9 +170,10 @@ I tested the library mostly on Linux systems, but the library should work on all
 
 Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
+\item You can compile manually the images: all the commands that are left to be executed are listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
 \item If images are all already cached, you don't need to enable \texttt{-shell-escape} (this might be interesting e.g. to send the files a pre-cached document to the arxiv or to a publisher: just make sure to include the cache folder).
 \item You can choose to display a dummy content until you choose to compile them.
-\item You can compile manually the images: all the commands that are left to be executed are listed in \texttt{robExt-compile-missing-figures.sh} and you can just run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
+\item We use very few commands to compile latex files, basically only pdflatex, mkdir (to create the cache folder if needed) and cd (if the cache folder is not present).
 \end{itemize}
 
 
@@ -1584,6 +1585,7 @@ command if no externalization/.code={%
   \robExtDisableTikzpictureOverwrite\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}%
 }
 \end{verbatim}
+Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\robExtExternalizeAllTikzpictures|).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1740,7 +1742,7 @@ with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
 \end{pgfmanualentry}
 
 
-\subsubsection{\LaTeX{}}
+\subsubsection{\LaTeX{} and \tikzname{}}
 
 The |latex| preset is used to cache any \LaTeX{} content, like tikz pictures. Note that as of today, it supports overlay content out of the box (if the overlay is more than 30cm long, you might want to customize a placeholder), but not images that need to use |remember picture|.
 
@@ -1805,9 +1807,13 @@ The next options can be used after calling the |latex| style:
   \def\extrakeytext{style, }
   \extractkey/robExt/latex/set preamble=\marg{code of preamble}\@nil
   \extractkey/robExt/latex/add to preamble=\marg{code of preamble}\@nil
+  \extractkey/robExt/latex/set preamble hyperref=\marg{code of preamble}\@nil
+  \extractkey/robExt/latex/add to preamble hyperref=\marg{code of preamble}\@nil
+  \extractkey/robExt/latex/set preamble after hyperref=\marg{code of preamble}\@nil
+  \extractkey/robExt/latex/add to preamble after hyperref=\marg{code of preamble}\@nil
   \makeatother%
   \pgfmanualbody
-  Set/add element to the preamble (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_DOCUMENT_CLASS__|.
+  Set/add element to the preamble (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_PREAMBLE__|. The variations |hyperref| and |after hyperref| are used to put stuff after the preambule, as |hyperref| typically needs to be loaded last (or nearly): packages that must be loaded after |hyperref| like |cref| can be added via |add to preamble after hyperref|.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1818,7 +1824,18 @@ The next options can be used after calling the |latex| style:
   \pgfmanualbody
   By default, the main content is wrapped into a box in order to measure its depth to properly set the baseline. If you do not want to do this wrapping, you can set this option. Internally, it is a shortcut for:\\
   |set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__}|
+  \textbf{IMPORTANT}: note that it means that you might need to adapt your code to take into account the fact that they are inside a box (I don't know of any other solution to compute the depth, but it does not mean that there is none). In particular, |tikz| matrices might require you to use |ampersand replacement|.
 \end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/tikz\@nil
+  \makeatother%
+  \pgfmanualbody
+  This style loads |latex| and then adds |tikz| to the preamble and wraps the main content with |\begin{tikzpicture}| and |\end{tikzpicture}| using |add {before/after} placeholder no space| so that the user does not need to type it. See for instance the introduction for examples of use.
+\end{pgfmanualentry}
+
 
 \subsubsection{Python}
 
@@ -2047,6 +2064,66 @@ in order to automatically load |tikz| and add the surrounding |tikzpicture| (not
 \end{codeexample}
 
 
+\subsection{Cache automatically a given environment}\label{sec:wrapAutomatically}
+
+It might be handy to cache automatically a given environment: we already provide |\robExtExternalizeAllTikzpictures| to cache all tikz pictures (unless externalization is disabled), but we also provide tools to handle arbitrary environments.
+
+\begin{pgfmanualentry}
+  \extractcommand\robExtExternalizeAllTikzpictures\@@
+  \pgfmanualbody
+  This will automatically cache all  tikz pictures. Note that we add an additional optional argument to the tikz picture to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\robExtDisableTikzpictureOverwrite\@@
+  \pgfmanualbody
+  This is useful to temporarily reset the current environment to their original value (since v1.1 it also resets other environments, not just |tikzpicture|). This must typically be called at the beginning of |command if no externalization| to avoid infinite recursion if you redefine it, but expect for this case the user is not expected to use this option.
+\end{pgfmanualentry}
+
+Let us say that you want to cache all elements of a given environment, like |minipage| or |zx-calculus| pictures (another package of mine):
+
+
+\begin{pgfmanualentry}
+  \extractcommand\robExtWrapEnvironment\marg{name environment}\marg{default preset options}\@@
+  \pgfmanualbody
+  This will automatically cache the corresponding environment (but note that you still need to define it in the preamble of the cached files, for instance by loading the appropriate package):
+  \begin{codeexample}[width=0pt,vbox]
+    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    A ZX figure %
+    \begin{ZX}
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \end{ZX} and the same but aligned on the second line %
+    \begin{ZX}[mbr=2]
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \end{ZX}.
+  \end{codeexample}
+
+  You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using |<...>| as the optional argument, like: %
+  \begin{codeexample}[width=0pt,vbox]
+    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \begin{ZX}<add to preamble={\usepackage{amsmath}}> % amsmath provides \text
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \end{ZX}
+  \end{codeexample}  
+
+If you are unlucky and your environment also expects an argument enclosed in |<...>| then you must provide some presets arguments, possibly empty: |\begin{someweirdenv}<><args to someweirdenv>|. You can also use this argument to disable externalisation on a per-picture basis:
+  \begin{codeexample}[width=0pt,vbox]
+    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \begin{ZX}<disable externalization> % amsmath provides \text
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \end{ZX}
+  \end{codeexample}
+  
+\end{pgfmanualentry}
+
+Note that we provide no argument to wrap automatically an arbitrary command since it is hard to know which part of the command should be kept in the file, and which should not: for instance, in |\foo{42}|, |{42}| might either be a group unrelated to |\foo|, or an argument to |\foo|. However, you can define yourself your own wrapping (even if it might be easier to simply create a new function instead of overwriting an existing macro). Note that if you want |disable externalization| to work on this command, you should define |\robExtCommandOrigYOURMACRONAME| that should point to the original definition of the macro.
+
+
+
 \subsection{Operations on the cache}\label{sec:operationsCache}
 
 Every time we compile a document, we create automatically a bunch of files:
@@ -2098,14 +2175,26 @@ You might often get an error |! Missing $ inserted.|: this is typically when a p
 \section{TODO and known bugs:}
 
 \begin{itemize}
-\item See how to deal with label and references inside pictures (without disabling externalization).
+\item See how to deal with label and cite inside pictures (without disabling externalization). For label, I have a proof of concept, I ``just'' need to write it down.
 \item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
 \item Deal with remember picture
+\item Right now, links will not work as they are stripped when included. A workaround would be to use newpax, as stated in: \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \end{itemize}
 
 \section{Acknowledgments}
 
 I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much!
+
+\section{Changelog}
+
+\begin{itemize}
+\item v1.1:
+  \begin{itemize}
+  \item you can now use ampersands etc freely thanks to lrbox
+  \item you can now automatically cache environments and commands using |\robExtWrapEnvironment|
+  \end{itemize}
+\end{itemize}
+
 
 \end{document}
 % Local Variables:

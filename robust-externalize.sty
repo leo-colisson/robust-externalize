@@ -6,6 +6,7 @@
 \RequirePackage{graphicx} % For the includegraphics command
 \RequirePackage{verbatim} % For the \verbatim command, useful for debugging purpose for instance
 \RequirePackage{xsimverb} % To easily write verbatim code to files
+\RequirePackage{etoolbox} % To easily write verbatim code to files
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
@@ -92,6 +93,31 @@ if __name__ == '__main__':
 \end{filecontents}
 
 \ExplSyntaxOn
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Compatibility %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% These commands exist on really recent kernels (~june 2023), so we provide them in case they do not already exist
+
+\ProvideDocumentCommand \NewEnvironmentCopy {mm} {
+    \expandafter \NewCommandCopy \csname#1\expandafter\endcsname \csname#2\endcsname
+    \expandafter \NewCommandCopy \csname end#1\expandafter\endcsname \csname end#2\endcsname
+}
+
+\ProvideDocumentCommand \RenewEnvironmentCopy {mm} {
+    \expandafter \RenewCommandCopy \csname#1\expandafter\endcsname \csname#2\endcsname
+    \expandafter \RenewCommandCopy \csname end#1\expandafter\endcsname \csname end#2\endcsname
+}
+
+\ProvideDocumentCommand \DeclareEnvironmentCopy {mm} {
+    \expandafter \DeclareCommandCopy \csname#1\expandafter\endcsname \csname#2\endcsname
+    \expandafter \DeclareCommandCopy \csname end#1\expandafter\endcsname \csname end#2\endcsname
+}
+
+\ProvideDocumentCommand \RenewEnvironmentCopy {mm} {
+    \expandafter \RenewCommandCopy \csname#1\expandafter\endcsname \csname#2\endcsname
+    \expandafter \RenewCommandCopy \csname end#1\expandafter\endcsname \csname end#2\endcsname
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Paths %%%%%%%%%%%%
@@ -976,6 +1002,8 @@ if __name__ == '__main__':
 \setPlaceholder{__ROBEXT_LATEX_OPTIONS__}{}
 \setPlaceholder{__ROBEXT_DOCUMENT_CLASS__}{standalone}
 \setPlaceholder{__ROBEXT_PREAMBLE__}{}
+\setPlaceholder{__ROBEXT_PREAMBLE_HYPERREF__}{}
+\setPlaceholder{__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{}
 \setPlaceholder{__ROBEXT_INCLUDEGRAPHICS_OPTIONS__}{}
 \setPlaceholder{__ROBEXT_INCLUDEGRAPHICS_FILE__}{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}
 \setPlaceholder{__ROBEXT_LATEX_TRIM_LENGTH__}{30cm}
@@ -983,6 +1011,11 @@ if __name__ == '__main__':
 \begin{PlaceholderFromCode}{__ROBEXT_LATEX__}
 \documentclass[__ROBEXT_LATEX_OPTIONS__]{__ROBEXT_DOCUMENT_CLASS__}
 __ROBEXT_PREAMBLE__
+% most packages must be loaded before hyperref
+% so we typically want to load hyperref here
+__ROBEXT_PREAMBLE_HYPERREF__
+% some packages must be loaded after hyperref
+__ROBEXT_PREAMBLE_AFTER_HYPERREF__
 \begin{document}%
 __ROBEXT_MAIN_CONTENT_WRAPPED__
 \end{document}
@@ -991,9 +1024,9 @@ __ROBEXT_MAIN_CONTENT_WRAPPED__
 \begin{PlaceholderFromCode}{__ROBEXT_MAIN_CONTENT_WRAPPED__}
 __ROBEXT_CREATE_OUT_FILE__%
 \newsavebox\boxRobExt%
-\savebox{\boxRobExt}{%
+\begin{lrbox}{\boxRobExt}%
   __ROBEXT_MAIN_CONTENT__%
-}%
+\end{lrbox}%
 \usebox{\boxRobExt}%
 __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
 \end{PlaceholderFromCode}
@@ -1046,6 +1079,21 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
     },
     add to preamble/.style={
       add to placeholder={__ROBEXT_PREAMBLE__}{##1},
+    },
+    add before preamble/.style={
+      add before placeholder={__ROBEXT_PREAMBLE__}{##1},
+    },
+    set preamble hyperref/.style={
+      set placeholder={__ROBEXT_PREAMBLE_HYPERREF__}{##1},
+    },
+    add to preamble hyperref/.style={
+      add to placeholder={__ROBEXT_PREAMBLE_HYPERREF__}{##1},
+    },
+    set preamble after hyperref/.style={
+      set placeholder={__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{##1},
+    },
+    add to preamble after hyperref/.style={
+      add to placeholder={__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{##1},
     },
     do not wrap code/.style={
       set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__},
@@ -1291,6 +1339,12 @@ touch "${outputPdf}"
     \let\tikzpicture\robExtTikzPictureOrig%
     \let\endtikzpicture\endrobExtTikzPictureOrig%
   \fi%
+  \ifdefined\robExtEnvironmentOrigName%
+    \expanded{\noexpand\DeclareEnvironmentCopy{\robExtEnvironmentOrigName}{robExtEnvironmentOrig\robExtEnvironmentOrigName}}%
+  \fi%
+  \ifdefined\robExtCommandOrigName%
+    \expanded{\noexpand\DeclareCommandCopy{\robExtCommandOrigName}{robExtCommandOrig\robExtCommandOrigName}}%
+  \fi%
 }
 
 %% The cached version
@@ -1299,4 +1353,34 @@ touch "${outputPdf}"
     #3%
   \end{CacheMe}%
 }{}%
+
+%% \robExtWrapEnvironment{myenv}
+\NewDocumentCommand{\robExtWrapEnvironment}{mm}{%
+  %% We need to save the original environment to avoid infinite recursion if we disable externalization
+  %% https://tex.stackexchange.com/questions/695391/why-isnt-my-environment-restored/695398
+  \NewEnvironmentCopy{robExtEnvironmentOrig#1}{#1}
+  \DeclareDocumentEnvironment{#1}{D<>{}}{%
+    \def\robExtEnvironmentOrigName{#1}%
+    \CacheMe{
+      #2,
+      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{#1}},
+      add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{#1}},
+      ##1
+    }%
+  }{\endCacheMe}
+}
+
+% %% \robExtWrapEnvironment{myenv}
+% \NewDocumentCommand{\robExtWrapCommand}{mm}{%
+%   %% We need to save the original environment to avoid infinite recursion if we disable externalization
+%   \expandafter\NewCommandCopy\csname robExtCommandOrig#1\expandafter\endcsname\csname#1\endcsname
+%   \DeclareDocumentCommand{#1}{D<>{}}{%
+%     \def\robExtCommandOrigName{#1}%
+%     \cacheMe[
+%       #2,
+%       add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\#1 }},
+%       ##1
+%     ]{}%
+%   }%
+% }
 
