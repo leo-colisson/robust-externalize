@@ -16,7 +16,7 @@
 \makeatletter
   \input{../robust-externalize.sty}
 \makeatother
-%\usepackage{zx-calculus}  
+\usepackage{zx-calculus}  
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
@@ -91,7 +91,6 @@
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
-
 \tableofcontents
 
 \bigskip
@@ -103,7 +102,7 @@
 This library allows you to cache any language: not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
-    tikz/.append style={
+    add to preset={tikz}{
       add to preamble={\usepackage{pifont}}
     }
   }
@@ -156,11 +155,11 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \paragraph{What is supported?}
 
-You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also feed some data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}). Since v1.1, you can also cache automatically any environment.
+You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also send some data (e.g.\ : the current page) to the compiled pictures, and feed some data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}). Since v1.1, you can also cache automatically any environment.
 
 \paragraph{What is not supported?}
 
-We do not yet support remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks) or links as links are stripped when the pdf is included. I might have some ideas to solve this\footnote{\url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data?noredirect=1#comment1726256_695277}}, meanwhile you can just disable locally the library on problematic figures. Note that this library is quite young, so expect untested things.
+We do not yet support remember picture, and you can't use (yet) cross-references inside your images (at least not without further hacks) or links as links are stripped when the pdf is included. I might have some ideas to solve this\footnote{\url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}}, meanwhile you can just disable locally the library on problematic figures. Note that this library is quite young, so expect untested things.
 
 \paragraph{What OS are supported?}
 
@@ -275,7 +274,7 @@ Note that the pictures are compiled in a separate document, with a different pre
 
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
-    tikz/.append style={
+    add to preset={tikz}{
       add to preamble={\usetikzlibrary{shadows}},
     },
   }
@@ -285,6 +284,8 @@ Note that the pictures are compiled in a separate document, with a different pre
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{CacheMe}
 \end{codeexample}
+
+\textbf{Note:} the |add to preset| directive has been added on v1.1. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that in |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
 
 You can also choose to overwrite it for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
 \begin{codeexample}[width=0pt,vbox]
@@ -389,6 +390,19 @@ We compute this data that is long to compute:
 We computed the cached value \myLongResult.
 \end{codeexample}
 
+\subsection{Passing functions}
+
+You can pass functions to the preamble normally in |cacheMe|:
+\begin{codeexample}[width=0pt,vbox]
+  \cacheMe[latex, add to preamble={\def\sayhello#1{Hello #1.}}]{
+    \sayhello{my friend}
+  }
+\printAllPlaceholdersExceptDefaults
+\end{codeexample}
+
+TODO: for now we need to double the number of hashes inside style, but I want to change that \url{https://tex.stackexchange.com/questions/695497/pgf-key-style-with-no-argument-or-how-to-avoid-escaping-hashes}.
+
+
 \subsection{For non-\LaTeX{} code}
 
 Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside macros and some environments that parse their body (e.g. align) as some characters are removed (e.g. percent symbols are comments and are removed). For this reason, we sometimes need to separate the time where we define the code and where we insert it (this is done using placeholders, see |PlaceholderFromCode|), and we need to introduce new environments to populate the template (see \cref{sec:placeholders} for more details, to generate them from filename, to get the path of a file etc).
@@ -460,7 +474,7 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
-  my matplotlib/.style={
+  new preset={my matplotlib}{
     python,
     add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_BEFORE__},
     add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_MATPLOTLIB_TEMPLATE_AFTER__},
@@ -497,7 +511,7 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
-  my matplotlib/.style={
+  new preset={my matplotlib}{
     python,
     % We create a new placeholder (it is simple enough that you don't need to use PlaceholderFromCode)
     set placeholder={__MY_MATPLOTLIB_FONT_SIZE__}{12},
@@ -574,12 +588,12 @@ print_file.close()
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
-  my python print both/.style={
+  new preset={my python print both}{
     python,
     add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__},
     add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_AFTER__},
     set title/.style={
-      set placeholder={__MY_TITLE__}{##1},
+      set placeholder={__MY_TITLE__}{#1},
     },
     set title={Example},
     custom include command={
@@ -645,12 +659,12 @@ print_file.close()
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
-  my python print both/.style={
+  new preset={my python print both}{
     python,
     add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_BEFORE__},
     add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{__MY_PRINT_BOTH_TEMPLATE_AFTER__},
     set title/.style={
-      set placeholder={__MY_TITLE__}{##1},
+      set placeholder={__MY_TITLE__}{#1},
     },
     set title={Example},
     custom include command={
@@ -690,7 +704,7 @@ touch "__ROBEXT_OUTPUT_PDF__"
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
-  my bash/.style={
+  new preset={my bash}{
     set compilation command={bash "__ROBEXT_SOURCE_FILE__"},
     set template={__MY_BASH_TEMPLATE__},
     %%% Version 1:
@@ -768,6 +782,7 @@ Placeholders are local variables (internally just some \LaTeX{} 3 strings). You 
 \begin{pgfmanualentry}
   \extractcommand\getPlaceholder\opt{\oarg{new placeholder name}}\marg{name placeholder or string}\@@
   \extractcommand\getPlaceholderInResult\opt{\oarg{new placeholder name}}\marg{name placeholder or string}\@@
+  \extractcommand\getPlaceholderInResultFromList\marg{list,of,placeholders,to,replace}\opt{\oarg{new placeholder name}}\marg{name placeholder or string}\@@
   \pgfmanualbody
 
   Get the value of a placeholder after replacing (recursively) all the inner placeholders. |\getPlaceholderInResult| puts the resulting string in a \LaTeX{} 3 string |\l_robExt_result_str| and in |\robExtResult|, while |\getPlaceholder| directly outputs this string. You can also put inside the argument
@@ -788,6 +803,15 @@ You can also specify the optional argument in order to additionally define a new
   \placeholderFromContent{__NICKNAME__}{the great}
   \getPlaceholderInResult[__NEW_PLACEHOLDER__]{In ``__MY_PLACEHOLDER__'', the name is __NAME__.}
   \printAllPlaceholdersExceptDefaults
+\end{codeexample}
+The variation |\getPlaceholderInResultFromList| allows you to specify a set of placeholder to replace from:
+\begin{codeexample}[width=0pt,vbox]
+\placeholderFromContent{__MY_PLACEHOLDER__}{Hello __NAME1__, __NAME2__ and __NAME3__, I am a template $\delta_n$.}
+\placeholderFromContent{__NAME1__}{Alice}
+\placeholderFromContent{__NAME2__}{Bob}
+\placeholderFromContent{__NAME3__}{Charlie}
+\getPlaceholderInResultReplaceFromList{__MY_PLACEHOLDER__,__NAME1__,__NAME2__}[__NEW_PLACEHOLDER__]{Here we go: __MY_PLACEHOLDER__}
+\printAllPlaceholdersExceptDefaults
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -920,9 +944,11 @@ But before seeing how to define placeholder containing arbitrary code, let us fi
 
 \begin{pgfmanualentry}
   \extractcommand\setPlaceholderRec\marg{new placeholder}\marg{content with placeholder}\@@
+  \extractcommand\setPlaceholderRecReplaceFromList\marg{list,of,placeholder,to,replace}\marg{new placeholder}\marg{content with placeholder}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/set placeholder rec=\marg{name placeholder}\marg{content placeholder}\@nil
+  \extractkey/robExt/set placeholder rec replace from list=\marg{list,of,placeholder,to,replace}\marg{name placeholder}\marg{content placeholder}\@nil
   \makeatother%
   \pgfmanualbody
 
@@ -938,6 +964,16 @@ Note that the if the placeholder content contains at the end the placeholder nam
 \setPlaceholderRec{__COMMAND_ARGS__}{__COMMAND_ARGS__ -s}
 \printAllPlaceholdersExceptDefaults
 \end{codeexample}
+The variation |\setPlaceholderRecReplaceFromList| allows us to specify a subset of placeholder that will be allowed to be expanded, and is an alias for |\getPlaceholderInResultReplaceFromList| (except that the optional argument is mandatory):
+\begin{codeexample}[width=0pt,vbox]
+\placeholderFromContent{__MY_PLACEHOLDER__}{Hello __NAME1__, __NAME2__ and __NAME3__, I am a template $\delta_n$.}
+\placeholderFromContent{__NAME1__}{Alice}
+\placeholderFromContent{__NAME2__}{Bob}
+\placeholderFromContent{__NAME3__}{Charlie}
+\setPlaceholderRecReplaceFromList{__MY_PLACEHOLDER__,__NAME2__,__NAME3__}{__OTHER_PLACEHOLDER__}{Here we go: __MY_PLACEHOLDER__}
+\printAllPlaceholdersExceptDefaults
+\end{codeexample}
+
 \end{pgfmanualentry}
 
 Note that sometimes, you might not want to use |\setPlaceholderRec| to simply append some data to the placeholder as it will also evaluate the inner placeholders (meaning that you will not be able to redefine them later). For this reason, we also provide functions to add something to the placeholder without evaluating it first:
@@ -961,6 +997,31 @@ Note that sometimes, you might not want to use |\setPlaceholderRec| to simply ap
 \addToPlaceholder*{__COMMAND__}{-option}
 \addBeforePlaceholder{__COMMAND__}{time}
 \printAllPlaceholdersExceptDefaults
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderFromString\marg{latex3 string}\@@
+  \extractcommand\setPlaceholderFromString\marg{latex3 string}\@@
+  \pgfmanualbody
+  (new in v1.1) This allows you to assign an existing \LaTeX{}3 string to a placeholder.
+\begin{codeexample}[width=0pt,vbox]
+  \ExplSyntaxOn
+  \setPlaceholderFromString{__my_percent_string__}{\c_percent_str}
+  \printAllPlaceholdersExceptDefaults
+  \ExplSyntaxOff
+\end{codeexample}
+We provide a list of placeholders that are useful to escape parts of the strings (but you should not really need them, if you need weird characters like percent, most of the time you want to use placeholderFromCode):
+\begin{codeexample}[width=0pt,vbox]
+  \printPlaceholder{
+    String containing
+    __ROBEXT_LEFT_BRACE__,
+    __ROBEXT_RIGHT_BRACE__,
+    __ROBEXT_BACKSLASH__,
+    __ROBEXT_HASH__,
+    __ROBEXT_UNDERSCORE__,
+    __ROBEXT_PERCENT__.
+  }
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -1184,19 +1245,30 @@ This content is cached $\delta$.
 
 \begin{pgfmanualentry}
   \extractcommand\robExtConfigure\marg{preset style}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/new preset=\marg{name preset}\marg{preset options}\@nil
+  \extractkey/robExt/add to preset=\marg{name preset}\marg{preset options}\@nil
+  \makeatother%
   \pgfmanualbody
-  You can then create your own style (or preset) in |\robExtConfigure| (that is basically an alias for |\pgfkeys{/robExt/.cd,#1}|) containing your template, add your own placeholders and commands to configure them etc.
+  You can then create your own style (or preset) in |\robExtConfigure| (that is basically an alias for |\pgfkeys{/robExt/.cd,#1}|) containing your template, add your own placeholders and commands to configure them etc. We provide two helper functions since v1.1:\\
+  |new preset={your preset}{your configuration}|\\
+  and\\
+  |add to preset={your preset}{your configuration}|\\
+  in order to create/modify the presets. You can also use |my preset/.style| or\\
+  |my preset/.append style|\\
+  to configure them instead, but in that case make sure to double the number of hashes like in |\def\mymacro##1{hello ##1}.|, as the |#1| in |\def\mymacro#1{hello #1}.| would be understood as the (non-existent) argument of |my preset|.
 
 \begin{codeexample}[width=0pt,vbox]
 %% Define your presets once:
 \robExtConfigure{%
-  my latex preset/.style={
+  new preset={my latex preset}{
     %% Create a default value for my new placeholders:
     set placeholder={__MY_COLOR__}{red},
     set placeholder={__MY_ANGLE__}{45},
     % We can also create custom commands to "hide" the notion of placeholder
     set my angle/.style={
-      set placeholder={__MY_ANGLE__}{##1}
+      set placeholder={__MY_ANGLE__}{#1}
     },
     set template={
       \documentclass{standalone}
@@ -1248,17 +1320,17 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 
 % Create a new preset called matplotlib
 \robExtConfigure{
-  matplotlib figure/.style={
+  new preset={matplotlib figure}{
     set template={__MY_MATPLOTLIB_TEMPLATE__},
     set compilation command={python "__ROBEXT_SOURCE_FILE__"},
     set caption/.style={
-      set placeholder={__FIG_CAPTION__}{##1}
+      set placeholder={__FIG_CAPTION__}{#1}
     },
     set label/.style={
-      set placeholder={__FIG_LABEL__}{##1}
+      set placeholder={__FIG_LABEL__}{#1}
     },
     set includegraphics options/.style={
-      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{#1}
     },
     set caption={},
     set label={},
@@ -1298,17 +1370,17 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 
 % Create a new preset called matplotlib
 \robExtConfigure{
-  matplotlib figure/.style={
+  new preset={matplotlib figure}{
     set template={__MY_MATPLOTLIB_TEMPLATE__},
     set compilation command={python "__ROBEXT_SOURCE_FILE__"},
     set caption/.style={
-      set placeholder={__FIG_CAPTION__}{##1}
+      set placeholder={__FIG_CAPTION__}{#1}
     },
     set label/.style={
-      set placeholder={__FIG_LABEL__}{##1}
+      set placeholder={__FIG_LABEL__}{#1}
     },
     set includegraphics options/.style={
-      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{#1}
     },
     set caption={},
     set label={},
@@ -1349,11 +1421,11 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 
 % Create a new preset called matplotlib
 \robExtConfigure{
-  matplotlib/.style={
+  new preset={matplotlib}{
     set template={__MY_MATPLOTLIB_TEMPLATE__},
     set compilation command={python "__ROBEXT_SOURCE_FILE__"},
     set includegraphics options/.style={
-      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{##1}
+      set placeholder={__INCLUDEGRAPHICS_OPTIONS__}{#1}
     },
     set includegraphics options={width=1cm},
     custom include command={%
@@ -1614,7 +1686,7 @@ You can also disable the externalization on all elements that use a common prese
 \begin{codeAndResult}
 \robExtConfigure{
   % bash code will not be compiled (useful on windows for instance)
-  bash/.append style={
+  add to preset={bash}{
     disable externalization
   },
 }
@@ -2042,18 +2114,17 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 Note that you can define your own presets simply by creating a new pgf style (please refer to tikz-pgf's documentation for more details). For instance, we defined the |tikz| style using:
 \begin{codeexample}[code only]
 \robExtConfigure{
-  tikz/.style={
-    latex,
+  new preset={tikz}{latex,
     add to preamble={\usepackage{tikz}},
     add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}},
     add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{tikzpicture}},
   },
 }
 \end{codeexample}
-in order to automatically load |tikz| and add the surrounding |tikzpicture| (note that the style is always loaded \textbf{after} the definition of |__ROBEXT_MAIN_CONTENT__|, you can therefore do any postprocessing you like on this placeholder). You can also customize an existing style by adding stuff to it using |.append style|. For instance, here, we add the |shadows| library to the |tikz| preset by default:
+in order to automatically load |tikz| and add the surrounding |tikzpicture| (note that the style is always loaded \textbf{after} the definition of |__ROBEXT_MAIN_CONTENT__|, you can therefore do any postprocessing you like on this placeholder). You can also customize an existing style by adding stuff to it using |add to preset| (or |.append style| but make sure to double the hashes). For instance, here, we add the |shadows| library to the |tikz| preset by default:
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
-    tikz/.append style={
+    add to preset={tikz}{
       add to preamble={\usetikzlibrary{shadows}},
     },
   }
@@ -2084,11 +2155,11 @@ Let us say that you want to cache all elements of a given environment, like |min
 
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtWrapEnvironment\marg{name environment}\marg{default preset options}\@@
+  \extractcommand\cacheEnvironment\marg{name environment}\marg{default preset options}\@@
   \pgfmanualbody
   This will automatically cache the corresponding environment (but note that you still need to define it in the preamble of the cached files, for instance by loading the appropriate package):
   \begin{codeexample}[width=0pt,vbox]
-    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \cacheEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
     A ZX figure %
     \begin{ZX}
       \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
@@ -2102,7 +2173,7 @@ Let us say that you want to cache all elements of a given environment, like |min
 
   You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using |<...>| as the optional argument, like: %
   \begin{codeexample}[width=0pt,vbox]
-    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \cacheEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
     \begin{ZX}<add to preamble={\usepackage{amsmath}}> % amsmath provides \text
       \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
       \zxZ{\beta} \rar           & \zxX*{b\pi}
@@ -2111,7 +2182,7 @@ Let us say that you want to cache all elements of a given environment, like |min
 
 If you are unlucky and your environment also expects an argument enclosed in |<...>| then you must provide some presets arguments, possibly empty: |\begin{someweirdenv}<><args to someweirdenv>|. You can also use this argument to disable externalisation on a per-picture basis:
   \begin{codeexample}[width=0pt,vbox]
-    \robExtWrapEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \cacheEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
     \begin{ZX}<disable externalization> % amsmath provides \text
       \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
       \zxZ{\beta} \rar           & \zxX*{b\pi}
@@ -2120,9 +2191,44 @@ If you are unlucky and your environment also expects an argument enclosed in |<.
   
 \end{pgfmanualentry}
 
-Note that we provide no argument to wrap automatically an arbitrary command since it is hard to know which part of the command should be kept in the file, and which should not: for instance, in |\foo{42}|, |{42}| might either be a group unrelated to |\foo|, or an argument to |\foo|. However, you can define yourself your own wrapping (even if it might be easier to simply create a new function instead of overwriting an existing macro). Note that if you want |disable externalization| to work on this command, you should define |\robExtCommandOrigYOURMACRONAME| that should point to the original definition of the macro.
+Note that we provide no argument to wrap automatically an arbitrary command since it is not trivial to know which part of the command should be kept in the file, and which should not: for instance, in |\foo{42}|, |{42}| might either be a group unrelated to |\foo|, or an argument to |\foo|. However, you can define yourself your own wrapping (even if it might be easier to simply create a new function instead of overwriting an existing macro). You have two ways:
+\begin{itemize}
+\item If you can define this function yourself, the easier might be directly to define is inside a |\CacheMe| environment.
+\item If you do not know how this function is created (e.g. come from a |\usepackage|), then you can redefine a new function that override the original one, but if you want |disable externalization| to work, make sure to define |\robExtCommandOrigYOURMACRONAME| that should point to the original definition of the macro, for instance using |\DeclareCommandCopy|, and set |\def\robExtCommandOrigName{YOURMACRONAME}| right before calling |CacheMe|.
+\end{itemize}
 
+We show below the two options:
 
+\paragraph{Option 1: define the function directly inside a macro.} Simpler option if you know the definition of the function. Say you want your function to draw a circle like, |\tikz \draw[fill=#2] (0,0) circle [radius=#1];|, then wrap in inside |CacheMe|:
+
+\begin{codeexample}[width=0mm,vbox]
+% D<>{} is an optional argument enclosed in <>, we use this to pass arguments to CacheMe
+\NewDocumentCommand{\drawMyCircle}{D<>{}O{2mm}m}{
+  \begin{CacheMe}{latex, add to preamble={\usepackage{tikz}}, #1}
+    \tikz \draw[fill=#3] (0,0) circle [radius=#2];
+  \end{CacheMe}
+}
+
+You can externalize it \drawMyCircle{pink} or disable externalization \drawMyCircle<disable externalization>[4mm]{red}.
+\end{codeexample}
+
+\paragraph{Option 2: define the function directly inside a macro.}
+
+The second option if you do not have access directly to the definition is to do copy first your command using |\DeclareCommandCopy{\robExtCommandOrigNAMEOFCOMMAND}{\NAMEOFCOMMAND}| (this is needed to disable externalization), and override it by wrapping it into a cache. Make sure to add |\def\robExtCommandOrigName{NAMEOFCOMMAND}| at the beginning of the function or |disable externalization| will not work:
+
+\begin{codeexample}[width=0cm,vbox]
+Original command: \zx{\zxZ{\alpha} \rar & \zxX{\beta}}
+
+\DeclareCommandCopy{\robExtCommandOrigzx}{\zx}
+\DeclareDocumentCommand{\zx}{D<>{}O{}m}{%
+  \def\robExtCommandOrigName{zx}%
+  \begin{CacheMe}{latex, add to preamble={\usepackage{zx-calculus}}, #1}%
+    \zx[#2]{#3}%
+  \end{CacheMe}%
+}
+
+This is cached \zx{\zxZ{\alpha} \rar & \zxX{\beta}}, you can add options like \zx<add to preamble={\usepackage{amsmath}}>{\zxZ{\alpha} \rar & \zxX{\text{Hey}}} and we can disable the externalization: \zx<disable externalization>{\zxZ{\alpha} \rar & \zxX{\text{Hey}}}.
+\end{codeexample}
 
 \subsection{Operations on the cache}\label{sec:operationsCache}
 
@@ -2191,10 +2297,13 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \item v1.1:
   \begin{itemize}
   \item you can now use ampersands etc freely thanks to lrbox
-  \item you can now automatically cache environments and commands using |\robExtWrapEnvironment|
+  \item you can now automatically cache environments using |\cacheEnvironment|
+  \item we provide |new preset| and |add to preset| to avoid doubling the number of hashes
+  \item we provide new functions like |\setPlaceholderRecReplaceFromList| to only expand a subset of placeholders
   \end{itemize}
 \end{itemize}
 
+\printindex
 
 \end{document}
 % Local Variables:

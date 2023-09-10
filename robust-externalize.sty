@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[1.0 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[1.0+unstable Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: understand why python scripts with raise NameError("42") do not make latex crash.
 
 \RequirePackage{pgfkeys} % We use the /robExt/... path to store our keys.
@@ -35,6 +35,22 @@
    \expandafter\aftergroup \csname x:\string#1\endcsname
 }
 
+\ExplSyntaxOn
+%% See also https://tex.stackexchange.com/questions/695432/latex3-latex-doubles-the-number-of-hashes-when-storing-them-in-string/695460#695460
+\cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
+\cs_set:Nn \str_set_hash_robust:Nn {
+  \str_set:Nn {#1} {#2}
+  \str_replace_all:Nnx {#1} { ## } { \c_hash_str }
+}
+\cs_generate_variant:Nn \str_set_hash_robust:Nn { cn }
+
+% Double the number of hashes... quite dirty but cannot find any solution or the user need to double it itself
+\NewDocumentCommand{\robExtStrSetDoubleHash}{mm}{
+  \str_set:Nn {#1} {#2}
+  \str_replace_all:Nnx {#1} { ## } { \c_hash_str \c_hash_str }
+}
+
+\ExplSyntaxOff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%% SCRIPTS %%%%%%%%%%%
@@ -312,7 +328,7 @@ if __name__ == '__main__':
 % This should automatically be called by other tools
 \NewDocumentCommand{\robExtAddPlaceholderToList}{m}{
   % Make sure we have a string here:
-  \str_set:Nn \l_robExt_tmp_str { #1 }
+  \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
   % First we remove existing occurrences (useful to avoid listing the same macro more than once
   % if we redefine a macro):
   \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
@@ -321,7 +337,7 @@ if __name__ == '__main__':
 
 \NewDocumentCommand{\robExtRemovePlaceholder}{m}{
   % This seems to be required to ensure catcodes are correct before removing the elements:
-  \str_set:Nn \l_robExt_tmp_str { #1 }
+  \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
   \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
   \expandafter \let \csname l_robExt_placeholder_#1_str \endcsname \undefined 
 }
@@ -332,12 +348,19 @@ if __name__ == '__main__':
 %% Warning: only LaTeX-friendly code should be placed here, as LaTeX does not preserve some symbols and adds spaces
 %% Tested!
 \NewDocumentCommand{\robExtPlaceholderFromContent}{mm}{
-  \str_set:cn { l_robExt_placeholder_#1_str } {#2}
+  \str_set_hash_robust:cn { l_robExt_placeholder_#1_str } {#2}
   \robExtAddPlaceholderToList{#1}
 }
 \let\placeholderFromContent\robExtPlaceholderFromContent
 \let\robExtSetPlaceholder\robExtPlaceholderFromContent
 \let\setPlaceholder\robExtPlaceholderFromContent
+
+\NewDocumentCommand{\robExtPlaceholderFromString}{mm}{
+  \str_set_eq:cN { l_robExt_placeholder_#1_str } {#2}
+  \robExtAddPlaceholderToList{#1}
+}
+\let\placeholderFromString\robExtPlaceholderFromString
+\let\setPlaceholderFromString\robExtPlaceholderFromString
 
 \NewDocumentCommand{\robExtCopyPlaceholder}{mm}{
   \str_set_eq:cc { l_robExt_placeholder_#1_str } { l_robExt_placeholder_#2_str }
@@ -350,11 +373,11 @@ if __name__ == '__main__':
 %% By default it adds a space in between, unless we use the star version
 \NewDocumentCommand{\robExtAddToPlaceholder}{smm}{
   \str_if_exist:cTF { l_robExt_placeholder_#2_str } {
-    \str_set:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
+    \str_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
     \IfBooleanTF{#1}{}{\str_put_right:cn { l_robExt_placeholder_#2_str } { ~ } }
     \str_put_right:cV { l_robExt_placeholder_#2_str } \l_tmp_str
   }{
-    \str_set:cn { l_robExt_placeholder_#2_str } {#3}
+    \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
     \robExtAddPlaceholderToList{#2}
   }
 }
@@ -364,11 +387,11 @@ if __name__ == '__main__':
 %% By default it adds a space in between, unless we use the star version
 \NewDocumentCommand{\robExtAddBeforePlaceholder}{smm}{
   \str_if_exist:cTF { l_robExt_placeholder_#2_str } {
-    \str_set:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
+    \str_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
     \IfBooleanTF{#1}{}{\str_put_left:cn { l_robExt_placeholder_#2_str } { ~ } }
     \str_put_left:cV { l_robExt_placeholder_#2_str } \l_tmp_str
   }{
-    \str_set:cn { l_robExt_placeholder_#2_str } {#3}
+    \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
     \robExtAddPlaceholderToList{#2}
   }
 }
@@ -463,7 +486,7 @@ if __name__ == '__main__':
 %% MYLIBPATH = robExt-abc.py
 %% Tested!
 \NewDocumentCommand{\robExtPlaceholderPathFromContent}{mO{.tex}m}{
-  \str_set:Nn \l_robExt_tmp_contain_file {#3}
+  \str_set_hash_robust:Nn \l_robExt_tmp_contain_file {#3}
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
   \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
@@ -534,7 +557,7 @@ if __name__ == '__main__':
 }
 
 \NewDocumentCommand{\robExtGetPlaceholderInResult}{O{}m}{
-  \str_set:Nn \l_robExt_result_str { #2 }
+  \str_set_hash_robust:Nn \l_robExt_result_str { #2 }
   \__replace_until_impossible:N { }
   \tl_if_blank:nTF {#1} {} {
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
@@ -546,13 +569,64 @@ if __name__ == '__main__':
 }
 \let\getPlaceholderInResult\robExtGetPlaceholderInResult
 
+\cs_set:Nn \__replace_from_list:N {
+  \str_set_eq:NN \l_robext_tmp_before \l_robExt_result_str
+  \clist_map_inline:Nn {#1} {
+    \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
+  }
+  % We compare the result
+  \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
+    % \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_result_str
+    % \robExtAddPlaceholderToList{#1}
+  }{
+    % The strings are different: we restart
+    \__replace_from_list:N { #1 }
+  }
+}
+
+\NewDocumentCommand{\robExtGetPlaceholderInResultReplaceFromList}{mO{}m}{
+  \str_set_hash_robust:Nn \l_robExt_result_str { #3 }
+  \clist_set:Nn \l_robExt_list_placeholder_replace_clist {#1}
+  \__replace_from_list:N { \l_robExt_list_placeholder_replace_clist }
+  \tl_if_blank:nTF {#2} {} {
+    \str_remove_all:Nn \l_robExt_result_str { #1 }
+    \str_set_eq:cN { l_robExt_placeholder_#2_str } \l_robExt_result_str
+    \robExtAddPlaceholderToList{#2}
+  }
+}
+\let\getPlaceholderInResultReplaceFromList\robExtGetPlaceholderInResultReplaceFromList
+
+
 % Otherwise we need latex3 
 \def\robExtResult{\l_robExt_result_str}
+
+%%%% Same version, but replaces only one (useful sometimes)
+\cs_set:Nn \__replace_n_times:n {
+  \str_set_eq:NN \l_robext_tmp_before \l_robExt_result_str
+  \seq_map_inline:Nn \l_robExt_placeholders_seq {
+    \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
+  }
+  \int_compare:nTF { #1 > 1}{
+    \__replace_n_times:n {\int_eval:n {#1-1}}
+  }{}
+}
+
 
 \NewDocumentCommand{\robExtSetPlaceholderRec}{mm}{
   \robExtGetPlaceholderInResult[#1]{#2}
 }
 \let\setPlaceholderRec\robExtSetPlaceholderRec
+
+\NewDocumentCommand{\robExtSetPlaceholderRecReplaceNTimes}{O{1}mm}{
+  \robExtGetPlaceholderInResultReplaceNTimes[#1][#2]{#3}
+}
+\let\setPlaceholderRecReplaceNTimes\robExtSetPlaceholderRecReplaceNTimes
+
+\NewDocumentCommand{\robExtSetPlaceholderRecReplaceFromList}{mmm}{
+  \robExtGetPlaceholderInResultReplaceFromList{#1}[#2]{#3}
+}
+\let\setPlaceholderRecReplaceFromList\robExtSetPlaceholderRecReplaceFromList
+
 
 \NewDocumentCommand{\robExtGetPlaceholder}{O{}m}{
   \robExtGetPlaceholderInResult[#1]{#2}
@@ -563,11 +637,30 @@ if __name__ == '__main__':
 %%% Evaluate a string by replacing the placeholders until there is none left
 %%% the result will be in \robExtResult
 \NewDocumentCommand{\robExtEvalPlaceholder}{m}{
-  \str_set:Nn \l_test_str {#1}
+  \str_set_hash_robust:Nn \l_test_str {#1}
   \robExtGetPlaceholderInResult{#1}
   \tl_rescan:nv {} { l_robExt_result_str }
 }
 \let\evalPlaceholder\robExtEvalPlaceholder
+
+%%% Evaluate a string by replacing the placeholders until there is none left
+%%% the result will be in \robExtResult
+\NewDocumentCommand{\robExtEvalPlaceholderReplaceNTimes}{O{1}m}{
+  \str_set_hash_robust:Nn \l_test_str {#2}
+  \robExtGetPlaceholderInResultReplaceNTimes[#1]{#2}
+  \tl_rescan:nv {} { l_robExt_result_str }
+}
+\let\evalPlaceholderReplaceNTimes\robExtEvalPlaceholderReplaceNTimes
+
+%%% Evaluate a string by replacing the placeholders until there is none left
+%%% the result will be in \robExtResult
+\NewDocumentCommand{\robExtEvalPlaceholderReplaceFromList}{mm}{
+  \str_set_hash_robust:Nn \l_test_str {#2}
+  \robExtGetPlaceholderInResultReplaceFromList{#1}{#2}
+  \tl_rescan:nv {} { l_robExt_result_str }
+}
+\let\evalPlaceholderReplaceFromList\robExtEvalPlaceholderReplaceFromList
+
 
 \NewDocumentCommand{\robExtEvalPlaceholderInplace}{m}{
   \robExtGetPlaceholderInResult{#1}
@@ -767,6 +860,39 @@ if __name__ == '__main__':
   /robExt/.cd,
   % We create a default style that will be loaded (mostly for the user)
   default style/.style={},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Code to create new styles %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % The advantage of this over .append style is that you do not need to double the number of hashes
+  % don't know if there is a better solution.
+  % https://tex.stackexchange.com/questions/695432/latex3-latex-doubles-the-number-of-hashes-when-storing-them-in-string/695461
+  add to preset/.code 2 args={%
+    \robExtStrSetDoubleHash{\robExtTmpStr}{#2}
+    % Sadly, \expanded{\noexpand } does not work, as I get extra {} around the def, creating a group
+    % so the simpler seems to use this library ^^
+    \robExtPlaceholderFromString{__ROBEXT_TMP__}{\robExtTmpStr}%
+    \robExtEvalPlaceholderReplaceFromList{__ROBEXT_TMP__}{%
+      \pgfkeys{%
+        /robExt/.cd,
+        #1/.append style={__ROBEXT_TMP__},%
+      }%
+    }%
+    \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
+  },
+  new preset/.code 2 args={%
+    \robExtStrSetDoubleHash{\robExtTmpStr}{#2}%
+    % Sadly, \expanded{\noexpand } does not work, as I get extra {} around the def, creating a group
+    % so the simpler seems to use this library ^^
+    \robExtPlaceholderFromString{__ROBEXT_TMP__}{\robExtTmpStr}%
+    % \robExtShowPlaceholder*{__ROBEXT_TMP__}
+    \robExtEvalPlaceholderReplaceFromList{__ROBEXT_TMP__}{%
+      \pgfkeys{%
+        /robExt/.cd,
+        #1/.style={__ROBEXT_TMP__},%
+      }%
+    }%
+    \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
+  },
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Interface to change placeholders %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -776,7 +902,11 @@ if __name__ == '__main__':
   },
   copy placeholder/.code 2 args={\robExtCopyPlaceholder{#1}{#2}},
   set placeholder rec/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}},
+  set placeholder rec replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}},
   set placeholder eval/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}\robExtEvalPlaceholderInplace{#1}},
+  set placeholder eval replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}\robExtEvalPlaceholderInplace{#2}},
+  eval placeholder/.code={\robExtEvalPlaceholder{#1}},
+  eval placeholder replace from list/.code 2 args={\robExtEvalPlaceholderReplaceFromList{#1}{#2}},
   set placeholder from content/.code 2 args={\robExtPlaceholderFromContent{#1}{#2}},
   add to placeholder/.code 2 args={\robExtAddToPlaceholder{#1}{#2}},
   add to placeholder no space/.code 2 args={\robExtAddToPlaceholder*{#1}{#2}},
@@ -996,6 +1126,18 @@ if __name__ == '__main__':
     },
   }
 }
+
+
+%%%% Generic placeholders, practical to escape stuff
+\ExplSyntaxOn
+\robExtPlaceholderFromString{__ROBEXT_LEFT_BRACE__}{\c_left_brace_str}
+\robExtPlaceholderFromString{__ROBEXT_RIGHT_BRACE__}{\c_right_brace_str}
+\robExtPlaceholderFromString{__ROBEXT_BACKSLASH__}{\c_backslash_str}
+\robExtPlaceholderFromString{__ROBEXT_HASH__}{\c_hash_str}
+\robExtPlaceholderFromString{__ROBEXT_PERCENT__}{\c_percent_str}
+\robExtPlaceholderFromString{__ROBEXT_UNDERSCORE__}{\c_underscore_str}
+\ExplSyntaxOff
+
 
 %%%% For LaTeX codes
 
@@ -1343,7 +1485,7 @@ touch "${outputPdf}"
     \expanded{\noexpand\DeclareEnvironmentCopy{\robExtEnvironmentOrigName}{robExtEnvironmentOrig\robExtEnvironmentOrigName}}%
   \fi%
   \ifdefined\robExtCommandOrigName%
-    \expanded{\noexpand\DeclareCommandCopy{\robExtCommandOrigName}{robExtCommandOrig\robExtCommandOrigName}}%
+    \expandafter\DeclareCommandCopy\csname \robExtCommandOrigName\expandafter\endcsname\csname robExtCommandOrig\robExtCommandOrigName\endcsname%
   \fi%
 }
 
@@ -1354,33 +1496,19 @@ touch "${outputPdf}"
   \end{CacheMe}%
 }{}%
 
-%% \robExtWrapEnvironment{myenv}
-\NewDocumentCommand{\robExtWrapEnvironment}{mm}{%
+%% \robExtCacheEnvironment{myenv}
+\NewDocumentCommand{\robExtCacheEnvironment}{mm}{%
   %% We need to save the original environment to avoid infinite recursion if we disable externalization
   %% https://tex.stackexchange.com/questions/695391/why-isnt-my-environment-restored/695398
-  \NewEnvironmentCopy{robExtEnvironmentOrig#1}{#1}
+  \NewEnvironmentCopy{robExtEnvironmentOrig#1}{#1}%
   \DeclareDocumentEnvironment{#1}{D<>{}}{%
     \def\robExtEnvironmentOrigName{#1}%
-    \CacheMe{
-      #2,
-      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{#1}},
-      add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{#1}},
-      ##1
+    \CacheMe{%
+      #2,%
+      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{#1}},%
+      add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{#1}},%
+      ##1%
     }%
-  }{\endCacheMe}
+  }{\endCacheMe}%
 }
-
-% %% \robExtWrapEnvironment{myenv}
-% \NewDocumentCommand{\robExtWrapCommand}{mm}{%
-%   %% We need to save the original environment to avoid infinite recursion if we disable externalization
-%   \expandafter\NewCommandCopy\csname robExtCommandOrig#1\expandafter\endcsname\csname#1\endcsname
-%   \DeclareDocumentCommand{#1}{D<>{}}{%
-%     \def\robExtCommandOrigName{#1}%
-%     \cacheMe[
-%       #2,
-%       add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\#1 }},
-%       ##1
-%     ]{}%
-%   }%
-% }
-
+\let\cacheEnvironment\robExtCacheEnvironment
