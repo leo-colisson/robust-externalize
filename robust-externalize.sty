@@ -617,11 +617,6 @@ if __name__ == '__main__':
 }
 \let\setPlaceholderRec\robExtSetPlaceholderRec
 
-\NewDocumentCommand{\robExtSetPlaceholderRecReplaceNTimes}{O{1}mm}{
-  \robExtGetPlaceholderInResultReplaceNTimes[#1][#2]{#3}
-}
-\let\setPlaceholderRecReplaceNTimes\robExtSetPlaceholderRecReplaceNTimes
-
 \NewDocumentCommand{\robExtSetPlaceholderRecReplaceFromList}{mmm}{
   \robExtGetPlaceholderInResultReplaceFromList{#1}[#2]{#3}
 }
@@ -754,8 +749,8 @@ if __name__ == '__main__':
   \file_if_exist:xTF{\robExtAddCachePathAndName{\robExtFinalHash.tex}}{
     \message{The\space file\space \robExtAddCachePathAndName{\robExtFinalHash.tex} \space already\space exists.^^J}
   }{
-    \str_if_empty:NTF \l_robExt_final_file_str {
-      \PackageError{robExt}{You ~ are ~ writing ~ an ~ empty ~ tex ~ file, ~ that ~ will ~ fail ~ to ~ compile. ~ Make ~ sure ~ you ~ defined ~ a ~ template.}{}
+    \str_if_eq:VnTF { \l_robExt_final_file_str }{__ROBEXT_TEMPLATE__} {
+      \PackageError{robExt}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}{}
     }{
       % Check if the output directory exists
       \robExtCheckIfPrefixFolderExists
