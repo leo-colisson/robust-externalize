@@ -225,7 +225,31 @@ Note that |remember picture| is not working in both libraries.
 
 To install the library, just copy the |robust-externalize.sty| file into the root of the project. Then, load the library using:\\
 
-|\usepackage{robust-externalize}|
+\begin{verbatim}
+\usepackage{robust-externalize}
+\end{verbatim}
+
+If you want to display a message in the pdf on how to manually compile the file if |-shell-escape| is disabled, you can also load this configuration (only available on v1.1):
+
+\begin{verbatim}
+\robExtConfigure{
+  enable fallback to manual mode,
+}
+\end{verbatim}
+
+\noindent (otherwise, it will give you an error if |-shell-escape| is disabled and if some pictures are not yet cached)
+
+If you forget/do not want to enable |-shell-escape|, this will give you this kind of message:
+
+\noindent {
+  \robExtConfigure{
+    enable manual mode
+  }
+  \begin{tikzpictureC}[baseline=(A.base)][]
+    \node[fill=red, rounded corners](A){I must be manually compiled.};
+    \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
+  \end{tikzpictureC}
+}
 
 
 \subsection{Caching a tikz picture}
@@ -1550,6 +1574,8 @@ The inclusion command is the command that is run to include the cached file back
   \def\extrakeytext{style, }
   \extractkey/robExt/enable manual mode\@nil
   \extractkey/robExt/disable manual mode\@nil
+  \extractkey/robExt/enable fallback to manual mode\@nil
+  \extractkey/robExt/disable fallback to manual mode\@nil
   \makeatother%
   \pgfmanualbody
   If you do or do not want to ask latex to run the compilation commands itself (for instance for security
@@ -1566,7 +1592,8 @@ The inclusion command is the command that is run to include the cached file back
       \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
     \end{tikzpictureC}
   \end{codeexample}
-
+  The main difference between |manual mode| and |fallback to manual mode| is that |fallback to manual mode| will try to compile the file if |-shell-escape| is enabled, while |manual mode| will never run any command, even if |-shell-escape| is enabled. Note that |enable fallback to manual mode| is available starting from v1.1.
+  
   See \cref{sec:operationsCache} for more details.
 \end{pgfmanualentry}
 
@@ -2265,6 +2292,13 @@ When enabling the manual mode (useful if we don't want to enable |-shell-escape|
 }
 \end{verbatim}
 
+or the fallback to manual mode (it will only enable the manual mode if |-shell-escape| is disabled):
+\begin{verbatim}
+\robExtConfigure{
+  enable fallback to manual mode,
+}
+\end{verbatim}
+
 the library creates a file |JOBNAME-robExt-compile-missing-figures.sh| that contains the instructions to build the figures that are not yet in the cache (each line contains the compilation command to run). On Linux (or on Windows with bash/cygwin/… installed, it possibly even work out of the box without) you can easily execute them using:
 
 \begin{verbatim}
@@ -2301,6 +2335,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item We provide |new preset| and |add to preset| to avoid doubling the number of hashes.
   \item We provide new functions like |\setPlaceholderRecReplaceFromList| to only expand a subset of placeholders.
   \item An error message is given if you forget to set a template.
+  \item Add |enable fallback to manual mode| to fallback to manual mode only if shell escape is missing.
   \end{itemize}
 \end{itemize}
 

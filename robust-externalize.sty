@@ -791,7 +791,12 @@ if __name__ == '__main__':
         \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l_robExt_finalCompilationCommand.}
         \sys_shell_now:x {\l_robExt_finalCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
       }{
-        \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
+        \ifdefined\robExtFallbackManualMode
+          \message{[robExt] Fallback to manual mode: please, manually compile the images using \l_robExt_finalCompilationCommand or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
+          \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_finalCompilationCommand^^J}
+        \else
+          \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
+        \fi
       }
     \fi
   }
@@ -831,13 +836,24 @@ if __name__ == '__main__':
           \framebox[\linewidth]
           {
             \begin{minipage}{\linewidth}
-              \textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ via ~ ``\l_robExt_finalCompilationCommand'' ~ or ~ call ~ ``bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh'' ~ to ~ compile ~ all ~ missing ~ figures.}}
+              \textbf{Draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_finalCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
             \end{minipage}
           }
           %\fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
           \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
         \else
-          \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
+          \ifdefined\robExtFallbackManualMode
+            \framebox[\linewidth]
+            {
+              \begin{minipage}{\linewidth}
+                \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_finalCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+              \end{minipage}
+            }
+            % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
+            \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+          \else
+            \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
+          \fi
         \fi
       }
     }%
@@ -969,6 +985,8 @@ if __name__ == '__main__':
   %% reasons, you can use these commands and run the command manually later):
   enable manual mode/.code={\def\robExtManualMode{}},
   disable manual mode/.code={\let\robExtManualMode\undefined},
+  enable fallback to manual mode/.code={\def\robExtFallbackManualMode{}},
+  disable fallback to manual mode/.code={\let\robExtFallbackManualMode\undefined},
   %% Arguments to include graphics
   include graphics args/.code={\def\robExtIncludeGraphicsArgs{#1}},
   %% The role of this command is to set \l_robExt_result_str, that will contain the final string.
@@ -1184,7 +1202,7 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
 
 %% Compilation commands
 \setPlaceholder{__ROBEXT_COMPILATION_COMMAND_LATEX__}{__ROBEXT_LATEX_ENGINE__ __ROBEXT_COMPILATION_COMMAND_OPTIONS__ "__ROBEXT_SOURCE_FILE__"}
-\setPlaceholder{__ROBEXT_COMPILATION_COMMAND_OPTIONS__}{-shell-escape -halt-on-error}
+\setPlaceholder{__ROBEXT_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error}
 \setPlaceholder{__ROBEXT_LATEX_ENGINE__}{pdflatex}
 
 \robExtConfigure{
