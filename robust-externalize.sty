@@ -157,10 +157,13 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtCheckIfPrefixFolderExists}{}{
   % Check if the output directory exists
   \ifdefined\robExtCacheFolder
-    \sys_if_shell_unrestricted:TF{
+    %% Not sure how to do an "OR" otherwise
+
+    \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation}}
+    {
       \ifdefined\robExtDoNotMkdirFolder\else
         \ifdefined\robExtManualMode
-          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ create ~ the ~ folder ~ \robExtCacheFolder.}
+          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ create ~ the ~ folder ~ \robExtCacheFolder.}
         \else
           \sys_shell_now:x {mkdir ~ -p ~ \robExtCacheFolder}
         \fi
@@ -787,7 +790,8 @@ if __name__ == '__main__':
       \message{[robExt] Manual mode enabled: please, manually compile the images using \l_robExt_finalCompilationCommand or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
       \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_finalCompilationCommand^^J}
     \else
-      \sys_if_shell_unrestricted:TF{
+      \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
+      {
         \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l_robExt_finalCompilationCommand.}
         \sys_shell_now:x {\l_robExt_finalCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
       }{
@@ -948,7 +952,11 @@ if __name__ == '__main__':
   reset dependencies/.code={\robExtResetDependencies{}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Compilation command %%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % People might want to force the compilation even if shell_unrestricted is false, notably if they
+  % allow commands like mkdir/cd/pdflatex to run in restricted mode.
+  force compilation/.code={\def\robExtForceCompilation{}},
+  do not force compilation/.code={\let\robExtForceCompilation\undefined},
   set compilation command/.code={\robExtSetCompilationCommand{#1}},
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={
@@ -997,7 +1005,10 @@ if __name__ == '__main__':
   set filename prefix/.code={\def\robExtPrefixFilename{#1}},
   % first argument is subfolder, second is how to get from subfolder to the folder containing the source:
   % set subfolder and way back={robustExternal/}{../}
+  % synonyme, "cache folder" is prefered over ""
   set subfolder and way back/.code 2 args={\def\robExtCacheFolder{#1}\def\robExtCacheFolderWayBack{#2}},
+  set cache folder and way back/.code 2 args={\def\robExtCacheFolder{#1}\def\robExtCacheFolderWayBack{#2}},
+  no cache folder/.code={\let\robExtCacheFolder\undefined\def\robExtCacheFolderWayBack{}},
   % By default we put everything in robustExternalize
   % Change this before starting to cache any library, and if you change it mid-document, be aware
   % that you will not be able to refer to elements in the old folder.
@@ -1137,7 +1148,24 @@ if __name__ == '__main__':
         __ROBEXT_VERBATIM_COMMAND__{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__-out.txt}%
       }%
     },
-  }
+  },
+  % Mostly for debugging purpose
+  print command and source/.style={
+    enable manual mode,
+    custom include command advanced={%
+      \evalPlaceholder{%
+        Command: (run in folder \texttt{__ROBEXT_CACHE_FOLDER__})
+        \robExtPrintPlaceholder{__ROBEXT_COMPILATION_COMMAND__}
+        Dependencies:
+        \verbatiminput{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__.deps}%
+        Source (in \texttt{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__.tex}):
+        \verbatiminput{__ROBEXT_CACHE_FOLDER____ROBEXT_OUTPUT_PREFIX__.tex}%
+      }%
+    },
+  },
+  debug/.style={
+    print command and source
+  },
 }
 
 
