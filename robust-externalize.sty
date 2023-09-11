@@ -1610,7 +1610,7 @@ touch "${outputPdf}"
 
 \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{<>}}{%
   \robExtCacheEnvironment[#1]{tikzpicture}{tikzpicture}
-  %\robExtCacheCommand[#1]{tikz}[O{}m]{tikz}
+  \robExtCacheCommand[#1]{tikz}[O{}m]{tikz}
 }
 
 
