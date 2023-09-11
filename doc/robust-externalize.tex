@@ -251,7 +251,7 @@ If you forget/do not want to enable |-shell-escape|, this will give you this kin
   \robExtConfigure{
     enable manual mode
   }
-  \begin{tikzpictureC}[baseline=(A.base)][]
+  \begin{tikzpictureC}[baseline=(A.base)]
     \node[fill=red, rounded corners](A){I must be manually compiled.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC}
@@ -262,12 +262,19 @@ If you forget/do not want to enable |-shell-escape|, this will give you this kin
 
 If you only care about \tikzname's picture, you have 3 options:
 \begin{enumerate}
-\item Call once |\robExtExternalizeAllTikzpictures| that will redefine |tikzpicture| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below.
+\item Call once |\robExtExternalizeAllTikzpictures| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| and |tikzpicture| (that first loads |tikz|).
+\item Use the generic commands that allows you to wrap an arbitrary environment or command (this is exactly what |\robExtExternalizeAllTikzpictures| is doing internally):
+\begin{verbatim}
+%        name environment ---v            v----- preset options
+\robExtCacheEnvironment{tikzpicture}{tikzpicture}
+%     name command ---v    v------v-----signature and preset options
+\robExtCacheCommand{tikz}[O{}m]{tikz}
+\end{verbatim}
 \item Use |tikzpictureC| instead of |tikzpicture| (this is mostly done to easily convert existing code to this library, but works only for |tikz| pictures).
 \item Use the more general |CacheMe| environment, that can cache \tikzname, \LaTeX{}, python, and much more.
 \end{enumerate}
 
-These 3 options are illustrated below (note that the newly defined |tikzpicture| and |tikzpictureC| accept a second optional argument that contains the options to pass to |CacheMe| after loading the |tikz| preset):
+These 3 options are illustrated below (note that the newly defined |tikzpicture| and |tikzpictureC| accept a second optional argument that contains the options to pass to |CacheMe| after loading the |tikzpicture| preset, that loads itself the |tikz| preset first):
 
 Option 1:
 \begin{codeexample}[width=0pt]
@@ -291,16 +298,16 @@ I am a cached picture: \begin{tikzpictureC}[baseline=(A.base)]
 
 Option 3:
 \begin{codeexample}[width=0pt]
-I am a cached picture: \begin{CacheMe}{tikz}[baseline=(A.base)]
+I am a cached picture: \begin{CacheMe}{tikzpicture}[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
 \end{CacheMe}.
 \end{codeexample}
 
-Since |CacheMe| is more general as it applies also to non-tikz pictures (just replace |tikz| with the style of your choice), we will mostly use this syntax from now.
+Since |CacheMe| is more general as it applies also to non-tikz pictures (just replace |tikzpicture| with the style of your choice), we will mostly use this syntax from now.
 
 \subsection{Custom preamble}
 
-Note that the pictures are compiled in a separate document, with a different preamble and class (we use the standalone class). This is interesting to reduce the compilation time of each picture (loading a large preamble is really time consuming) and to avoid unnecessary recompilation (do you want to recompile all your pictures when you add a single new macro?) without sacrificing the purity. But of course, you need to provide the preamble of the pictures. The easiest way is probably to modify the |tikz| preset (you can also modify the |latex| preset if you want the change to apply to all \LaTeX{} documents):
+Note that the pictures are compiled in a separate document, with a different preamble and class (we use the standalone class). This is interesting to reduce the compilation time of each picture (loading a large preamble is really time consuming) and to avoid unnecessary recompilation (do you want to recompile all your pictures when you add a single new macro?) without sacrificing the purity. But of course, you need to provide the preamble of the pictures. The easiest way is probably to modify the |tikz| preset (since |tikzpicture| loads this style first, it will also apply to tikzpictures. Note that you can also modify the |latex| preset if you want the change to apply to all \LaTeX{} documents):
 
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
@@ -310,17 +317,17 @@ Note that the pictures are compiled in a separate document, with a different pre
   }
 
   See, tikz's style now packs the |shadows| library by default: %
-  \begin{CacheMe}{tikz}[even odd rule]
+  \begin{CacheMe}{tikzpicture}[even odd rule]
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{CacheMe}
 \end{codeexample}
 
-\textbf{Note:} the |add to preset| directive has been added on v1.1. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that in |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
+\textbf{Note:} the |add to preset| directive has been added on v1.1, together with the |tikzpicture| preset. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that in |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
 
 You can also choose to overwrite it for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
 \begin{codeexample}[width=0pt,vbox]
   See, you can add something to the preamble of a single picture: %
-  \begin{CacheMe}{tikz, add to preamble={\usetikzlibrary{shadows}}}[even odd rule]
+  \begin{CacheMe}{tikzpicture, add to preamble={\usetikzlibrary{shadows}}}[even odd rule]
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{CacheMe}
 \end{codeexample}
@@ -328,7 +335,7 @@ You can also choose to overwrite it for a single picture (or even a block of pic
 Note that if you use the |tikzpictureC| or |tikzpicture| syntax, you want to add the options after the tikz options (leave an empty bracket if there is none):
 \begin{codeexample}[width=0pt,vbox]
   See, you can add something to the preamble of a single picture: %
-  \begin{tikzpictureC}[even odd rule][add to preamble={\usetikzlibrary{shadows}}]
+  \begin{tikzpictureC}<add to preamble={\usetikzlibrary{shadows}}>[even odd rule]
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{tikzpictureC}
 \end{codeexample}
@@ -359,7 +366,7 @@ You can use |disable externalization| to disable externalization (which is parti
     \node[rounded corners, fill=orange](pointtome1){Point to me if you can};\\
   \robExtExternalizeAllTikzpictures
   % But we can disable it temporarily
-  \begin{tikzpicture}[remember picture][disable externalization]
+  \begin{tikzpicture}<disable externalization>[remember picture]
     \node[rounded corners, fill=red](A){This figure is not externalized.
       This way, it can use remember picture.};
     \draw[->,overlay] (A) to[bend right] (pointtome1);
@@ -393,7 +400,7 @@ You can use |disable externalization| to disable externalization (which is parti
 You can feed data from the main document to the cached file using placeholders, since |set placeholder eval={__foo__}{\bar}| will evaluate |\bar| and put the result in |__foo__|. For instance, if the picture depends on the current page, you can do:
 
 \begin{codeexample}[width=0pt,vbox]
-\begin{tikzpictureC}[][set placeholder eval={__thepage__}{\thepage}]
+\begin{tikzpictureC}<set placeholder eval={__thepage__}{\thepage}>
   \node[rounded corners, fill=red]{The current page is __thepage__.};
 \end{tikzpictureC}
 \end{codeexample}
@@ -486,7 +493,7 @@ $\rightarrow$ The cosinus of 1 is \cosComputedInPython.
 
 \paragraph{Improve an existing preset}
 
-If you often use the same code (e.g.\ load matplotlib, save the file etc), you can directly modify the |__ROBEXT_MAIN_CONTENT__| placeholder to add the redundant information (or create a new template from scratch, see below), as this placeholder contains the code typed by the user (this is true for all presets, as |CacheMe*| is in charge of setting this placeholder):
+If you often use the same code (e.g.\ load matplotlib, save the file etc), you can directly modify the |__ROBEXT_MAIN_CONTENT__| placeholder to add the redundant information (or create a new template from scratch, see below). By default, it points to |__ROBEXT_MAIN_CONTENT_ORIG__| that contains directly the code typed by the user (this is true for all presets, as |CacheMe*| is in charge of setting this placeholder). When dealing with \LaTeX{} code, |__ROBEXT_MAIN_CONTENT__| should ideally contain a code that can be inserted as-it in the document in order to be compatible by default with |disable externalization|. So if you want to wrap the content of the user in an environment like |\begin{tikzpicture}...\end{tikzpicture}|, this is the placeholder to modify.
 
 \begin{codeAndResult}
 %% Create your style:
@@ -756,7 +763,7 @@ uname -srv > "__ROBEXT_OUTPUT_PREFIX__-out.txt"
 
 \paragraph{Code inside a macro}
 
-Due to fundamental \LaTeX{} restrictions, it is impossible to use |CacheMeCode| inside a macro or some environments as \LaTeX{} will strip all lines containing a percent character for instance. The solution here is to define our main content before, and then set it using |set main content| (that simply sets |__ROBEXT_MAIN_CONTENT__|). In this example, we also show how |CacheMeNoContent| can be used when their is no content (the arguments to |CacheMe| are directly given in the body of |CacheMeNoContent|):
+Due to fundamental \LaTeX{} restrictions, it is impossible to use |CacheMeCode| inside a macro or some environments as \LaTeX{} will strip all lines containing a percent character for instance. The solution here is to define our main content before, and then set it using |set main content| (that simply sets |__ROBEXT_MAIN_CONTENT_ORIG__|). In this example, we also show how |CacheMeNoContent| can be used when their is no content (the arguments to |CacheMe| are directly given in the body of |CacheMeNoContent|):
 
 \begin{codeAndResult}
 \begin{PlaceholderFromCode}{__TMP_MAIN_CONTENT__}
@@ -1141,7 +1148,7 @@ Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_E
   \pgfmanualbody
   Alias for |\setPlaceholderRec{#1}{#2}\evalPlaceholderInplace{#1}|: set and evaluate recursively the placeholders and macros. This can be practical to pass the value of a counter/macro to the template (of course, if this value is fixed, you can also directly load it from the preambule):
 \begin{codeexample}[width=0pt,vbox]
-\begin{CacheMe}{tikz, set placeholder eval={__thepage__}{\thepage}}
+\begin{CacheMe}{tikzpicture, set placeholder eval={__thepage__}{\thepage}}
   \node[rounded corners, fill=red]{The current page is __thepage__.};
 \end{CacheMe}
 \end{codeexample}
@@ -1299,7 +1306,6 @@ As a sanity check, this file contains
   \setPlaceholder{__MY_CONTENT__}{The content used to be __MY_OLD_CONTENT__}
   \printAllPlaceholdersExceptDefaults
 \end{codeexample}
- It is useful for instance if you want to use a different value for |__ROBEXT_MAIN_CONTENT__|: first copy |__ROBEXT_MAIN_CONTENT__| to another placeholder, say |__NEW_MAIN_CONTENT__|, and then set |__ROBEXT_MAIN_CONTENT__| to point to an arbitrary template that may load |__NEW_MAIN_CONTENT__|.
 \end{pgfmanualentry}
 
 
@@ -1311,7 +1317,7 @@ As a sanity check, this file contains
   \extractcommand\cacheMe\opt{\oarg{preset style}}\marg{content to cache}\@@
   \extractenvironement{CacheMe}\marg{preset style}\@@
   \pgfmanualbody
-  This command (and its environment alias) is the main entry point if you want to cache the result of a file. The preset style is a pgfkeys-based style that is used to configure the template that is used, the compilation command, and more. You can either inline the style, or use some presets that configure the style automatically. After evaluating the style, the placeholders |__ROBEXT_TEMPLATE__| (containing the content of the file) and |__ROBEXT_COMPILATION_COMMAND__| (containing the compilation command run in the cache folder, that can use other placeholders internally like |__ROBEXT_SOURCE_FILE__| to get the path to the source file) should be set. Note that we provide some basic styles that allow settings these placeholders easily. See \cref{sec:placeholders} for a list of existing placeholders and presets. The placeholder |__ROBEXT_MAIN_CONTENT__| will automatically be set by this command (or environment) so that it equals the content of the second argument (or the body of the environment). This style can also configure the command to use to include the file and more. By default it will insert the compiled PDF, making sure that the depth is respected (internally, we read the depth from an aux file created by our \LaTeX{} preset), but you can easily change it to anything you like.
+  This command (and its environment alias) is the main entry point if you want to cache the result of a file. The preset style is a pgfkeys-based style that is used to configure the template that is used, the compilation command, and more. You can either inline the style, or use some presets that configure the style automatically. After evaluating the style, the placeholders |__ROBEXT_TEMPLATE__| (containing the content of the file) and |__ROBEXT_COMPILATION_COMMAND__| (containing the compilation command run in the cache folder, that can use other placeholders internally like |__ROBEXT_SOURCE_FILE__| to get the path to the source file) should be set. Note that we provide some basic styles that allow settings these placeholders easily. See \cref{sec:placeholders} for a list of existing placeholders and presets. The placeholder |__ROBEXT_MAIN_CONTENT_ORIG__| will automatically be set by this command (or environment) so that it equals the content of the second argument (or the body of the environment). By default, |__ROBEXT_MAIN_CONTENT__| will point to |__ROBEXT_MAIN_CONTENT_ORIG__|, possibly wrapping it inside an environment like |\begin{tikzpicture}| (most of the time, you want to modify and display |__ROBEXT_MAIN_CONTENT__| rather than the |_ORIG_| to easily recover the input of the user). This style can also configure the command to use to include the file and more. By default it will insert the compiled PDF, making sure that the depth is respected (internally, we read the depth from an aux file created by our \LaTeX{} preset), but you can easily change it to anything you like.
 
   For an educational purpose, we write here an example that does not exploit any preset. In practice, we recommend however to use our presets, or to define new presets based on our presets (see below for examples).
 \begin{codeexample}[width=0pt,vbox]
@@ -1662,7 +1668,7 @@ The inclusion command is the command that is run to include the cached file back
 
     The next picture must be manually compiled %
     (see JOBNAME-robExt-compile-missing-figures.sh):\\ %
-    \begin{tikzpictureC}[baseline=(A.base)][]
+    \begin{tikzpictureC}[baseline=(A.base)]
       \node[fill=red, rounded corners](A){I must be manually compiled.};
       \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
     \end{tikzpictureC}
@@ -1737,7 +1743,7 @@ You might want (sometimes or always) to disable externalization, for instance to
     % In theory all pictures should be externalized (so remember picture should fail)
     \robExtExternalizeAllTikzpictures
     % But we can disable it temporarily
-    \begin{tikzpicture}[remember picture][disable externalization]
+    \begin{tikzpicture}<disable externalization>[remember picture]
       \node[rounded corners, fill=red](A){This figure is not externalized.
         This way, it can use remember picture.};
       \draw[->,overlay] (A) to[bend right] (pointtome);
@@ -1863,7 +1869,7 @@ It can sometimes be handy to use the result of a previous cached file to cache a
   |name output=foo| will create two global macros |\foo| and |\fooInCache|: |\foo| expands to the prefix of the files created in the template like |robExt-somehash|, and |\fooInCache| also adds the cache folder like |robustExternalize/robExt-somehash|. You can then use |set placeholder eval| to send it to another cached file. It is then your role to add the extension, usually |.tex| to get the source (even if the source is a python file), |.pdf| to get the pdf, |-out.tex| to get the file that is loaded before the import, |-out.txt| if you wanted to make it compatible with |verbatim output| (this list is not exhaustive as each script might decide to create a different output file). Here is a demo:
   
 \begin{codeexample}[width=0cm,vbox]
-\begin{CacheMe}{tikz, do not add margins, name output=mycode}[baseline=(A.base)]
+\begin{CacheMe}{tikzpicture, do not add margins, name output=mycode}[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
 \end{CacheMe}\\[3mm]
 
@@ -1873,7 +1879,7 @@ It this can be helpful for instance to debug, as you can inspect the source:
 \verbatiminput{\mycodeInCache.tex}
 but it is also practical to define a template based on the previously cached files:\\
 
-\begin{CacheMe}{tikz, set placeholder eval={__previous__}{\mycode.pdf}}
+\begin{CacheMe}{tikzpicture, set placeholder eval={__previous__}{\mycode.pdf}}
   \node[rounded corners, fill=green!50]{A cached file can use result from another cached file:
     \includegraphics[width=2cm]{__previous__}\includegraphics[width=2cm]{__previous__}};
 \end{CacheMe}  
@@ -2033,16 +2039,28 @@ The next options can be used after calling the |latex| style:
   \pgfmanualbody
   By default, the main content is wrapped into a box in order to measure its depth to properly set the baseline. If you do not want to do this wrapping, you can set this option. Internally, it is a shortcut for:\\
   |set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__}|
-  \textbf{IMPORTANT}: note that it means that you might need to adapt your code to take into account the fact that they are inside a box (I don't know of any other solution to compute the depth, but it does not mean that there is none). In particular, |tikz| matrices might require you to use |ampersand replacement|.
+  \textbf{IMPORTANT}: note that it means that you might need to adapt your code to take into account the fact that they are inside a box (I don't know of any other solution to compute the depth, but it does not mean that there is none).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/in command\@nil
+  \makeatother%
+  \pgfmanualbody
+  Sets |__ROBEXT_MAIN_CONTENT| to point to |__ROBEXT_MAIN_CONTENT_ORIG__| to remove any wrapping of the user input, for instance made by tikzpicture.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/tikz\@nil
+  \extractkey/robExt/tikzpicture\@nil
   \makeatother%
   \pgfmanualbody
-  This style loads |latex| and then adds |tikz| to the preamble and wraps the main content with |\begin{tikzpicture}| and |\end{tikzpicture}| using |add {before/after} placeholder no space| so that the user does not need to type it. See for instance the introduction for examples of use.
+  |tikz| loads |latex| and then adds |tikz| to the preamble. |tikzpicture| first load |tikz| and wraps the main content within |\begin{tikzpicture}| and |\end{tikzpicture}| using:\\
+  |set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}__ROBEXT_MAIN_CONTENT_ORIG__\end{tikzpicture}}|\\
+  so that the user does not need to type it. See for instance the introduction for examples of use.
 \end{pgfmanualentry}
 
 
@@ -2190,7 +2208,8 @@ This library defines a number of pre-existing placeholders, or placeholders play
 We define two special placeholders that should be defined by the user (possibly indirectly, using presets offered by this library):
 \begin{itemize}
 \item |__ROBEXT_TEMPLATE__| is a placeholder that should contain the code of the file to compile.
-\item |__ROBEXT_MAIN_CONTENT__|: is a placeholder that might be used inside |__ROBEXT_TEMPLATE__| and that contains the content that the user is expected to type inside the document. For instance, this might be a tikz picture, a python function without the import etc. This will be automatically set by |CacheMe|, |CacheMeCode| etc, and some styles might add stuff to it (for instance the |tikz| preset adds the |\begin{tikzpicture}| around the user code automatically: this way we do not need to edit the command to disable externalization).
+\item |__ROBEXT_MAIN_CONTENT_ORIG__| is a placeholder containing the text typed by the user, automatically set by |CacheMe|, |CacheMeCode| etc. You rarely need to deal with this placeholder directly since |__ROBEXT_MAIN_CONTENT__| will typically point to it and add some necessary wrapping.
+\item |__ROBEXT_MAIN_CONTENT__| is a placeholder that might be used inside |__ROBEXT_TEMPLATE__|, that points by default to |__ROBEXT_MAIN_CONTENT_ORIG__| and that contains the content that should be typed inside the document. For instance, this might be a tikz picture, a python function without the import etc. Note that it is often used to wrap the text of the user |__ROBEXT_MAIN_CONTENT_ORIG__|: for instance, the |tikzpicture| preset adds the |\begin{tikzpicture}| around the user code automatically: this way we do not need to edit the command to disable externalization.
 \item |__ROBEXT_COMPILATION_COMMAND__| contains the compilation command to run to compile the file (assuming we are in the cache folder).
 \end{itemize}
 
@@ -2244,17 +2263,20 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 
 \subsection{Customize presets and create your own style}\label{sec:customize}
 
-Note that you can define your own presets simply by creating a new pgf style (please refer to tikz-pgf's documentation for more details). For instance, we defined the |tikz| style using:
+Note that you can define your own presets simply by creating a new pgf style (please refer to tikz-pgf's documentation for more details). For instance, we defined the |tikz| and |tikzpicture| presets using:
 \begin{codeexample}[code only]
 \robExtConfigure{
-  new preset={tikz}{latex,
+  new preset={tikz}{
+    latex,
     add to preamble={\usepackage{tikz}},
-    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}},
-    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{tikzpicture}},
+  },
+  new preset={tikzpicture}{
+    tikz,
+    set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}__ROBEXT_MAIN_CONTENT_ORIG__\end{tikzpicture}},
   },
 }
 \end{codeexample}
-in order to automatically load |tikz| and add the surrounding |tikzpicture| (note that the style is always loaded \textbf{after} the definition of |__ROBEXT_MAIN_CONTENT__|, you can therefore do any postprocessing you like on this placeholder). You can also customize an existing style by adding stuff to it using |add to preset| (or |.append style| but make sure to double the hashes). For instance, here, we add the |shadows| library to the |tikz| preset by default:
+in order to automatically load |tikz| and add the surrounding |tikzpicture| when needed (note that the style is always loaded \textbf{after} the definition of |__ROBEXT_MAIN_CONTENT_ORIG__|, so in theory you could also modify it directly even if it is not recommended). You can also customize an existing style by adding stuff to it using |add to preset| (or |.append style| but make sure to double the hashes). For instance, here, we add the |shadows| library to the |tikz| preset by default:
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
     add to preset={tikz}{
@@ -2262,7 +2284,7 @@ in order to automatically load |tikz| and add the surrounding |tikzpicture| (not
     },
   }
   See, tikz's style now packs the |shadows| library by default: %
-  \begin{CacheMe}{tikz}[even odd rule]
+  \begin{CacheMe}{tikzpicture}[even odd rule]
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{CacheMe}
 \end{codeexample}
@@ -2275,7 +2297,7 @@ It might be handy to cache automatically a given environment: we already provide
 \begin{pgfmanualentry}
   \extractcommand\robExtExternalizeAllTikzpictures\@@
   \pgfmanualbody
-  This will automatically cache all  tikz pictures. Note that we add an additional optional argument to the tikz picture to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  This will automatically cache all tikz pictures. Note that we add an additional optional argument to the tikz picture to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2382,7 +2404,7 @@ Note that when you define yourself a macro function, the above structure might n
 \begin{codeexample}[width=0mm,vbox]
 % D<>{} is an optional argument enclosed in <>, we use this to pass arguments to CacheMe
 \NewDocumentCommand{\drawMyCircle}{D<>{}O{2mm}m}{
-  \begin{CacheMe}{latex, add to preamble={\usepackage{tikz}}, #1}
+  \begin{CacheMe}{tikz, #1}
     \tikz \draw[fill=#3] (0,0) circle [radius=#2];
   \end{CacheMe}
 }
@@ -2466,7 +2488,7 @@ You might often get an error |! Missing $ inserted.|: this is typically when a p
 You can also use |debug| (or its alias |print command and source|) in order to disable the compilation and print instead the compilation command and the source file:
 
 \begin{codeexample}[width=0pt,vbox]
-  \begin{tikzpictureC}[baseline=(A.base)][debug]
+  \begin{tikzpictureC}<debug>[baseline=(A.base)]
     \node[fill=red, rounded corners](A){My node that respects baseline \ding{164}.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC}
@@ -2477,10 +2499,8 @@ You can also use |debug| (or its alias |print command and source|) in order to d
 
 \begin{itemize}
 \item See how to deal with label and cite inside pictures (without disabling externalization). For label, I have a proof of concept, I ``just'' need to write it down.
-\item We should create more pre-made settings, e.g. for tikz-cd, zx-calculus etc.
 \item Deal with remember picture
 \item Right now, links will not work as they are stripped when included. A workaround would be to use newpax, as stated in: \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
-\item Check how cacheEnvironment works with tikz (to avoid double wrapping)
 \end{itemize}
 
 \section{Acknowledgments}
@@ -2492,6 +2512,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \begin{itemize}
 \item v1.1:
   \begin{itemize}
+  \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |robExtExternalizeAllTikzpictures|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
   \item You can now use ampersands etc freely thanks to lrbox.
   \item You can now automatically cache environments using |\cacheEnvironment| and commands using |\cacheCommand|.
   \item We provide |new preset| and |add to preset| to avoid doubling the number of hashes.

@@ -933,6 +933,12 @@ if __name__ == '__main__':
     }%
     \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
   },
+  % reset the main content to the main content orig
+  % Use case: e.g. tikz will wrap automatically its code in \begin{tikzpicture}
+  % but this should not be set in a command. So we can use \cacheMe{tikz, in command}{\tikz\node{A};}
+  in command/.style={
+    set placeholder={__ROBEXT_MAIN_CONTENT__}{__ROBEXT_MAIN_CONTENT_ORIG__},
+  },
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Interface to change placeholders %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -942,7 +948,7 @@ if __name__ == '__main__':
   },
   set placeholder/.code 2 args={\robExtSetPlaceholder{#1}{#2}},
   set main content/.style={
-    set placeholder={__ROBEXT_MAIN_CONTENT__}{#1}
+    set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#1}
   },
   show placeholder/.code={\robExtShowPlaceholder*{#1}},
   copy placeholder/.code 2 args={\robExtCopyPlaceholder{#1}{#2}},
@@ -1114,7 +1120,7 @@ if __name__ == '__main__':
   {% Group
     \pgfkeys{%
       /robExt/.cd,
-      set placeholder={__ROBEXT_MAIN_CONTENT__}{#2},
+      set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},
       default style,
       #1,
     }%
@@ -1135,7 +1141,7 @@ if __name__ == '__main__':
 \let\endCacheMe\endRobExtCacheMe
 
 \NewDocumentEnvironment{RobExtCacheMeCode}{m}{%
-  \RobExtPlaceholderFromCode{__ROBEXT_MAIN_CONTENT__}%
+  \RobExtPlaceholderFromCode{__ROBEXT_MAIN_CONTENT_ORIG__}%
 }{%
   \endRobExtPlaceholderFromCode%
   \pgfkeys{%
@@ -1212,6 +1218,13 @@ if __name__ == '__main__':
 \robExtPlaceholderFromString{__ROBEXT_PERCENT__}{\c_percent_str}
 \robExtPlaceholderFromString{__ROBEXT_UNDERSCORE__}{\c_underscore_str}
 \ExplSyntaxOff
+
+% This additional level of indirection is made to allow an easier wrapping
+% of \begin{tikzpicture} ... \end{tikzpicture} for instance.
+% The original behavior (modify __ROBEXT_MAIN_CONTENT__ directly)
+% was not really practical as if you use both |tikz| and |\cacheCommand|, it would wrap
+% the environment twice.
+\setPlaceholder{__ROBEXT_MAIN_CONTENT__}{__ROBEXT_MAIN_CONTENT_ORIG__}
 
 
 %%%% For LaTeX codes
@@ -1321,11 +1334,14 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
       set placeholder={__ROBEXT_LATEX_TRIM_LENGTH__}{0cm}
     },
   },
+  % U
   tikz/.style={
     latex,
     add to preamble={\usepackage{tikz}},
-    add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}},
-    add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{tikzpicture}},
+  },
+  tikzpicture/.style={
+    tikz,
+    set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}__ROBEXT_MAIN_CONTENT_ORIG__\end{tikzpicture}},
   },
 }
 
@@ -1540,17 +1556,10 @@ touch "${outputPdf}"
 %%%%% Replace tikzpicture:
 
 \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
-  %% We need to save the tikzpicture environment to avoid infinite recursion if we disable externalization
-  \let\robExtTikzPictureOrig\tikzpicture%
-  \let\endrobExtTikzPictureOrig\endtikzpicture%
-  \DeclareDocumentEnvironment{tikzpicture}{O{}O{}b}{%
-    \begin{CacheMe}{tikz,##2}[##1]%
-        ##3%
-    \end{CacheMe}%
-  }{}%
+  \robExtCacheEnvironment{tikzpicture}{tikzpicture}
+  \robExtCacheCommand{tikz}[O{}m]{tikz}
 }
 
-% To avoid infinite recursion when using \robExtExternalizeAllTikzpictures, we need to redefine tikzpicture
 \NewDocumentCommand{\robExtDisableTikzpictureOverwrite}{}{%
   \ifdefined\robExtTikzPictureOrig%
     \let\tikzpicture\robExtTikzPictureOrig%
@@ -1564,12 +1573,11 @@ touch "${outputPdf}"
   \fi%
 }
 
+
 %% The cached version
-\DeclareDocumentEnvironment{tikzpictureC}{O{}O{}b}{%
-  \begin{CacheMe}{tikz,#2}[#1]%
-    #3%
-  \end{CacheMe}%
-}{}%
+\DeclareDocumentEnvironment{tikzpictureC}{D<>{}O{}O{}}{%
+  \begin{CacheMe}{tikzpicture,#1}[#2]%
+}{\end{CacheMe}}%
 
 %% \robExtCacheEnvironment{myenv}
 \NewDocumentCommand{\robExtCacheEnvironment}{mm}{%
@@ -1580,8 +1588,7 @@ touch "${outputPdf}"
     \def\robExtEnvironmentOrigName{#1}%
     \CacheMe{%
       #2,%
-      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{\begin{#1}},%
-      add to placeholder no space={__ROBEXT_MAIN_CONTENT__}{\end{#1}},%
+      set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{#1}__ROBEXT_MAIN_CONTENT_ORIG__\end{#1}},
       ##1%
     }%
   }{\endCacheMe}%
