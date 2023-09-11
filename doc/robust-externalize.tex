@@ -17,6 +17,8 @@
   \input{../robust-externalize.sty}
 \makeatother
 \usepackage{zx-calculus}  
+\setlength{\marginparwidth}{2cm}
+\usepackage{todonotes}
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
@@ -393,6 +395,18 @@ You can use |disable externalization| to disable externalization (which is parti
     \node[rounded corners, fill=green](A){This figure is externalized, but cannot use remember picture.};
   \end{tikzpicture}
 \end{codeexample}
+
+You can also disable externalization for some kinds of commands. For instance, the packages |todonotes| requires |remember picture| and is therefore not compatible with externalization provided by this package. To disable externalization on all |\todo|, you can do:
+
+\begin{codeexample}[code only]
+\cacheCommand{todo}[O{}m]{disable externalization}
+\todo{Check how to use cacheCommand and cacheEnvironment}  
+\end{codeexample}
+
+Which gives you {
+  \cacheCommand{todo}[O{}m]{disable externalization}
+  \todo{Check how to use cacheCommand and cacheEnvironment}
+}
 
 
 \subsection{Feeding data from the main document to the picture}
@@ -1735,6 +1749,7 @@ You might want (sometimes or always) to disable externalization, for instance to
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/disable externalization\@nil
+  \extractkey/robExt/disable externalization now\@nil
   \extractkey/robExt/enable externalization\@nil
   \makeatother%
   \pgfmanualbody
@@ -1766,6 +1781,16 @@ You might want (sometimes or always) to disable externalization, for instance to
       \end{tikzpicture}
     }
   \end{codeexample}
+  |disable externalization now| additionally redefines all automatically cached commands and environments to their default value right now (|disable externalization| would only do so when running the |command if no externalization| is run, which should be preferred if possible). This is mostly useful when an automatically cached command cannot be parsed (e.g.\ you specified the signature |O{}m| but in fact the command expects a more complicated parsing algorithm. For instance, in |tikz| we can omit the brackets, and it might confuse the system if we defined it as:
+  \begin{codeexample}[width=0pt,vbox]
+    %% Not the recommended way to proceed, but this is for the example
+    \cacheCommand{tikz}[O{}m]{tikz}
+    {
+      % Needed, or the parser would be confused by the next command
+      \robExtConfigure{disable externalization now}
+      \tikz\node[fill=green]{The short version of tikz can be confusing.};
+    }
+  \end{codeexample}  
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2310,7 +2335,7 @@ Let us say that you want to cache all elements of a given environment, like |min
 
 
 \begin{pgfmanualentry}
-  \extractcommand\cacheEnvironment\marg{name environment}\marg{default preset options}\@@
+  \extractcommand\cacheEnvironment\opt{\marg{delimiters}}\marg{name environment}\marg{default preset options}\@@
   \pgfmanualbody
   This will automatically cache the corresponding environment (but note that you still need to define it in the preamble of the cached files, for instance by loading the appropriate package):
   \begin{codeexample}[width=0pt,vbox]
@@ -2325,16 +2350,26 @@ Let us say that you want to cache all elements of a given environment, like |min
       \zxZ{\beta} \rar           & \zxX*{b\pi}
     \end{ZX}.
   \end{codeexample}  
-  You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using |<...>| as the optional argument, like: %
+  You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using the delimiters |delimiters| that default to |<...>| as the optional argument, like: %
   \begin{codeexample}[width=0pt,vbox]
     \cacheEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
     \begin{ZX}<add to preamble={\usepackage{amsmath}}> % amsmath provides \text
       \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
       \zxZ{\beta} \rar           & \zxX*{b\pi}
     \end{ZX}
-  \end{codeexample}  
+  \end{codeexample}
+  If you do not like |<>| or if your command already have this parameter, you can change it, for instance to get parens as delimiters, use:
+  \begin{codeexample}[width=0pt,vbox]
+    \cacheEnvironment[()]{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \begin{ZX}(add to preamble={\usepackage{amsmath}}) % amsmath provides \text
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \end{ZX}
+  \end{codeexample}
+  otherwise you must provide some presets arguments, possibly empty:\\
+  |\begin{someweirdenv}<><args to someweirdenv>|
 
-If you are unlucky and your environment also expects an argument enclosed in |<...>| then you must provide some presets arguments, possibly empty: |\begin{someweirdenv}<><args to someweirdenv>|. You can also use this argument to disable externalisation on a per-picture basis:
+    You can also use this argument to disable externalisation on a per-picture basis:
   \begin{codeexample}[width=0pt,vbox]
     \cacheEnvironment{ZX}{latex, add to preamble={\usepackage{zx-calculus}}}
     \begin{ZX}<disable externalization> % amsmath provides \text
@@ -2346,7 +2381,7 @@ If you are unlucky and your environment also expects an argument enclosed in |<.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
-  \extractcommand\cacheCommand\marg{name command}\opt{\oarg{xparse signature}}\marg{default preset options}\@@
+  \extractcommand\cacheCommand\opt{\oarg{delimiter}}\marg{name command}\opt{\oarg{xparse signature}}\marg{default preset options}\@@
   \pgfmanualbody
   This will automatically cache the corresponding command, in a similar way to environment. It work exactly the same, except that we need to specify the signature of the command or it is impossible to know where the command stops. If the command is defined using xparse-compatible commands like |\NewDocumentCommand|, this detection is automatically done. Otherwise, you need to specify it in the xparse format: long story short, |O{foo}| is an optional argument with default value foo, |m| is a mandatory argument.
   \begin{codeexample}[width=0pt,vbox]
@@ -2363,14 +2398,22 @@ If you are unlucky and your environment also expects an argument enclosed in |<.
     }.
   \end{codeexample}
   
-  You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using |<...>| as the optional argument, like: %
+  You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using the delimiters that default to |<>| as the optional argument, like: %
   \begin{codeexample}[width=0pt,vbox]
     \cacheCommand{zx}{latex, add to preamble={\usepackage{zx-calculus}}}
     \zx<add to preamble={\usepackage{amsmath}}>[mbr=1]{ % amsmath provides \text
       \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
       \zxZ{\beta} \rar           & \zxX*{b\pi}
     }
-  \end{codeexample}  
+  \end{codeexample}
+  or with parens as delimiters:
+  \begin{codeexample}[width=0pt,vbox]
+    \cacheCommand[()]{zx}{latex, add to preamble={\usepackage{zx-calculus}}}
+    \zx(add to preamble={\usepackage{amsmath}})[mbr=1]{ % amsmath provides \text
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
+      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    }
+  \end{codeexample} 
 
   Here is an example with a command not defined with |\NewDocumentCommand| (we also show how you can use the optional argument to disable externalisation on a per-picture basis):
 \begin{codeexample}[width=0pt,vbox]

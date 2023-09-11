@@ -889,6 +889,59 @@ if __name__ == '__main__':
   \fi%
 }
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Disabling externalization
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% It seems that when we disable externalization on \tikz, \tikz internally call \tikzpicture in a
+% weird way (certainly some tikz magic), and as a result it does not manage to grab the end of the CacheMe
+% environment. For this reason, by default, |disable externalization| will disable **all** commands
+
+\seq_clear_new:N \l_commands_to_reset_seq % List of commands to reset by default when disable externalization is set
+
+\NewDocumentCommand{\robExtAddToCommandResetList}{m}{
+  \seq_put_right:Nn \l_commands_to_reset_seq {#1}
+}
+
+\NewDocumentCommand{\robExtSetCommandResetList}{m}{
+  \seq_set_from_clist:Nn \l_commands_to_reset_seq {#1}
+}
+
+\seq_clear_new:N \l_environments_to_reset_seq % List of environments to reset by default when disable externalization is set
+
+\NewDocumentCommand{\robExtAddToEnvironmentResetList}{m}{
+  \seq_put_right:Nn \l_environments_to_reset_seq {#1}
+}
+
+\NewDocumentCommand{\robExtSetEnvironmentResetList}{m}{
+  \seq_set_from_clist:Nn \l_environments_to_reset_seq {#1}
+}
+
+\NewDocumentCommand{\robExtDisableTikzpictureOverwrite}{}{%
+  \ifdefined\robExtTikzPictureOrig%
+    \let\tikzpicture\robExtTikzPictureOrig%
+    \let\endtikzpicture\endrobExtTikzPictureOrig%
+  \fi%
+  \ifdefined\robExtEnvironmentOrigName%
+    \expanded{\noexpand\DeclareEnvironmentCopy{\robExtEnvironmentOrigName}{robExtEnvironmentOrig\robExtEnvironmentOrigName}}%
+  \fi%
+  \ifdefined\robExtCommandOrigName%
+    \expandafter\DeclareCommandCopy\csname \robExtCommandOrigName\expandafter\endcsname\csname robExtCommandOrig\robExtCommandOrigName\endcsname%
+  \fi%
+  \ifdefined\robExtDoNotResetAllCommands\else%
+    \seq_map_inline:Nn \l_commands_to_reset_seq {
+      \cs_if_exist:cTF { robExtCommandOrig##1 } {
+        \expandafter\DeclareCommandCopy\csname ##1\expandafter\endcsname\csname robExtCommandOrig##1\endcsname%
+      } {}
+    }
+    \seq_map_inline:Nn \l_environments_to_reset_seq {
+      \cs_if_exist:cTF { robExtEnvironmentOrig##1 } {
+        \expanded{\noexpand\DeclareEnvironmentCopy{##1}{robExtEnvironmentOrig##1}}
+      } {}
+    }
+  \fi%
+}
+
 
 \ExplSyntaxOff
 
@@ -1059,6 +1112,7 @@ if __name__ == '__main__':
   %% Note: this does not work reliably for now
   %% TODO: fix this!
   disable externalization/.code={\def\robExtDisableExternalization{}},
+  disable externalization now/.code={\robExtDisableTikzpictureOverwrite\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
   command if no externalization/.code={\robExtDisableTikzpictureOverwrite\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}},
@@ -1104,7 +1158,10 @@ if __name__ == '__main__':
 % It assumes that __ROBEXT_COMPILATION_COMMAND__ and __ROBEXT_TEMPLATE__ is set
 \NewDocumentCommand{\robExtEvaluateCompileAndInclude}{}{%
   \ifdefined\robExtDisableExternalization%
-    \pgfkeys{/robExt/.cd,command if no externalization}%
+    \pgfkeys{
+      /robExt/.cd,
+      command if no externalization
+    }%
   \else%
     \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
     \robExtWriteFile{}%
@@ -1130,10 +1187,6 @@ if __name__ == '__main__':
 \let\cacheMe\robExtCacheMe
 
 %% #1: Arguments, #2: content to externalize
-% \NewDocumentEnvironment{robExtern}{O{}+b}{%
-%   \robExt[#1]{#2}%
-% }{}
-
 \NewDocumentEnvironment{RobExtCacheMe}{m+b}{%
   \robExtCacheMe[#1]{#2}%
 }{}
@@ -1555,22 +1608,9 @@ touch "${outputPdf}"
 
 %%%%% Replace tikzpicture:
 
-\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{}{%
-  \robExtCacheEnvironment{tikzpicture}{tikzpicture}
-  \robExtCacheCommand{tikz}[O{}m]{tikz}
-}
-
-\NewDocumentCommand{\robExtDisableTikzpictureOverwrite}{}{%
-  \ifdefined\robExtTikzPictureOrig%
-    \let\tikzpicture\robExtTikzPictureOrig%
-    \let\endtikzpicture\endrobExtTikzPictureOrig%
-  \fi%
-  \ifdefined\robExtEnvironmentOrigName%
-    \expanded{\noexpand\DeclareEnvironmentCopy{\robExtEnvironmentOrigName}{robExtEnvironmentOrig\robExtEnvironmentOrigName}}%
-  \fi%
-  \ifdefined\robExtCommandOrigName%
-    \expandafter\DeclareCommandCopy\csname \robExtCommandOrigName\expandafter\endcsname\csname robExtCommandOrig\robExtCommandOrigName\endcsname%
-  \fi%
+\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{<>}}{%
+  \robExtCacheEnvironment[#1]{tikzpicture}{tikzpicture}
+  %\robExtCacheCommand[#1]{tikz}[O{}m]{tikz}
 }
 
 
@@ -1580,15 +1620,16 @@ touch "${outputPdf}"
 }{\end{CacheMe}}%
 
 %% \robExtCacheEnvironment{myenv}
-\NewDocumentCommand{\robExtCacheEnvironment}{mm}{%
+\NewDocumentCommand{\robExtCacheEnvironment}{O{<>}mm}{%
   %% We need to save the original environment to avoid infinite recursion if we disable externalization
   %% https://tex.stackexchange.com/questions/695391/why-isnt-my-environment-restored/695398
-  \NewEnvironmentCopy{robExtEnvironmentOrig#1}{#1}%
-  \DeclareDocumentEnvironment{#1}{D<>{}}{%
-    \def\robExtEnvironmentOrigName{#1}%
+  \NewEnvironmentCopy{robExtEnvironmentOrig#2}{#2}%
+  \robExtAddToEnvironmentResetList{#2}%
+  \DeclareDocumentEnvironment{#2}{D#1{}}{%
+    \def\robExtEnvironmentOrigName{#2}%
     \CacheMe{%
-      #2,%
-      set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{#1}__ROBEXT_MAIN_CONTENT_ORIG__\end{#1}},
+      #3,%
+      set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{#2}__ROBEXT_MAIN_CONTENT_ORIG__\end{#2}},
       ##1%
     }%
   }{\endCacheMe}%
@@ -1656,33 +1697,33 @@ touch "${outputPdf}"
 \ExplSyntaxOn
 \NewDocumentCommand{\robExtRescanHashRobust}{m}{
   \str_set_hash_robust:Nn \l_robExt_tmp_str {#1}
-  %\show\l_robExt_tmp_str
   \tl_rescan:nv {}{ l_robExt_tmp_str }
 }
 \ExplSyntaxOff
 
 %% Inspired and modified from
 %% https://github.com/sasozivanovic/memoize/blob/81d960aa547148bdb38fea89917eda1476c9bace/memoize.sty#L744
-\NewDocumentCommand{\robExtCacheCommand}{mom}{%
+\NewDocumentCommand{\robExtCacheCommand}{O{<>}mom}{%
   %% We get the specification of the command, like "O{}mm"
-  \IfNoValueTF{#2}{%
-    \expandafter\GetDocumentCommandArgSpec\csname #1\endcsname%
+  \IfNoValueTF{#3}{%
+    \expandafter\GetDocumentCommandArgSpec\csname #2\endcsname%
   }{%
-    \def\ArgumentSpecification{#2}%
+    \def\ArgumentSpecification{#3}%
   }%
-  \edef\ArgumentSpecification{D<>{}\ArgumentSpecification}%
+  \edef\ArgumentSpecification{D#1{}\ArgumentSpecification}%
   % We copy the original definition for later (if externalization is disabled)
-  \expandafter\DeclareCommandCopy\csname robExtCommandOrig#1\expandafter\endcsname\csname #1\endcsname%
+  \expandafter\DeclareCommandCopy\csname robExtCommandOrig#2\expandafter\endcsname\csname #2\endcsname%
+  \robExtAddToCommandResetList{#2}%
   \edef\robExt@marshal{%
     \noexpand\DeclareDocumentCommand%
-      \expandonce{\csname #1\endcsname}%
+      \expandonce{\csname #2\endcsname}%
       {\expandonce{\ArgumentSpecification}}%
       {%
-        \noexpand\def\noexpand\robExtCommandOrigName{#1}%
+        \noexpand\def\noexpand\robExtCommandOrigName{#2}%
         % todo: add a hook for users setup; prevent user from changing \MemoizeWrapper?
         \edef\noexpand\robExt@marshal{%
-        \noexpand\noexpand\noexpand\robExtRescanHashRobust{\noexpand\noexpand\noexpand\cacheMe[\detokenize{#3}, \noexpand\detokenize{####1}]{%
-          \noexpand\noexpand\expandonce{\csname #1\endcsname}%
+        \noexpand\noexpand\noexpand\robExtRescanHashRobust{\noexpand\noexpand\noexpand\robExtCacheMe[\detokenize{#4}, \noexpand\detokenize{####1}]{%
+          \noexpand\noexpand\expandonce{\csname #2\endcsname}%
             \robExtArgumentList%
           }%
         }%
@@ -1697,4 +1738,5 @@ touch "${outputPdf}"
   \robExt@marshal%
 }
 \let\cacheCommand\robExtCacheCommand
+
 
