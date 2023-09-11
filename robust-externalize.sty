@@ -38,11 +38,14 @@
 \ExplSyntaxOn
 %% See also https://tex.stackexchange.com/questions/695432/latex3-latex-doubles-the-number-of-hashes-when-storing-them-in-string/695460#695460
 \cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
+\cs_generate_variant:Nn \str_replace_all:Nnn { cnx }
+\cs_generate_variant:Nn \str_replace_all:Nnn { cxx }
 \cs_set:Nn \str_set_hash_robust:Nn {
   \str_set:Nn {#1} {#2}
   \str_replace_all:Nnx {#1} { ## } { \c_hash_str }
 }
 \cs_generate_variant:Nn \str_set_hash_robust:Nn { cn }
+\cs_generate_variant:Nn \str_set_hash_robust:Nn { cx }
 
 % Double the number of hashes... quite dirty but cannot find any solution or the user need to double it itself
 \NewDocumentCommand{\robExtStrSetDoubleHash}{mm}{
@@ -344,7 +347,7 @@ if __name__ == '__main__':
   \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
   \expandafter \let \csname l_robExt_placeholder_#1_str \endcsname \undefined 
 }
-
+\let\removePlaceholder\robExtRemovePlaceholder
 
 %% Usage: \placeholderFromContent{MYTITLE}{My slide title}
 %% MYTITLE will contain at the end "My slide title"
@@ -663,9 +666,31 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtEvalPlaceholderInplace}{m}{
   \robExtGetPlaceholderInResult{#1}
   \tl_set_rescan:Nnx \l_robExt_tmp_tl  {} { \l_robExt_result_str }
-  \str_set:cx { l_robExt_placeholder_#1_str } { \l_robExt_tmp_tl }
+  \str_set_hash_robust:cx { l_robExt_placeholder_#1_str } { \l_robExt_tmp_tl }
 }
 \let\evalPlaceholderInplace\robExtEvalPlaceholderInplace
+
+% Sometimes two symbols ## (with a different catcode than a normal hash) are added instead of a single #
+\NewDocumentCommand{\robExtPlaceholderDoubleNumberHashesInplace}{m}{
+  \str_replace_all:cxx { l_robExt_placeholder_#1_str } { \c_hash_str } { \c_hash_str \c_hash_str }
+}
+\let\placeholderDoubleNumberHashesInplace\robExtPlaceholderDoubleNumberHashesInplace
+
+\NewDocumentCommand{\robExtPlaceholderHalveNumberHashesInplace}{m}{
+  \str_replace_all:cxx { l_robExt_placeholder_#1_str } { \c_hash_str \c_hash_str } { \c_hash_str }
+}
+\let\placeholderHalveNumberHashesInplace\robExtPlaceholderHalveNumberHashesInplace
+
+\NewDocumentCommand{\robExtPlaceholderReplaceInplace}{mmm}{
+  \str_replace_all:cnn { l_robExt_placeholder_#1_str } { #2 } { #3 }
+}
+\let\placeholderReplaceInplace\robExtPlaceholderReplaceInplace
+
+\NewDocumentCommand{\robExtPlaceholderReplaceInplaceEval}{mmm}{
+  \str_replace_all:cxx { l_robExt_placeholder_#1_str } { #2 } { #3 }
+}
+\let\placeholderReplaceInplaceEval\robExtPlaceholderReplaceInplaceEval
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Dependencies %%%%%%%%%%%%
@@ -911,10 +936,15 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Interface to change placeholders %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  remove placeholder/.code={\robExtRemovePlaceholder{#1}},
+  remove placeholders/.style={
+    remove placeholder/.list={#1},
+  },
   set placeholder/.code 2 args={\robExtSetPlaceholder{#1}{#2}},
   set main content/.style={
     set placeholder={__ROBEXT_MAIN_CONTENT__}{#1}
   },
+  show placeholder/.code={\robExtShowPlaceholder*{#1}},
   copy placeholder/.code 2 args={\robExtCopyPlaceholder{#1}{#2}},
   set placeholder rec/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}},
   set placeholder rec replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}},
@@ -931,6 +961,10 @@ if __name__ == '__main__':
   set placeholder from file content/.code 2 args={\robExtPlaceholderFromFileContent{#1}{#2}},
   set placeholder path from content/.code n args={3}{\robExtPlaceholderPathFromContent{#1}[#3]{#2}},
   eval placeholder in place/.code={\robExtEvalPlaceholderInplace{#1}},
+  placeholder halve number hashes in place/.code={\robExtPlaceholderHalveNumberHashesInplace{#1}},
+  placeholder double number hashes in place/.code={\robExtPlaceholderDoubleNumberHashesInplace{#1}},
+  placeholder replace in place/.code n args={3}{\robExtPlaceholderReplaceInplace{#1}{#2}{#3}},
+  placeholder replace in place eval/.code n args={3}{\robExtPlaceholderReplaceInplaceEval{#1}{#2}{#3}},
   % Interface to set template
   set template/.style={
     set placeholder={__ROBEXT_TEMPLATE__}{#1},
@@ -1553,3 +1587,107 @@ touch "${outputPdf}"
   }{\endCacheMe}%
 }
 \let\cacheEnvironment\robExtCacheEnvironment
+
+
+%%%% Borrowed and adapted from https://github.com/sasozivanovic/memoize/blob/master/xparse-arglist.sty
+%%%% see also https://tex.stackexchange.com/questions/695662/automatically-wrap-a-macro/695734
+%% The idea of the library is that it builds a string like
+%% [#2]<#3>{#4}
+%% in order to generate something like
+%% \NewDocumentCommand{\myfunction}{D<>{}O{coucou}D<>{yes}m}
+%% {
+%%  \cacheMe[#1]{\myfunction[#2]<#3>{#4}}
+%% }
+%%%%   _________________________________________________________________
+
+\def\robExtArgumentList{%
+  \expandafter\robExt@arglist\expandafter0\ArgumentSpecification.%
+}
+
+\def\robExt@arglist#1#2{%
+  \ifcsname robExt@arglist@#2\endcsname
+    \csname robExt@arglist@#2\expandafter\expandafter\expandafter\endcsname
+  \else
+    \expandafter\robExt@arglist@error
+  \fi
+  \expandafter{\the\numexpr#1+1\relax}%
+}
+
+% \robExt@arglist@...: #1 = the argument number
+\def\robExt@arglist@m#1{\noexpand\unexpanded{{#####1}}\robExt@arglist{#1}}
+\def\robExt@arglist@r#1#2#3{\noexpand\unexpanded{#2#####1#3}\robExt@arglist{#1}}
+\def\robExt@arglist@R#1#2#3#4{\noexpand\unexpanded{#2#####1#3}\robExt@arglist{#1}}
+\def\robExt@arglist@v#1{{Handled commands with verbatim arguments are not
+    supported}\robExt@arglist{#1}} % error
+\def\robExt@arglist@b#1{{This is not the way to handle
+    environment}\robExt@arglist{#1}} % error
+\def\robExt@arglist@o#1{\noexpand\unexpanded{[#####1]}\robExt@arglist{#1}}
+\def\robExt@arglist@d#1#2#3{\noexpand\unexpanded{#2#####1#3}\robExt@arglist{#1}}
+\def\robExt@arglist@O#1#2{\noexpand\unexpanded{[#####1]}\robExt@arglist{#1}}
+% \def\robExt@arglist@O#1#2{\noexpand\unexpanded{[#####1]}\robExt@arglist{#1}}
+\def\robExt@arglist@D#1#2#3#4{\noexpand\unexpanded{#2#####1#3}\robExt@arglist{#1}}
+\def\robExt@arglist@s#1{\noexpand\IfBooleanT{#####1}{*}\robExt@arglist{#1}}
+\def\robExt@arglist@t#1#2{\noexpand\IfBooleanT{#####1}{#2}\robExt@arglist{#1}}
+\csdef{robExt@arglist@+}#1{\expandafter\robExt@arglist\expandafter{\the\numexpr#1-1\relax}}%
+\csdef{robExt@arglist@.}#1{}
+% e,E: Embellishments are not supported.
+% > Argument processors are not supported. And how could they be?
+\def\robExt@arglist@error#1.{{Unknown argument type}}
+%%%% _________________________________________________________________
+
+%% Since the very first occurrence of D is not forwarded to the function
+%% we discard it:
+%% The first argument of \robExt@arglist@D is the number of the argument
+%% so #2#####1#3 reads as #2 = <, #### = #, #1 = > #3 = default value that can be discarded since it is already part of the argument spec.
+
+\def\robExt@arglist@D#1#2#3#4{%
+  \noexpand\unexpanded{%
+    \ifnum #1=1 % If it is the first argument D, then we do not add anything to the argument string
+    \else #2#####1#3\fi}\robExt@arglist{#1}%
+}
+
+\ExplSyntaxOn
+\NewDocumentCommand{\robExtRescanHashRobust}{m}{
+  \str_set_hash_robust:Nn \l_robExt_tmp_str {#1}
+  %\show\l_robExt_tmp_str
+  \tl_rescan:nv {}{ l_robExt_tmp_str }
+}
+\ExplSyntaxOff
+
+%% Inspired and modified from
+%% https://github.com/sasozivanovic/memoize/blob/81d960aa547148bdb38fea89917eda1476c9bace/memoize.sty#L744
+\NewDocumentCommand{\robExtCacheCommand}{mom}{%
+  %% We get the specification of the command, like "O{}mm"
+  \IfNoValueTF{#2}{%
+    \expandafter\GetDocumentCommandArgSpec\csname #1\endcsname%
+  }{%
+    \def\ArgumentSpecification{#2}%
+  }%
+  \edef\ArgumentSpecification{D<>{}\ArgumentSpecification}%
+  % We copy the original definition for later (if externalization is disabled)
+  \expandafter\DeclareCommandCopy\csname robExtCommandOrig#1\expandafter\endcsname\csname #1\endcsname%
+  \edef\robExt@marshal{%
+    \noexpand\DeclareDocumentCommand%
+      \expandonce{\csname #1\endcsname}%
+      {\expandonce{\ArgumentSpecification}}%
+      {%
+        \noexpand\def\noexpand\robExtCommandOrigName{#1}%
+        % todo: add a hook for users setup; prevent user from changing \MemoizeWrapper?
+        \edef\noexpand\robExt@marshal{%
+        \noexpand\noexpand\noexpand\robExtRescanHashRobust{\noexpand\noexpand\noexpand\cacheMe[\detokenize{#3}, \noexpand\detokenize{####1}]{%
+          \noexpand\noexpand\expandonce{\csname #1\endcsname}%
+            \robExtArgumentList%
+          }%
+        }%
+      }%
+      % For debug
+      %\noexpand\show\noexpand\robExt@marshal%
+      \noexpand\robExt@marshal%
+    }%
+  }%
+  % for debug
+  %\show\robExt@marshal%
+  \robExt@marshal%
+}
+\let\cacheCommand\robExtCacheCommand
+
