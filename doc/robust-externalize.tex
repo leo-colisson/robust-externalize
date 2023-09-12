@@ -16,7 +16,8 @@
 \makeatletter
   \input{../robust-externalize.sty}
 \makeatother
-\usepackage{zx-calculus}  
+\usepackage{zx-calculus}
+\usepackage{forest}
 \setlength{\marginparwidth}{2cm}
 \usepackage{todonotes}
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
@@ -130,6 +131,68 @@ Actually, we also provide this style by default (and explain how to write it you
 \usepackage{tcolorbox}
 \end{verbatim}
 
+You can also cache any environment and command using something like:
+\begin{itemize}
+\item For environments:
+\begin{codeAndResult}
+% We cache the environment forest
+\cacheEnvironment{forest}{latex, add to preamble={\usepackage{forest}}}
+  
+A forest tree automatically cached %
+\begin{forest}
+  [VP
+    [DP[John]]
+    [V’
+      [V[sent]]
+      [DP[Mary]]
+      [DP[D[a]][NP[letter]]]
+    ]
+  ]
+\end{forest}\\
+And one not cached: %
+\begin{forest}<disable externalization>
+  [VP
+    [DP[John]]
+    [V’
+      [V[sent]]
+      [DP[Mary]]
+      [DP[D[a]][NP[letter]]]
+    ]
+  ]
+\end{forest}
+\end{codeAndResult}  
+\item For commands:
+\begin{codeAndResult}
+% We cache the command \zx
+% O{} = optional argument, m = mandatory argument. Autodetected if command defined with xparse (NewDocumentCommand)
+\cacheCommand{zx}[O{}O{}O{}m]{latex, add to preamble={\usepackage{zx-calculus}}}
+  
+A ZX figure %
+\zx{
+  \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
+  \zxZ{\beta} \rar           & \zxX*{b\pi}
+}, we can disable externalization: %
+\zx<disable externalization>{
+  \zxX{\alpha} \rar \ar[d,C] & \zxZ*{a\pi} \\
+  \zxZ{\beta} \rar           & \zxX*{b\pi}
+} or add more options: %
+\zx<add to preamble={\usepackage{amsmath}\def\hello#1{Hello #1.}}>{
+  \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{\hello{Alice}}} \\
+  \zxZ{\beta} \rar           & \zxX*{b\pi}
+}
+\end{codeAndResult}
+\end{itemize}
+You can also cache all tikz pictures by default, except those that are run from some commands (as remember picture does not work yet, this is important). For instance, this code will allow you to freely use the |todonotes| package:
+\begin{codeexample}[code only]
+\cacheCommand{todo}[O{}m]{disable externalization}
+\todo{Check how to use cacheCommand and cacheEnvironment}  
+\end{codeexample}
+
+will gives you {
+  \cacheCommand{todo}[O{}m]{disable externalization}
+  \todo{Check how to use cacheCommand and cacheEnvironment}
+}
+
 To achieve a pleasant and configurable interface, we introduced placeholders, that can be of independent interest.
 
 \section{Introduction}
@@ -213,7 +276,7 @@ So during the first compilation, we lost a x2 factor (roughly an additional time
 Pros of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
 \item The above library is likely to be quicker on the first run since it packs everything in a single file (so you save the time to run latex for each picture). On the other hand, we can load in the preamble exactly what is needed for the picture (we do not load all the preamble of the main file), so our startup time is not huge (it adds .5s per picture in my tests when using the |zx-calculus| library), and you can still commit the cached file to help with recompiling the document elsewhere.
-\item It seems to be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz picture are automatically memoized (we provide |\robExtExternalizeAllTikzpictures| for that, but you still need to specify the preamble once).
+\item It seems to be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz picture are automatically memoized (we provide |\cacheTikz| for that, but you still need to specify the preamble once).
 \end{itemize}
 
 Cons of \url{https://github.com/sasozivanovic/memoize}:
@@ -264,14 +327,17 @@ If you forget/do not want to enable |-shell-escape|, this will give you this kin
 
 If you only care about \tikzname's picture, you have 3 options:
 \begin{enumerate}
-\item Call once |\robExtExternalizeAllTikzpictures| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| and |tikzpicture| (that first loads |tikz|).
-\item Use the generic commands that allows you to wrap an arbitrary environment or command (this is exactly what |\robExtExternalizeAllTikzpictures| is doing internally):
+\item Call once |\cacheTikz| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| or |tikzpicture| presets (that first loads |tikz|).
+\item Use the generic commands that allows you to wrap an arbitrary environment or command:
 \begin{verbatim}
 %        name environment ---v            v----- preset options
 \robExtCacheEnvironment{tikzpicture}{tikzpicture}
 %     name command ---v    v------v-----signature and preset options
 \robExtCacheCommand{tikz}[O{}m]{tikz}
 \end{verbatim}
+  Note that the signature is not needed if the macro is defined using xparse.
+
+  \textbf{This is not recommended for the tikz command as the actual definition of } |\tikz| \textbf{is more complicated since it has numerous syntax.} |\cacheTikz| \textbf{on the other hand parses tikz correctly.} For simpler macros, this is not a problem.
 \item Use |tikzpictureC| instead of |tikzpicture| (this is mostly done to easily convert existing code to this library, but works only for |tikz| pictures).
 \item Use the more general |CacheMe| environment, that can cache \tikzname, \LaTeX{}, python, and much more.
 \end{enumerate}
@@ -283,7 +349,7 @@ Option 1:
 %% We override the default tikzpicture environment
 %% to externalize all pictures
 %% Warning: it will cause troubles with pictures relying on |remember pictures|
-\robExtExternalizeAllTikzpictures
+\cacheTikz
 
 I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
@@ -292,13 +358,21 @@ I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
 
 Option 2:
 \begin{codeexample}[width=0pt]
+\cacheEnvironment{tikzpicture}{tikzpicture}
+I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpicture}.
+\end{codeexample}
+
+Option 3:
+\begin{codeexample}[width=0pt]
 I am a cached picture: \begin{tikzpictureC}[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
 \end{tikzpictureC}.
 \end{codeexample}
 
 
-Option 3:
+Option 4:
 \begin{codeexample}[width=0pt]
 I am a cached picture: \begin{CacheMe}{tikzpicture}[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
@@ -324,9 +398,36 @@ Note that the pictures are compiled in a separate document, with a different pre
   \end{CacheMe}
 \end{codeexample}
 
-\textbf{Note:} the |add to preset| directive has been added on v1.1, together with the |tikzpicture| preset. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that in |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
+and you can also create a new preset, and why not mix multiple presets together:
+\begin{codeexample}[width=0pt,vbox]
+  \robExtConfigure{
+    new preset={load forest}{
+      latex,
+      add to preamble={\usepackage{forest}},
+    },
+    new preset={load hello}{
+      add to preamble={\def\hello#1{Hello #1.}},
+    },
+  }
 
-You can also choose to overwrite it for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
+  \begin{CacheMe}{load forest, load hello}
+    \begin{forest}
+      [VP
+        [DP[\hello{John}]]
+        [V’
+          [V[sent]]
+          [DP[Mary]]
+          [DP[D[a]][NP[letter]]]
+        ]
+      ]
+    \end{forest}
+  \end{CacheMe}
+\end{codeexample}
+
+
+\textbf{Note:} the |add to preset| and |new preset| directives have been added in v1.1, together with the |tikzpicture| preset. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
+
+You can also choose to overwrite the preset options for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
 \begin{codeexample}[width=0pt,vbox]
   See, you can add something to the preamble of a single picture: %
   \begin{CacheMe}{tikzpicture, add to preamble={\usetikzlibrary{shadows}}}[even odd rule]
@@ -334,13 +435,15 @@ You can also choose to overwrite it for a single picture (or even a block of pic
   \end{CacheMe}
 \end{codeexample}
 
-Note that if you use the |tikzpictureC| or |tikzpicture| syntax, you want to add the options after the tikz options (leave an empty bracket if there is none):
+Note that if you use the |tikzpictureC| or |tikzpicture| syntax, you want to add the options right after the name of the command or environment, enclosed in |<>| (by default):
 \begin{codeexample}[width=0pt,vbox]
   See, you can add something to the preamble of a single picture: %
   \begin{tikzpictureC}<add to preamble={\usetikzlibrary{shadows}}>[even odd rule]
     \filldraw [drop shadow,fill=white] (0,0) circle (.5) (0.5,0) circle (.5);
   \end{tikzpictureC}
 \end{codeexample}
+
+\textbf{Important}: Note that the preset options can be specified in a number of places: in |\robExtConfigure| (possibly in a group, or inside a preset), in the options of the picture, in the default options of |cacheEnvironment| and |cacheCommand| etc. Most options can be used in all these places, the only difference being the scope of the options.
 
 \subsection{Dependencies}\label{sec:dependencies}
 
@@ -358,15 +461,40 @@ Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache
 
 You can note that we used |add dependencies={common_inputs.tex}|: this allows us to recompile the files if |common_inputs.tex| changes. If you do not want this behavior (e.g. |common_inputs.tex| changes too often and you do not want to recompile everything at every change), you can remove this line, but beware: if you do a breaking changes in |common_inputs.tex| (e.g.\ redefine |42| to |43|), then the previously cached picture will not be recompiled! (So you will still read 42 instead of 43.)
 
+\subsection{Wrap arbitrary environments}
+
+You can wrap arbitrary environments using the already presented |cacheEnvironment| and |cacheCommand|, where the first mandatory argument is the name of the environment/macro, and the second mandatory argument contains the default preset. |cacheEnvironment| works for any environment while |cacheCommand| might need a bit of help to determine the signature of the macro if the function is defined via xparse. Long story short, |O{foo}| is an optional argument with default value foo, |m| is a mandatory argument. By default, you can pass an optional arguments via the first argument enclosed in |<>|:
+\begin{codeexample}[width=0pt,vbox]
+  \cacheCommand{zx}[O{}O{}O{}m]{latex, add to preamble={\usepackage{zx-calculus}\def\hello#1{Hello #1.}}}
+  \zx<add to preamble={\usepackage{amsmath}\def\bye#1{Bye #1.}}>[mbr=1]{ % amsmath provides \text
+    \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{\hello{Alice}}} \\
+    \zxZ{\beta} \rar           & \zxZ{\text{\bye{Bob}}}
+  }
+\end{codeexample}
+
+you can also disable externalization for some commands using this same command, here is for instance the code to use |todonotes|:
+\begin{codeexample}[code only]
+\cacheCommand{todo}[O{}m]{disable externalization}
+\todo{Check how to use cacheCommand and cacheEnvironment}  
+\end{codeexample}
+
+Which gives you {
+  \cacheCommand{todo}[O{}m]{disable externalization}
+  \todo{Check how to use cacheCommand and cacheEnvironment}
+}
+
+
+See \cref{sec:wrapAutomatically} for more details.
+
 \subsection{Disabling externalization}
 
-You can use |disable externalization| to disable externalization (which is particularly practical if you set |\robExtExternalizeAllTikzpictures|). You can configure the exact command run in that case using |command if no externalization/.code={...}|, but most of the time it should work out of the box (see \cref{sec:disableExternalization} for details).
+You can use |disable externalization| to disable externalization (which is particularly practical if you set |\cacheTikz|). You can configure the exact command run in that case using |command if no externalization/.code={...}|, but most of the time it should work out of the box (see \cref{sec:disableExternalization} for details).
 
 \begin{codeexample}[width=0pt,vbox]
   % In theory all pictures should be externalized (so remember picture should fail)
   \tikz[remember picture,baseline=(pointtome1.base)]
     \node[rounded corners, fill=orange](pointtome1){Point to me if you can};\\
-  \robExtExternalizeAllTikzpictures
+  \cacheTikz
   % But we can disable it temporarily
   \begin{tikzpicture}<disable externalization>[remember picture]
     \node[rounded corners, fill=red](A){This figure is not externalized.
@@ -396,7 +524,7 @@ You can use |disable externalization| to disable externalization (which is parti
   \end{tikzpicture}
 \end{codeexample}
 
-You can also disable externalization for some kinds of commands. For instance, the packages |todonotes| requires |remember picture| and is therefore not compatible with externalization provided by this package. To disable externalization on all |\todo|, you can do:
+You can also disable externalization for some kinds of commands. For instance, the package |todonotes| requires |remember picture| and is therefore not compatible with externalization provided by this package. To disable externalization on all |\todo|, you can do:
 
 \begin{codeexample}[code only]
 \cacheCommand{todo}[O{}m]{disable externalization}
@@ -1033,6 +1161,7 @@ Note that sometimes, you might not want to use |\setPlaceholderRec| to simply ap
   \extractkey/robExt/add to placeholder no space=\marg{name placeholder}\marg{content to add}\@nil
   \extractkey/robExt/add before placeholder=\marg{name placeholder}\marg{content to add}\@nil
   \extractkey/robExt/add before placeholder no space=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before main content=\marg{name placeholder}\marg{content to add}\@nil
   \makeatother%
   \pgfmanualbody
 
@@ -1044,6 +1173,13 @@ Note that sometimes, you might not want to use |\setPlaceholderRec| to simply ap
 \addToPlaceholder*{__COMMAND__}{-option}
 \addBeforePlaceholder{__COMMAND__}{time}
 \printAllPlaceholdersExceptDefaults
+\end{codeexample}
+|add before main content| is a particular case where the placeholder is |__ROBEXT_MAIN_CONTENT__|. It is practical if you want to define for instance a macro, but in a way that even if you disable externalization, the command should still compile (if you define the macro in the preamble, it will not be added when disabling externalization). For instance:
+\begin{codeexample}[width=0pt,vbox]
+\robExtConfigure{
+  new preset={my preset}{latex, add before main content={\def\hello#1{Hello #1.}}},
+}
+\cacheMe[my preset]{Here I am cached (\hello{Alice})} and \cacheMe[my preset, disable externalization]{Here I am not (\hello{Bob}).}
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -1743,7 +1879,7 @@ If needed, you can configure the cache:
 \newpage
 \subsubsection{Customize or disable externalization}\label{sec:disableExternalization}
 
-You might want (sometimes or always) to disable externalization, for instance to use |remember picture| \tikz[remember picture,baseline=(pointtome.base)] \node[rounded corners, fill=orange](pointtome){Point to me if you can};, even if you used |\robExtExternalizeAllTikzpictures|:
+You might want (sometimes or always) to disable externalization, for instance to use |remember picture| \tikz[remember picture,baseline=(pointtome.base)] \node[rounded corners, fill=orange](pointtome){Point to me if you can};, even if you used |\cacheTikz|:
 
 \begin{pgfmanualentry}
   \makeatletter%
@@ -1756,7 +1892,7 @@ You might want (sometimes or always) to disable externalization, for instance to
   Enable or disable externalization.
   \begin{codeexample}[width=0pt,vbox]
     % In theory all pictures should be externalized (so remember picture should fail)
-    \robExtExternalizeAllTikzpictures
+    \cacheTikz
     % But we can disable it temporarily
     \begin{tikzpicture}<disable externalization>[remember picture]
       \node[rounded corners, fill=red](A){This figure is not externalized.
@@ -1805,7 +1941,7 @@ command if no externalization/.code={%
   \robExtDisableTikzpictureOverwrite\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}%
 }
 \end{verbatim}
-Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\robExtExternalizeAllTikzpictures|). Note that if you write your own style, try to modify |__ROBEXT_MAIN_CONTENT__| so that it can be included as-it in a document: this way you do not need to change this command.
+Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\cacheTikz|). Note that if you write your own style, try to modify |__ROBEXT_MAIN_CONTENT__| so that it can be included as-it in a document: this way you do not need to change this command.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2317,12 +2453,52 @@ in order to automatically load |tikz| and add the surrounding |tikzpicture| when
 
 \subsection{Cache automatically a given environment}\label{sec:wrapAutomatically}
 
-It might be handy to cache automatically a given environment: we already provide |\robExtExternalizeAllTikzpictures| to cache all tikz pictures (unless externalization is disabled), but we also provide tools to handle arbitrary environments.
+It might be handy to cache automatically a given environment: we already provide:\\ |\cacheTikz|\\
+to cache all tikz pictures (unless externalization is disabled), but we also provide tools to handle arbitrary environments.
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtExternalizeAllTikzpictures\@@
+  \extractcommand\robExtExternalizeAllTikzpictures\opt{\oarg{delimiters}}\@@
+  \extractcommand\cacheTikz\opt{\oarg{delimiters}}\@@
   \pgfmanualbody
-  This will automatically cache all tikz pictures. Note that we add an additional optional argument to the tikz picture to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v1.1). Since v1.1, we added the delimiters options, and we parse |\tikz| as well. Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+\begin{codeexample}[width=0pt,vbox]
+\cacheTikz
+
+\def\whereIAm{(not cached)}
+\robExtConfigure{
+  add to preset={tikz}{
+    add to preamble={
+      \def\whereIAm{(cached)}
+    },
+  },
+}
+
+\tikz \node[fill=pink, rounded corners]{See that this syntax can be safely used. \whereIAm};
+
+\tikz<add to preamble={\def\sayHello#1{Hello #1!}}> \node[fill=green, rounded corners]{\sayHello{Alice} \whereIAm};
+
+\tikz<disable externalization> \node[fill=green, rounded corners]{Foo \whereIAm};
+\end{codeexample}
+Here is an example to specify arguments via parenthesis:
+\begin{codeexample}[width=0pt,vbox]
+\cacheTikz[()]
+
+\def\whereIAm{(not cached)}
+\robExtConfigure{
+  add to preset={tikz}{
+    add to preamble={
+      \def\whereIAm{(cached)}
+    },
+  },
+}
+
+\tikz \node[fill=pink, rounded corners]{See that this syntax can be safely used. \whereIAm};
+
+\tikz(add to preamble={\def\sayHello#1{Hello #1!}}) \node[fill=green, rounded corners]{\sayHello{Alice} \whereIAm};
+
+\tikz(disable externalization) \node[fill=green, rounded corners]{Foo \whereIAm};
+\end{codeexample}
+
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2383,7 +2559,9 @@ Let us say that you want to cache all elements of a given environment, like |min
 \begin{pgfmanualentry}
   \extractcommand\cacheCommand\opt{\oarg{delimiter}}\marg{name command}\opt{\oarg{xparse signature}}\marg{default preset options}\@@
   \pgfmanualbody
-  This will automatically cache the corresponding command, in a similar way to environment. It work exactly the same, except that we need to specify the signature of the command or it is impossible to know where the command stops. If the command is defined using xparse-compatible commands like |\NewDocumentCommand|, this detection is automatically done. Otherwise, you need to specify it in the xparse format: long story short, |O{foo}| is an optional argument with default value foo, |m| is a mandatory argument.
+  This will automatically cache the corresponding command, in a similar way to environment. It work exactly the same, except that we (usually) need to specify the signature of the command or it is impossible to know where the command stops. If the command is defined using xparse-compatible commands like |\NewDocumentCommand|, this detection is automatically done. Otherwise, you need to specify it in the xparse format: long story short, |O{foo}| is an optional argument with default value foo, |m| is a mandatory argument.
+
+  First, let us see an example with a command defined using xparse:
   \begin{codeexample}[width=0pt,vbox]
     % We cache the command \zx that is defined with NewDocumentCommand: no need to specify the signature
     \cacheCommand{zx}{latex, add to preamble={\usepackage{zx-calculus}}}
@@ -2400,10 +2578,10 @@ Let us say that you want to cache all elements of a given environment, like |min
   
   You can of course configure them using globally defined configuration, but you can also provide arguments to a single picture using the delimiters that default to |<>| as the optional argument, like: %
   \begin{codeexample}[width=0pt,vbox]
-    \cacheCommand{zx}{latex, add to preamble={\usepackage{zx-calculus}}}
-    \zx<add to preamble={\usepackage{amsmath}}>[mbr=1]{ % amsmath provides \text
-      \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{yes}} \\
-      \zxZ{\beta} \rar           & \zxX*{b\pi}
+    \cacheCommand{zx}{latex, add to preamble={\usepackage{zx-calculus}\def\hello#1{Hello #1.}}}
+    \zx<add to preamble={\usepackage{amsmath}\def\bye#1{Bye #1.}}>[mbr=1]{ % amsmath provides \text
+      \zxX{\alpha} \rar \ar[d,C] & \zxZ{\text{\hello{Alice}}} \\
+      \zxZ{\beta} \rar           & \zxZ{\text{\bye{Bob}}}
     }
   \end{codeexample}
   or with parens as delimiters:
@@ -2456,11 +2634,12 @@ You can externalize it \drawMyCircle{pink} %
 or disable externalization \drawMyCircle<disable externalization>[4mm]{red}.
 \end{codeexample}
 
-\paragraph{Manually wrap a command.} In some more advanced cases, if you do not know the definition of the command and if |\cacheCommand| does not work (e.g. the number of mandatory argument depends on the first argument), you can wrap it manually. To do so, first copy first your command using |\DeclareCommandCopy{\robExtCommandOrigNAMEOFCOMMAND}{\NAMEOFCOMMAND}| (this is needed to disable externalization), and override it by wrapping it into a cache. Make sure to add |\def\robExtCommandOrigName{NAMEOFCOMMAND}| at the beginning of the function or |disable externalization| will not work:
+\paragraph{Manually wrap a command.} In some more advanced cases, if you do not know the definition of the command and if |\cacheCommand| does not work (e.g. the number of mandatory argument depends on the first argument), you can wrap it manually. To do so, first copy first your command using |\DeclareCommandCopy{\robExtCommandOrigNAMEOFCOMMAND}{\NAMEOFCOMMAND}| and run |\robExtAddToCommandResetList{NAMEOFCOMMAND}| (this is needed to disable externalization), and override the command by wrapping it into a cache. Make sure to add |\def\robExtCommandOrigName{NAMEOFCOMMAND}| at the beginning of the function or |disable externalization| will not work:
 
 \begin{codeAndResult}
 Original command: \zx{\zxZ{\alpha} \rar & \zxX{\beta}}. %
-\DeclareCommandCopy{\robExtCommandOrigzx}{\zx}
+\DeclareCommandCopy{\robExtCommandOrigzx}{\zx}% used to recover the original function
+\robExtAddToCommandResetList{zx}% let us know that this function should be reset when externalization is disabled
 \DeclareDocumentCommand{\zx}{D<>{}O{}m}{%
   \def\robExtCommandOrigName{zx}%
   \begin{CacheMe}{latex, add to preamble={\usepackage{zx-calculus}}, #1}%
@@ -2472,6 +2651,8 @@ This is cached \zx<>{\zxZ{\alpha} \rar & \zxX{\beta}}, you can add options like 
 and we can disable the externalization: %
 \zx<disable externalization>{\zxZ{\alpha} \rar & \zxX{\text{Hey}}}.
 \end{codeAndResult}
+
+You can do a similar trick for environment, by using instead |\NewEnvironmentCopy{robExtEnvironmentOrigNAMEENV}{NAMEENV}| |\robExtAddToEnvironmentResetList{NAMEENV}| and |\def\robExtEnvironmentOrigName{NAMEENV}|.
 
 \subsection{Operations on the cache}\label{sec:operationsCache}
 
@@ -2541,21 +2722,20 @@ You can also use |debug| (or its alias |print command and source|) in order to d
 \section{TODO and known bugs:}
 
 \begin{itemize}
-\item See how to deal with label and cite inside pictures (without disabling externalization). For label, I have a proof of concept, I ``just'' need to write it down.
+\item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
-\item Right now, links will not work as they are stripped when included. A workaround would be to use newpax, as stated in: \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \end{itemize}
 
 \section{Acknowledgments}
 
-I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much!
+I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much! A big thanks also to the project \url{https://github.com/sasozivanovic/memoize/} from which I borrowed most of the code to automatically wrap commands.
 
 \section{Changelog}
 
 \begin{itemize}
 \item v1.1:
   \begin{itemize}
-  \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |robExtExternalizeAllTikzpictures|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
+  \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |cacheTikz|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
   \item You can now use ampersands etc freely thanks to lrbox.
   \item You can now automatically cache environments using |\cacheEnvironment| and commands using |\cacheCommand|.
   \item We provide |new preset| and |add to preset| to avoid doubling the number of hashes.

@@ -1363,6 +1363,9 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
     add to preamble/.style={
       add to placeholder={__ROBEXT_PREAMBLE__}{##1},
     },
+    add before main content/.style={
+      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{##1},
+    },
     add before preamble/.style={
       add before placeholder={__ROBEXT_PREAMBLE__}{##1},
     },
@@ -1608,11 +1611,58 @@ touch "${outputPdf}"
 
 %%%%% Replace tikzpicture:
 
-\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{<>}}{%
-  \robExtCacheEnvironment[#1]{tikzpicture}{tikzpicture}
-  \robExtCacheCommand[#1]{tikz}[O{}m]{tikz}
+%% The parser is mostly taken from
+%% https://github.com/sasozivanovic/memoize/blob/master/memoize-tikz.tex
+
+\newtoks\robExt@temptoks
+\def\robExt@apptotoks#1#2{\expandafter#1\expandafter{\the#1#2}}
+
+\def\robExt@tikz{%
+  \robExt@temptoks={}%
+  \robExt@tikz@anim%
+}
+\def\robExt@tikz@anim{%
+  \pgfutil@ifnextchar[{\robExt@tikz@opt}{%
+    \pgfutil@ifnextchar:{\robExt@tikz@anim@a}{%
+      \robExt@tikz@code}}%]
+}%
+\def\robExt@tikz@anim@a#1=#2{%
+  \robExt@apptotoks\robExt@temptoks{#1={#2}}%
+  \robExt@tikz@anim%
+}%
+\def\robExt@tikz@opt[#1]{%
+  \robExt@apptotoks\robExt@temptoks{[#1]}%
+  \robExt@tikz@code%
+}
+\def\robExt@tikz@code{%
+  \pgfutil@ifnextchar\bgroup\robExt@tikz@braced\robExt@tikz@single%
+}
+\def\robExt@tikz@braced#1{\robExt@apptotoks\robExt@temptoks{{#1}}\robExt@tikz@done}
+\def\robExt@tikz@single#1;{\robExt@apptotoks\robExt@temptoks{#1;}\robExt@tikz@done}
+\def\robExt@tikz@done{%
+  \edef\robExt@marshal{%
+    \noexpand\robExtRescanHashRobust{\noexpand\robExtCacheMe[tikz, \expandonce{\robExt@tmp@args}]{%
+        \noexpand\tikz\the\robExt@temptoks%
+      }%
+    }%
+  }%
+  \robExt@marshal%
 }
 
+\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{<>}}{%
+  \robExtCacheEnvironment[#1]{tikzpicture}{tikzpicture}
+  % \robExtCacheCommand[#1]{tikz}[O{}m]{tikz}
+  % Tikz has a more complicated parsing system
+  \DeclareCommandCopy{\robExtCommandOrigtikz}{\tikz}% we save the function for later reset
+  \robExtAddToCommandResetList{tikz}% we add it to the list of functions to reset
+  \DeclareDocumentCommand{\tikz}{D#1{}}{
+    \def\robExtCommandOrigName{tikz}% we specify the name of the current environment
+    \edef\robExt@tmp@args{\detokenize{##1}}% we specify the name of the current environment
+    % we start the parsing
+    \robExt@tikz%
+  }
+}
+\let\cacheTikz\robExtExternalizeAllTikzpictures
 
 %% The cached version
 \DeclareDocumentEnvironment{tikzpictureC}{D<>{}O{}O{}}{%
@@ -1711,9 +1761,9 @@ touch "${outputPdf}"
     \def\ArgumentSpecification{#3}%
   }%
   \edef\ArgumentSpecification{D#1{}\ArgumentSpecification}%
+  \robExtAddToCommandResetList{#2}%
   % We copy the original definition for later (if externalization is disabled)
   \expandafter\DeclareCommandCopy\csname robExtCommandOrig#2\expandafter\endcsname\csname #2\endcsname%
-  \robExtAddToCommandResetList{#2}%
   \edef\robExt@marshal{%
     \noexpand\DeclareDocumentCommand%
       \expandonce{\csname #2\endcsname}%
