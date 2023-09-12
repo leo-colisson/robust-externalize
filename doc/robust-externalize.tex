@@ -100,6 +100,9 @@
 
 \textbf{WARNING: This library is young and has not been tested extensively (and is an important rewrite of a previous version). Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}, or let us know if it works!}
 
+\textbf{WARNING 2: Since we rewrote the library to use placeholders, the library is significantly slower (7 times slower!). I need to understand why, and see how to fix it. Hopefully I can fix it without important change, but it might introduce backward-incompatible changes in the future. So do not consider this version as stable, and definitely copy the .sty file if you plan to use it.}
+
+
 \section{A taste of this library}
 
 This library allows you to cache any language: not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays:
@@ -233,7 +236,8 @@ I tested the library mostly on Linux systems, but the library should work on all
 
 Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
-\item You can compile manually the images: all the commands that are left to be executed are listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
+\item You can choose to display a dummy content explaining how to manually compile the pictures until they are compiled, see |enable fallback to manual mode|.
+\item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
 \item If you allowed:
   \begin{itemize}
   \item |pdflatex| (needed to compile latex documents)
@@ -242,8 +246,7 @@ Since we need to compile the images via an external command, the simpler option 
   \end{itemize}
   to run in restricted mode (so without enabling |-shell-escape|), then there is no need for |-shell-escape|. In that case, set |force compilation| and this library will compile even if |-shell-escape| is disabled.
 \item If images are all already cached, you don't need to enable \texttt{-shell-escape} (this might be interesting e.g. to send a pre-cached document to the arxiv or to a publisher: just make sure to include the cache folder).
-\item You can choose to display a dummy content until you choose to compile them, see |enable fallback to manual mode|.
-\item We use very few commands to compile latex files, basically only pdflatex, mkdir (to create the cache folder if needed) and cd (if the cache folder is not present).
+\item We use very few commands to compile latex files, basically only pdflatex, mkdir (to create the cache folder if needed) and cd (if the cache folder is not present). You might want to allow them in restricted mode.
 \end{itemize}
 
 
@@ -253,13 +256,23 @@ Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing 
 
 \paragraph{Do you have some benchmarks?}
 
-On an early draft of a small paper containing 76 small tikz-cd based pictures (from my other zx-calculus library), we measured:
+We benchmarked the library before a major rewrite introducing placeholders (benchmark was in commit \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{09a05a86ec9c04eb6687b75831ebb84185786ac5}), and the library was performing really well. On an early draft of a small paper containing 76 small tikz-cd based pictures (from my other zx-calculus library), we measured on a first version of this library:
 \begin{itemize}
 \item 35 seconds for a normal compilation without externalization
 \item 75 seconds for the first compilation with this library
 \item 2.4 seconds for the next runs
 \end{itemize}
 So during the first compilation, we lost a x2 factor (roughly an additional time of .5 seconds per picture coming from the time to start \LaTeX{}, it seems like on average a picture takes .5 seconds to be built in my benchmark), but then we have a speedup of x15 (2.43s instead of 34.63s) for all subsequent runs. And I expect this to be even higher with more pictures and more complex documents.
+
+\textbf{TODO: understand why} BUT on the latest version 1.0+unstable, the benchmark it actually not as good. Tested on 318 pictures:
+\begin{itemize}
+\item without externalization: 1mn36
+\item with externalization (first run): 3mn25, more or less like in the original case
+\item with externalization (next runs): 26 seconds (hum… not really good!)
+\item with old version (next runs): 3.74 seconds (hum… why is the old version so much faster?)
+\end{itemize}
+so on the latest version we only get a x3 improvement over a normal compilation while the old version gets a x25 improvement speed\dots{} Seems like \LaTeX{} is really slow with string manipulations, I need to investigate further. So you might still not consider this version as stable yet.
+
 
 \paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
 
@@ -271,17 +284,18 @@ So during the first compilation, we lost a x2 factor (roughly an additional time
 
 \paragraph{Can I extend it easily?} We tried to take a quite modular approach in order to allow easy extensions. Internally, to support a new cache scheme, we only expect a string containing the program (possibly produced using a template), a list of dependencies, a command to compile this program (e.g. producing a pdf and possibly a tex file with the properties (depth…) of the pdf), and a command to load the result of the compilation into the final document (called after loading the previously mentioned optional tex file). Thanks to pgfkeys, it is then possible to create simple pre-made settings to automatically apply when needed.
 
-\paragraph{How does it compare with \url{https://github.com/sasozivanovic/memoize}?} I recently became aware of the great \url{https://github.com/sasozivanovic/memoize}. While me aim to solve a similar goal, our approaches are quite different. While we focus on purity, and therefore create a different file for each picture, the above project puts all pictures in a single file and compile them all at once to avoid losing time to run the latex command for each picture (this mostly makes a difference for the first compilation). Our understanding of the main differences is the following:
+\paragraph{How does it compare with \url{https://github.com/sasozivanovic/memoize}?} I recently became aware of the great \url{https://github.com/sasozivanovic/memoize}. While we aim to solve a similar goal, our approaches are quite different. While I focus on purity, and therefore create a different file for each picture, the above project puts all pictures in a single file and compile them all at once to avoid losing time to run the latex command for each picture (this mostly makes a difference for the first compilation). Our understanding of the main differences is the following:
 
 Pros of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
 \item The above library is likely to be quicker on the first run since it packs everything in a single file (so you save the time to run latex for each picture). On the other hand, we can load in the preamble exactly what is needed for the picture (we do not load all the preamble of the main file), so our startup time is not huge (it adds .5s per picture in my tests when using the |zx-calculus| library), and you can still commit the cached file to help with recompiling the document elsewhere.
 \item It seems to be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz picture are automatically memoized (we provide |\cacheTikz| for that, but you still need to specify the preamble once).
+\item Even if it does not officially support contexts, it might work automatically (while we need to explicitly pass the context). However, this can break purity (see below).
 \end{itemize}
 
 Cons of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
-\item The purity is not enforced so strongly since all images are in the same file. Notably, the hash only depends on the picture, but not on its context. So for instance if you define |\def\mycolor{blue}| before the picture, and use |\mycolor| inside the picture, if you change later the color to, say, |\def\mycolor{red}|, the picture will not be recompiled (so cleaning the cache and recompiling would produce a different result). In our case, the purity is always strictly enforced (unless you choose not to).
+\item The purity is not enforced so strongly since all images are in the same file. Notably, the hash only depends on the picture, but not on its context. So for instance if you define |\def\mycolor{blue}| before the picture, and use |\mycolor| inside the picture, if you change later the color to, say, |\def\mycolor{red}|, the picture will not be recompiled (so cleaning the cache and recompiling would produce a different result). In our case, the purity is always strictly enforced (unless you choose not to) since the context must be explicitly passed to the compiled file.
 \item As a result, the above library has poor support for contexts (in our case, you can easily, for instance, make a picture depend on the current page, and recompile the picture only if the current page changes: you can also do it the other way, and change some counters, say, depending on the cached file).
 \item The above library only focuses on \LaTeX{} while our library works for any language
 \item The above library can only produce pdf formats, while we can generate any format (text, tex, jpg\dots{} and even videos that I include in my beamer presentation).
@@ -2457,10 +2471,10 @@ It might be handy to cache automatically a given environment: we already provide
 to cache all tikz pictures (unless externalization is disabled), but we also provide tools to handle arbitrary environments.
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtExternalizeAllTikzpictures\opt{\oarg{delimiters}}\@@
+  \extractcommand\robExtExternalizeAllTikzpicture\opt{\oarg{delimiters}}\@@
   \extractcommand\cacheTikz\opt{\oarg{delimiters}}\@@
   \pgfmanualbody
-  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v1.1). Since v1.1, we added the delimiters options, and we parse |\tikz| as well. Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v1.1). Since v1.1, we added the delimiters options, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
 \begin{codeexample}[width=0pt,vbox]
 \cacheTikz
 
