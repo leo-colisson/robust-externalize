@@ -2736,6 +2736,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \item v1.1:
   \begin{itemize}
   \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |cacheTikz|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
+  \item Added an alias to |\robExtExternalizeAllTikzpictures| called |\cacheTikz|. Now, this also configures |\tikz|.
   \item You can now use ampersands etc freely thanks to lrbox.
   \item You can now automatically cache environments using |\cacheEnvironment| and commands using |\cacheCommand|.
   \item We provide |new preset| and |add to preset| to avoid doubling the number of hashes.
