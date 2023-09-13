@@ -53,6 +53,10 @@
   \str_replace_all:Nnx {#1} { ## } { \c_hash_str \c_hash_str }
 }
 
+\NewDocumentCommand{\robExtStrSetHashRobust}{mm}{
+  \str_set_hash_robust:Nn {#1} {#2}
+}
+
 \ExplSyntaxOff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -246,6 +250,7 @@ if __name__ == '__main__':
 %% different commands depending on whether they can be used in a macro or not, whether they should be taken
 %% from an external file etc...
 \seq_clear_new:N \l_robExt_placeholders_seq 
+\seq_clear_new:N \l_robExt_placeholders_all_seq 
 
 \NewDocumentCommand{\robExtShowPlaceholder}{sm}{
   \message{Placeholder ~ #2 ~ contains:^^J~ \use:c{l_robExt_placeholder_#2_str}}
@@ -338,13 +343,72 @@ if __name__ == '__main__':
   % First we remove existing occurrences (useful to avoid listing the same macro more than once
   % if we redefine a macro):
   \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+  \seq_put_right:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+}
+\let\robExtImportPlaceholder\robExtAddPlaceholderToList
+\let\importPlaceholder\robExtAddPlaceholderToList
+
+\NewDocumentCommand{\robExtClearImportedPlaceholders}{}{
+  \seq_clear:N \l_robExt_placeholders_seq
+}
+\let\clearImportedPlaceholders\robExtClearImportedPlaceholders
+
+\NewDocumentCommand{\robExtRemoveImportedPlaceholder}{m}{
+  \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
+  \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+}
+\let\removeImportedPlaceholder\robExtRemoveImportedPlaceholder
+
+
+% Make sure that the placeholder is in the list \l_robExt_placeholders_seq.
+% This should automatically be called by other tools
+\NewDocumentCommand{\robExtImportAllPlaceholders}{}{
+  \seq_set_eq:NN \l_robExt_placeholders_seq \l_robExt_placeholders_all_seq
+}
+\let\importAllPlaceholders\robExtImportAllPlaceholders
+
+% Import all placeholders matching a given pattern, like
+% \importMatchingPlaceholders{__ROBEXT_LATEX}
+\NewDocumentCommand{\robExtImportMatchingPlaceholders}{m}{
+  \seq_map_inline:Nn \l_robExt_placeholders_all_seq {
+    \str_if_in:nnTF { ##1 }{ #1 } {
+      \robExtAddPlaceholderToList{##1}
+    }{}
+  }
+}
+\let\importMatchingPlaceholders\robExtImportMatchingPlaceholders
+
+
+% add it first in the list
+\NewDocumentCommand{\robExtAddPlaceholderToListFirst}{m}{
+  % Make sure we have a string here:
+  \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
+  % First we remove existing occurrences (useful to avoid listing the same macro more than once
+  % if we redefine a macro):
+  \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
   \seq_put_left:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
 }
+\let\robExtImportPlaceholderFirst\robExtAddPlaceholderToListFirst
+\let\importPlaceholderFirst\robExtAddPlaceholderToListFirst
+
+
+% Make sure that the placeholder is in the list \l_robExt_placeholders_all_seq
+% That also contains placeholders that are not imported (might be useful to filter on their name)
+\NewDocumentCommand{\robExtAddPlaceholderToListAll}{m}{
+  % Make sure we have a string here:
+  \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
+  % First we remove existing occurrences (useful to avoid listing the same macro more than once
+  % if we redefine a macro):
+  \seq_remove_all:NV \l_robExt_placeholders_all_seq \l_robExt_tmp_str
+  \seq_put_right:NV \l_robExt_placeholders_all_seq \l_robExt_tmp_str
+}
+
 
 \NewDocumentCommand{\robExtRemovePlaceholder}{m}{
   % This seems to be required to ensure catcodes are correct before removing the elements:
   \str_set_hash_robust:Nn \l_robExt_tmp_str { #1 }
   \seq_remove_all:NV \l_robExt_placeholders_seq \l_robExt_tmp_str
+  \seq_remove_all:NV \l_robExt_placeholders_all_seq \l_robExt_tmp_str
   \expandafter \let \csname l_robExt_placeholder_#1_str \endcsname \undefined 
 }
 \let\removePlaceholder\robExtRemovePlaceholder
@@ -353,24 +417,28 @@ if __name__ == '__main__':
 %% MYTITLE will contain at the end "My slide title"
 %% Warning: only LaTeX-friendly code should be placed here, as LaTeX does not preserve some symbols and adds spaces
 %% Tested!
-\NewDocumentCommand{\robExtPlaceholderFromContent}{mm}{
-  \str_set_hash_robust:cn { l_robExt_placeholder_#1_str } {#2}
-  \robExtAddPlaceholderToList{#1}
+%% The star version does NOT import the placeholder (useful for efficiency reasons)
+\NewDocumentCommand{\robExtPlaceholderFromContent}{smm}{
+  \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
+  \robExtAddPlaceholderToListAll {#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
 \let\placeholderFromContent\robExtPlaceholderFromContent
 \let\robExtSetPlaceholder\robExtPlaceholderFromContent
 \let\setPlaceholder\robExtPlaceholderFromContent
 
-\NewDocumentCommand{\robExtPlaceholderFromString}{mm}{
-  \str_set_eq:cN { l_robExt_placeholder_#1_str } {#2}
-  \robExtAddPlaceholderToList{#1}
+\NewDocumentCommand{\robExtPlaceholderFromString}{smm}{
+  \str_set_eq:cN { l_robExt_placeholder_#2_str } {#3}
+  \robExtAddPlaceholderToListAll {#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
 \let\placeholderFromString\robExtPlaceholderFromString
 \let\setPlaceholderFromString\robExtPlaceholderFromString
 
-\NewDocumentCommand{\robExtCopyPlaceholder}{mm}{
-  \str_set_eq:cc { l_robExt_placeholder_#1_str } { l_robExt_placeholder_#2_str }
-  \robExtAddPlaceholderToList{#1}
+\NewDocumentCommand{\robExtCopyPlaceholder}{smm}{
+  \str_set_eq:cc { l_robExt_placeholder_#2_str } { l_robExt_placeholder_#3_str }
+  \robExtAddPlaceholderToListAll {#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
 \let\copyPlaceholder\robExtCopyPlaceholder
 
@@ -385,9 +453,23 @@ if __name__ == '__main__':
   }{
     \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
     \robExtAddPlaceholderToList{#2}
+    \robExtAddPlaceholderToListAll{#2}
   }
 }
 \let\addToPlaceholder\robExtAddToPlaceholder
+
+\NewDocumentCommand{\robExtAddToPlaceholderNoImport}{smm}{
+  \str_if_exist:cTF { l_robExt_placeholder_#2_str } {
+    \str_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
+    \IfBooleanTF{#1}{}{\str_put_right:cn { l_robExt_placeholder_#2_str } { ~ } }
+    \str_put_right:cV { l_robExt_placeholder_#2_str } \l_tmp_str
+  }{
+    \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
+    \robExtAddPlaceholderToListAll{#2}
+  }
+}
+\let\addToPlaceholderNoImport\robExtAddToPlaceholderNoImport
+
 
 %% Add something to the right of the placeholder
 %% By default it adds a space in between, unless we use the star version
@@ -399,9 +481,23 @@ if __name__ == '__main__':
   }{
     \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
     \robExtAddPlaceholderToList{#2}
+    \robExtAddPlaceholderToListAll{#2}
   }
 }
 \let\addBeforePlaceholder\robExtAddBeforePlaceholder
+
+
+\NewDocumentCommand{\robExtAddBeforePlaceholderNoImport}{smm}{
+  \str_if_exist:cTF { l_robExt_placeholder_#2_str } {
+    \str_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
+    \IfBooleanTF{#1}{}{\str_put_left:cn { l_robExt_placeholder_#2_str } { ~ } }
+    \str_put_left:cV { l_robExt_placeholder_#2_str } \l_tmp_str
+  }{
+    \str_set_hash_robust:cn { l_robExt_placeholder_#2_str } {#3}
+    \robExtAddPlaceholderToListAll{#2}
+  }
+}
+\let\addBeforePlaceholderNoImport\robExtAddBeforePlaceholderNoImport
 
 
 % Usage:
@@ -411,7 +507,7 @@ if __name__ == '__main__':
 % \end{placeholderFromCode}
 % HELPERFUNCTION will contain at the end "def ..."
 % This environment cannot be placed inside any other macro/align/...
-\NewDocumentEnvironment{RobExtPlaceholderFromCode}{m}{%
+\NewDocumentEnvironment{RobExtPlaceholderFromCode}{sm}{%
   % % debug part
   % \str_set:Nn \l_test_str {#1}
   % \show\l_test_str
@@ -430,25 +526,34 @@ if __name__ == '__main__':
   \ior_str_map_inline:Nn \g_robExt_read_ior {%
     \str_gput_right:Nx \l_robExt_tmp {\tl_to_str:N{##1}^^J}%
   }%
-  \str_set_eq:cN {l_robExt_placeholder_#1_str} \l_robExt_tmp%
-  \robExtAddPlaceholderToList{#1}%
-  %% Otherwise they will be lost when the environment ends
-  \robExtKeepaftergroup{l_robExt_placeholders_seq}%
+  \str_set_eq:cN {l_robExt_placeholder_#2_str} \l_robExt_tmp%
+  \IfBooleanTF {#1} {} {
+    \robExtAddPlaceholderToList{#2}
+    %% Otherwise they will be lost when the environment ends
+    \robExtKeepaftergroup{l_robExt_placeholders_seq}%
+  }
+  \robExtAddPlaceholderToListAll {#2}
+  \robExtKeepaftergroup{l_robExt_placeholders_all_seq}%
   %% for other variable
-  \robExtKeepaftergroup{l_robExt_placeholder_#1_str}%
+  \robExtKeepaftergroup{l_robExt_placeholder_#2_str}%
 }%
 \let\PlaceholderFromCode\RobExtPlaceholderFromCode
 \let\endPlaceholderFromCode\endRobExtPlaceholderFromCode
 \let\SetPlaceholderCode\RobExtPlaceholderFromCode
 \let\endSetPlaceholderCode\endRobExtPlaceholderFromCode
 
+\NewDocumentCommand{\robExtKeepPlaceholderAfterGroup}{m}{
+  \robExtKeepaftergroup{l_robExt_placeholder_#1_str}%
+}
+\let\keepPlaceholderAfterGroup\robExtKeepPlaceholderAfterGroup
+
 %% Usage:
 %% \placeholderPathFromFilename{MYLIBPATH}{mylib.py}
 %% This will copy mylib.py in the cache, and set MYLIBPATH to the name of the file in the cache like
 %% MYLIBPATH = robExt-abcmylib.py
 %% Tested!
-\NewDocumentCommand{\robExtPlaceholderPathFromFilename}{mm}{
-  \ior_open:Nn \g_robExt_read_ior {#2}
+\NewDocumentCommand{\robExtPlaceholderPathFromFilename}{smm}{
+  \ior_open:Nn \g_robExt_read_ior {#3}
   %% Put the file in l_robExt_tmp_contain_file
   \str_clear_new:N \l_robExt_tmp_contain_file
   \ior_str_map_inline:Nn \g_robExt_read_ior {
@@ -456,15 +561,16 @@ if __name__ == '__main__':
   }
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
   \iow_close:N \g_robExt_write_iow
   %% sets the template name to the relative path to the file
-  \str_set:cx { l_robExt_placeholder_#1_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-  \robExtAddPlaceholderToList{#1}
+  \str_set:cx { l_robExt_placeholder_#2_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
+  \robExtAddPlaceholderToListAll {#2}
 }
 \let\placeholderPathFromFilename\robExtPlaceholderPathFromFilename
 
@@ -472,16 +578,17 @@ if __name__ == '__main__':
 %% \placeholderFromFileContent{MYLIB}{mylib.py}
 %% This will set MYLIB to the content of the file mylib.py
 %% Tested!
-\NewDocumentCommand{\robExtPlaceholderFromFileContent}{mm}{
-  \ior_open:Nn \g_robExt_read_ior {#2}
+\NewDocumentCommand{\robExtPlaceholderFromFileContent}{smm}{
+  \ior_open:Nn \g_robExt_read_ior {#3}
   %% Put the file in l_robExt_tmp_contain_file
   \str_clear_new:N \l_robExt_tmp_contain_file
   \ior_str_map_inline:Nn \g_robExt_read_ior {
     \str_put_right:Nx \l_robExt_tmp_contain_file {\tl_to_str:N{##1}^^J}
   }
   %% sets the template name to the relative path to the file
-  \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_tmp_contain_file
-  \robExtAddPlaceholderToList{#1}
+  \str_set_eq:cN { l_robExt_placeholder_#2_str } \l_robExt_tmp_contain_file
+  \robExtAddPlaceholderToListAll {#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
 \let\placeholderFromFileContent\robExtPlaceholderFromFileContent
 
@@ -491,19 +598,20 @@ if __name__ == '__main__':
 %% This will copy "some code" in the cache, and set MYLIBPATH to the name of the file in the cache like
 %% MYLIBPATH = robExt-abc.py
 %% Tested!
-\NewDocumentCommand{\robExtPlaceholderPathFromContent}{mO{.tex}m}{
-  \str_set_hash_robust:Nn \l_robExt_tmp_contain_file {#3}
+\NewDocumentCommand{\robExtPlaceholderPathFromContent}{smO{.tex}m}{
+  \str_set_hash_robust:Nn \l_robExt_tmp_contain_file {#4}
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
   \iow_close:N \g_robExt_write_iow
   %% sets the template name to the relative path to the file
-  \str_set:cx { l_robExt_placeholder_#1_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-  \robExtAddPlaceholderToList{#1}
+  \str_set:cx { l_robExt_placeholder_#2_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
+  \robExtAddPlaceholderToListAll {#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
 \let\placeholderPathFromContent\robExtPlaceholderPathFromContent
 
@@ -514,7 +622,7 @@ if __name__ == '__main__':
 %% \end{PlaceholderPathFromCode}
 %% This will copy "some code" in the cache, and set MYLIBPATH to the name of the file in the cache like
 %% MYLIBPATH = robExt-abc.py
-\NewDocumentEnvironment{RobExtPlaceholderPathFromCode}{O{}m}{
+\NewDocumentEnvironment{RobExtPlaceholderPathFromCode}{sO{}m}{
   \XSIMfilewritestart*{\jobname-robExt-tmp-file-you-can-remove.tmp}
 }{
   \XSIMfilewritestop
@@ -526,51 +634,85 @@ if __name__ == '__main__':
   }
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#1}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
   \iow_now:NV \g_robExt_write_iow \l_robExt_tmp_contain_file
   \iow_close:N \g_robExt_write_iow
   %% sets the template name to the relative path to the file
-  \str_set:cx { l_robExt_placeholder_#2_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
-  \robExtAddPlaceholderToList{#2}
+  \str_set:cx { l_robExt_placeholder_#3_str } {\robExtPrefixFilename\l_robExt_tmp_filename_no_prefix}
+  \robExtAddPlaceholderToListAll {#3}
+  \robExtKeepaftergroup{l_robExt_placeholders_all_seq}
+  \IfBooleanTF {#1} {} {
+    \robExtAddPlaceholderToList{#3}
+    \robExtKeepaftergroup{l_robExt_placeholders_seq}
+  }
   %% Otherwise they will be lost when the environment ends
-  \robExtKeepaftergroup{l_robExt_placeholders_seq}
-  %% for other variable
-  \robExtKeepaftergroup{l_robExt_placeholder_#2_str}
+  \robExtKeepaftergroup{l_robExt_placeholder_#3_str}
 }
 \let\PlaceholderPathFromCode\RobExtPlaceholderPathFromCode
 \let\endPlaceholderPathFromCode\endRobExtPlaceholderPathFromCode
 
-
-
 %%% Evaluate a string by replacing the placeholders until there is none left
 %%% the result will be in \robExtResult
+% \cs_set:Nn \__replace_until_impossible:N {
+%   \str_set:Nn \l_robExt_result_str { ls }
+% }
+
+% backup, we are gona test it
+% %%% Evaluate a string by replacing the placeholders until there is none left
+% %%% the result will be in \robExtResult
 \cs_set:Nn \__replace_until_impossible:N {
   \str_set_eq:NN \l_robext_tmp_before \l_robExt_result_str
   \seq_map_inline:Nn \l_robExt_placeholders_seq {
-    \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
+    \message{One loop for ##1^^J}
+    \str_if_exist:cTF { l_robExt_placeholder_##1_str } {
+      \str_replace_all:Nnv \l_robExt_result_str { ##1 } { l_robExt_placeholder_##1_str }
+    }{
+      \message{WARNING: ~ the ~ placeholder ~ ##1 ~ does ~ not ~ exist.}
+    }    
   }
-  % We compare the result
-  \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
-    %\str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_result_str
-    %\robExtAddPlaceholderToList{#1}
+  % In quick mode, we first try to check if the string contains __ since by default all placeholders start with __
+  % If not, no need to do one more run
+  \cs_if_exist:NTF {\robExtPlaceholderOnlyWithUnderscores} {
+    %\message{OOOOOOOOOOoooptimasation for robExtPlaceholderOnlyWithUnderscores}
+    \str_if_in:NnTF { \l_robExt_result_str } { __ } {
+      \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
+        % We converged
+      }{
+        % The strings are different: we restart
+        %\message{The strings are different, we restart: It ~ used ~ to ~ be ~\l_robext_tmp_before^^J^^J now it is^^J^^J \l_robExt_result_str}
+        \__replace_until_impossible:N { }
+      }
+    }{
+      % We found no __ so we stop before even if a change was made
+      %\message{WWWWWe found no underscores in \l_robExt_result_str}
+    }
   }{
-    % The strings are different: we restart
-    \__replace_until_impossible:N { }
+    % We compare the result
+    \str_compare:eNeTF \l_robext_tmp_before = \l_robExt_result_str {
+      % \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_result_str
+      % \robExtAddPlaceholderToList{#1}
+    }{
+      % The strings are different: we restart
+      \__replace_until_impossible:N { }
+    }
   }
 }
 
-\NewDocumentCommand{\robExtGetPlaceholderInResult}{O{}m}{
-  \str_set_hash_robust:Nn \l_robExt_result_str { #2 }
+\NewDocumentCommand{\robExtGetPlaceholderInResult}{sO{}m}{
+  \str_set_hash_robust:Nn \l_robExt_result_str { #3 }
+  \message{BBBBBBBBBBBBegin^^J \l_robExt_result_str}
   \__replace_until_impossible:N { }
-  \tl_if_blank:nTF {#1} {} {
+  \message{BBBBBBBBBBBEnd^^J \l_robExt_result_str}
+  \tl_if_blank:nTF {#2} {} {
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
     % we remove the name of the placeholder at the end
-    \str_remove_all:Nn \l_robExt_result_str { #1 }
-    \str_set_eq:cN { l_robExt_placeholder_#1_str } \l_robExt_result_str
-    \robExtAddPlaceholderToList{#1}
+    \str_remove_all:Nn \l_robExt_result_str { #2 }
+    \str_set_eq:cN { l_robExt_placeholder_#2_str } \l_robExt_result_str
+    \robExtAddPlaceholderToListAll {#2}
+    \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
   }
 }
 \let\getPlaceholderInResult\robExtGetPlaceholderInResult
@@ -590,14 +732,15 @@ if __name__ == '__main__':
   }
 }
 
-\NewDocumentCommand{\robExtGetPlaceholderInResultReplaceFromList}{mO{}m}{
-  \str_set_hash_robust:Nn \l_robExt_result_str { #3 }
-  \clist_set:Nn \l_robExt_list_placeholder_replace_clist {#1}
+\NewDocumentCommand{\robExtGetPlaceholderInResultReplaceFromList}{smO{}m}{
+  \str_set_hash_robust:Nn \l_robExt_result_str { #4 }
+  \clist_set:Nn \l_robExt_list_placeholder_replace_clist {#2}
   \__replace_from_list:N { \l_robExt_list_placeholder_replace_clist }
-  \tl_if_blank:nTF {#2} {} {
-    \str_remove_all:Nn \l_robExt_result_str { #1 }
-    \str_set_eq:cN { l_robExt_placeholder_#2_str } \l_robExt_result_str
-    \robExtAddPlaceholderToList{#2}
+  \tl_if_blank:nTF {#3} {} {
+    \str_remove_all:Nn \l_robExt_result_str { #3 }
+    \str_set_eq:cN { l_robExt_placeholder_#3_str } \l_robExt_result_str
+    \robExtAddPlaceholderToListAll {#3}
+    \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#3}}
   }
 }
 \let\getPlaceholderInResultReplaceFromList\robExtGetPlaceholderInResultReplaceFromList
@@ -618,13 +761,21 @@ if __name__ == '__main__':
 }
 
 
-\NewDocumentCommand{\robExtSetPlaceholderRec}{mm}{
-  \robExtGetPlaceholderInResult[#1]{#2}
+\NewDocumentCommand{\robExtSetPlaceholderRec}{smm}{
+  \IfBooleanTF {#1} {
+    \robExtGetPlaceholderInResult*[#2]{#3}
+  } {
+    \robExtGetPlaceholderInResult[#2]{#3}
+  }
 }
 \let\setPlaceholderRec\robExtSetPlaceholderRec
 
-\NewDocumentCommand{\robExtSetPlaceholderRecReplaceFromList}{mmm}{
-  \robExtGetPlaceholderInResultReplaceFromList{#1}[#2]{#3}
+\NewDocumentCommand{\robExtSetPlaceholderRecReplaceFromList}{smmm}{
+  \IfBooleanTF {#1} {
+    \robExtGetPlaceholderInResultReplaceFromList*{#2}[#3]{#4}
+  }{
+    \robExtGetPlaceholderInResultReplaceFromList{#2}[#3]{#4}
+  }
 }
 \let\setPlaceholderRecReplaceFromList\robExtSetPlaceholderRecReplaceFromList
 
@@ -643,15 +794,6 @@ if __name__ == '__main__':
   \tl_rescan:nv {} { l_robExt_result_str }
 }
 \let\evalPlaceholder\robExtEvalPlaceholder
-
-%%% Evaluate a string by replacing the placeholders until there is none left
-%%% the result will be in \robExtResult
-\NewDocumentCommand{\robExtEvalPlaceholderReplaceNTimes}{O{1}m}{
-  \str_set_hash_robust:Nn \l_test_str {#2}
-  \robExtGetPlaceholderInResultReplaceNTimes[#1]{#2}
-  \tl_rescan:nv {} { l_robExt_result_str }
-}
-\let\evalPlaceholderReplaceNTimes\robExtEvalPlaceholderReplaceNTimes
 
 %%% Evaluate a string by replacing the placeholders until there is none left
 %%% the result will be in \robExtResult
@@ -737,6 +879,8 @@ if __name__ == '__main__':
   %% Make sure to remove these placeholders as they should not be replaced.
   %% Not that we cannot just give them their final value here, as it cannot yet be determined without
   %% first computing the md5 hash.
+  \ifdefined\robExtEnableImportMechanism\else\robExtImportAllPlaceholders\fi%
+  \robExtConfigure{run ~ early ~ before ~ compilation}
   \robExtRemovePlaceholder{__ROBEXT_SOURCE_FILE__}
   \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PDF__}
   \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PREFIX__}
@@ -745,14 +889,18 @@ if __name__ == '__main__':
   \setPlaceholder{__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
   \robExtEvalPlaceholderInplace{__ROBEXT_CACHE_FOLDER__}
   %%% We rescan the string in order to evaluate stuff like \myframes into "12,45,56".
+  \robExtConfigure{run ~ before ~ compilation}
   \robExtGetPlaceholderInResult{__ROBEXT_COMPILATION_COMMAND__}
+  \robExtConfigure{run ~ after ~ compilation}
   \ifdefined\robExtDoNotRescanFirstTime
     \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_result_str
   \else
     \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand  {} { \l_robExt_result_str }
   \fi%
   %% We get the template
+  \robExtConfigure{run ~ before ~ template}
   \robExtGetPlaceholderInResult{__ROBEXT_TEMPLATE__}
+  \robExtConfigure{run ~ after ~ template}
   \str_set_eq:NN \l_robExt_final_file_minus_hash_str \l_robExt_result_str
   % We first add on the first line the compilation command, and on the second line the template file.
   \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_final_file_minus_hash_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
@@ -845,6 +993,7 @@ if __name__ == '__main__':
           % https://tex.stackexchange.com/questions/104034/when-is-it-good-practice-to-use-unskip
           \input{\robExtAddCachePathAndName{\robExtFinalHash-out.tex}}\unskip% Otherwise if the file contains space it will be added here.
         }{}%
+        \robExtConfigure{run ~ before ~ include ~ command}%
         \ifdefined\robExtIncludeCommand%
           \robExtIncludeCommand%
         \else%
@@ -860,6 +1009,7 @@ if __name__ == '__main__':
             }%
           \fi%
         \fi%
+        \robExtConfigure{run ~ after ~ include ~ command}%
       }{
         \ifdefined\robExtManualMode
           \framebox[\linewidth]
@@ -986,6 +1136,36 @@ if __name__ == '__main__':
     }%
     \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
   },
+  % new compiled preset={latex compiled}{
+  %  code to compile in order to produce the expected strings  
+  % }{
+  %  code to initialize
+  % }
+  new compiled preset/.code n args={3}{
+    \robExtStrSetDoubleHash{\robExtCodeToCompileStr}{#2}%
+    \robExtStrSetDoubleHash{\robExtCodeToRunStr}{#3}%
+    % Sadly, \expanded{\noexpand } does not work, as I get extra {} around the def, creating a group
+    % so the simpler seems to use this library ^^
+    \robExtPlaceholderFromString{__ROBEXT_TMP_CODE_TO_COMPILE__}{\robExtCodeToCompileStr}%
+    \robExtPlaceholderFromString{__ROBEXT_TMP_CODE_TO_RUN__}{\robExtCodeToRunStr}%
+    % \robExtShowPlaceholder*{__ROBEXT_TMP__}
+    \robExtEvalPlaceholderReplaceFromList{__ROBEXT_TMP_CODE_TO_COMPILE__,__ROBEXT_TMP_CODE_TO_RUN__}{%
+      \robExtConfigure{%
+        #1-recompile/.code={%
+          \begingroup%
+            \robExtConfigure{__ROBEXT_TMP_CODE_TO_COMPILE__}%
+          \endgroup%
+        },
+        #1-recompile,
+        #1/.style={
+          recompile/.style={#1-recompile},% importantly, the cached code is always run in a group, so this does not change the compilation command of other pictures
+          __ROBEXT_TMP_CODE_TO_RUN__
+        },%
+      }%
+    }%
+    \robExtRemovePlaceholder{__ROBEXT_TMP_CODE_TO_RUN__}% let us clean our variables
+    \robExtRemovePlaceholder{__ROBEXT_TMP_CODE_TO_COMPILE__}% let us clean our variables
+  },
   % reset the main content to the main content orig
   % Use case: e.g. tikz will wrap automatically its code in \begin{tikzpicture}
   % but this should not be set in a command. So we can use \cacheMe{tikz, in command}{\tikz\node{A};}
@@ -1000,25 +1180,91 @@ if __name__ == '__main__':
     remove placeholder/.list={#1},
   },
   set placeholder/.code 2 args={\robExtSetPlaceholder{#1}{#2}},
+  % do not import the placeholder (useful for efficiency reasons)
+  set placeholder no import/.code 2 args={\robExtSetPlaceholder*{#1}{#2}},
+  clear imported placeholders/.code={\robExtClearImportedPlaceholders},
+  remove imported placeholder/.code={\robExtRemoveImportedPlaceholder{#1}},
+  remove imported placeholders/.style={
+    remove imported placeholder/.list={#1},
+  },
+  keep placeholder after group/.code={\robExtKeepPlaceholderAfterGroup{#1}},
+  import placeholder/.code={\robExtImportPlaceholder{#1}},
+  import all placeholders/.code={\robExtImportAllPlaceholders},
+  import placeholders/.style={
+    import placeholder/.list={#1},
+  },
+  import placeholder first/.code={\robExtImportPlaceholder{#1}},
+  %% If all placeholders have __, this option will speed up the compilation time
+  all placeholders have underscores/.code={\def\robExtPlaceholderOnlyWithUnderscores{}},
+  not all placeholders have underscores/.code={\let\robExtPlaceholderOnlyWithUnderscores\undefined},
+  enable import mechanism/.code={\def\robExtEnableImportMechanism{}},
+  disable import mechanism/.code={\let\robExtEnableImportMechanism\undefined},
+  disable optimizations/.style={
+    not all placeholders have underscores,
+    disable import mechanism,
+  },
+  enable optimizations/.style={
+    all placeholders have underscores,
+    enable import mechanism,
+  },
+  disable optimizations,
   set main content/.style={
     set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#1}
   },
   show placeholder/.code={\robExtShowPlaceholder*{#1}},
   copy placeholder/.code 2 args={\robExtCopyPlaceholder{#1}{#2}},
   set placeholder rec/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}},
+  set placeholder rec keep after group/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}\robExtKeepPlaceholderAfterGroup{#1}},
+  save compiled template in/.style={
+    set placeholder rec keep after group={#1}{__ROBEXT_TEMPLATE__},
+  },
+  save compiled compilation command in/.style={
+    set placeholder rec keep after group={#1}{__ROBEXT_COMPILATION_COMMAND__},
+  },
+  reuse compiled template/.style={
+    import placeholders={#1},
+    set template={#1},
+  },
+  reuse compiled command/.style={
+    import placeholders={#1},
+    set compilation command={#1},
+  },
+  import default placeholder at the right time/.style={
+    run before compilation/.style={
+      %import placeholders={__ROBEXT_TEMPLATE_COMPILED_LATEX__,__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__},
+    },
+    run before template/.style={
+      import placeholders={__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
+    },
+    run before include command/.style={
+      import placeholders={__ROBEXT_INCLUDEGRAPHICS_OPTIONS__,__ROBEXT_INCLUDEGRAPHICS_FILE__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_WAY_BACK__,__ROBEXT_CACHE_FOLDER__}
+    },    
+  },
+  set placeholder rec no import/.code 2 args={\robExtSetPlaceholderRec*{#1}{#2}},
   set placeholder rec replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}},
+  set placeholder rec replace from list no import/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList*{#1}{#2}{#3}},
   set placeholder eval/.code 2 args={\robExtSetPlaceholderRec{#1}{#2}\robExtEvalPlaceholderInplace{#1}},
+  set placeholder eval no import/.code 2 args={\robExtSetPlaceholderRec*{#1}{#2}\robExtEvalPlaceholderInplace{#1}},
   set placeholder eval replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}\robExtEvalPlaceholderInplace{#2}},
+  set placeholder eval replace from list no import/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList*{#1}{#2}{#3}\robExtEvalPlaceholderInplace{#2}},
   eval placeholder/.code={\robExtEvalPlaceholder{#1}},
   eval placeholder replace from list/.code 2 args={\robExtEvalPlaceholderReplaceFromList{#1}{#2}},
   set placeholder from content/.code 2 args={\robExtPlaceholderFromContent{#1}{#2}},
+  set placeholder from content no import/.code 2 args={\robExtPlaceholderFromContent*{#1}{#2}},
   add to placeholder/.code 2 args={\robExtAddToPlaceholder{#1}{#2}},
+  add to placeholder no import/.code 2 args={\robExtAddToPlaceholderNoImport{#1}{#2}},
   add to placeholder no space/.code 2 args={\robExtAddToPlaceholder*{#1}{#2}},
+  add to placeholder no space no import/.code 2 args={\robExtAddToPlaceholderNoImport*{#1}{#2}},
   add before placeholder/.code 2 args={\robExtAddBeforePlaceholder{#1}{#2}},
   add before placeholder no space/.code 2 args={\robExtAddBeforePlaceholder*{#1}{#2}},
+  add before placeholder no import/.code 2 args={\robExtAddBeforePlaceholderNoImport{#1}{#2}},
+  add before placeholder no space no import/.code 2 args={\robExtAddBeforePlaceholderNoImport*{#1}{#2}},
   set placeholder path from filename/.code 2 args={\robExtPlaceholderPathFromFilename{#1}{#2}},
+  set placeholder path from filename no import/.code 2 args={\robExtPlaceholderPathFromFilename*{#1}{#2}},
   set placeholder from file content/.code 2 args={\robExtPlaceholderFromFileContent{#1}{#2}},
+  set placeholder from file content no import/.code 2 args={\robExtPlaceholderFromFileContent*{#1}{#2}},
   set placeholder path from content/.code n args={3}{\robExtPlaceholderPathFromContent{#1}[#3]{#2}},
+  set placeholder path from content no import/.code n args={3}{\robExtPlaceholderPathFromContent*{#1}[#3]{#2}},
   eval placeholder in place/.code={\robExtEvalPlaceholderInplace{#1}},
   placeholder halve number hashes in place/.code={\robExtPlaceholderHalveNumberHashesInplace{#1}},
   placeholder double number hashes in place/.code={\robExtPlaceholderDoubleNumberHashesInplace{#1}},
@@ -1160,7 +1406,9 @@ if __name__ == '__main__':
   \ifdefined\robExtDisableExternalization%
     \pgfkeys{
       /robExt/.cd,
-      command if no externalization
+      run before no externalization,
+      /utils/exec={\ifdefined\robExtEnableImportMechanism\else\robExtImportAllPlaceholders\fi},
+      command if no externalization,
     }%
   \else%
     \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
@@ -1170,6 +1418,7 @@ if __name__ == '__main__':
     \ifdefined\robExtExecuteNamedOutput\robExtExecuteNamedOutput\fi%
     \ifdefined\robExtExecuteAfter\robExtExecuteAfter\fi%
   \fi%
+  \message{Finished to include the file.}%
 }
 
 %% #1: Arguments, #2: content to externalize
@@ -1227,6 +1476,15 @@ if __name__ == '__main__':
 
 %%%%  Available in all styles
 \robExtConfigure{
+  all placeholders have underscores,
+  run early before compilation/.style={},
+  run before compilation/.style={},
+  run after compilation/.style={},
+  run before template/.style={},
+  run after template/.style={},
+  run before include command/.style={},
+  run after include command/.style={},
+  run before no externalization/.style={},
   set includegraphics options/.style={
     set placeholder={__ROBEXT_INCLUDEGRAPHICS_OPTIONS__}{#1},
   },
@@ -1281,17 +1539,17 @@ if __name__ == '__main__':
 
 
 %%%% For LaTeX codes
+% the star does not import the placeholder. Needed for efficiency reasons
+\setPlaceholder*{__ROBEXT_LATEX_OPTIONS__}{}
+\setPlaceholder*{__ROBEXT_DOCUMENT_CLASS__}{standalone}
+\setPlaceholder*{__ROBEXT_PREAMBLE__}{}
+\setPlaceholder*{__ROBEXT_PREAMBLE_HYPERREF__}{}
+\setPlaceholder*{__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{}
+\setPlaceholder*{__ROBEXT_INCLUDEGRAPHICS_OPTIONS__}{}
+\setPlaceholder*{__ROBEXT_INCLUDEGRAPHICS_FILE__}{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}
+\setPlaceholder*{__ROBEXT_LATEX_TRIM_LENGTH__}{30cm}
 
-\setPlaceholder{__ROBEXT_LATEX_OPTIONS__}{}
-\setPlaceholder{__ROBEXT_DOCUMENT_CLASS__}{standalone}
-\setPlaceholder{__ROBEXT_PREAMBLE__}{}
-\setPlaceholder{__ROBEXT_PREAMBLE_HYPERREF__}{}
-\setPlaceholder{__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{}
-\setPlaceholder{__ROBEXT_INCLUDEGRAPHICS_OPTIONS__}{}
-\setPlaceholder{__ROBEXT_INCLUDEGRAPHICS_FILE__}{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}
-\setPlaceholder{__ROBEXT_LATEX_TRIM_LENGTH__}{30cm}
-
-\begin{PlaceholderFromCode}{__ROBEXT_LATEX__}
+\begin{RobExtPlaceholderFromCode}*{__ROBEXT_LATEX__}
 \documentclass[__ROBEXT_LATEX_OPTIONS__]{__ROBEXT_DOCUMENT_CLASS__}
 __ROBEXT_PREAMBLE__
 % most packages must be loaded before hyperref
@@ -1302,9 +1560,9 @@ __ROBEXT_PREAMBLE_AFTER_HYPERREF__
 \begin{document}%
 __ROBEXT_MAIN_CONTENT_WRAPPED__
 \end{document}
-\end{PlaceholderFromCode}
+\end{RobExtPlaceholderFromCode}
 
-\begin{PlaceholderFromCode}{__ROBEXT_MAIN_CONTENT_WRAPPED__}
+\begin{PlaceholderFromCode}*{__ROBEXT_MAIN_CONTENT_WRAPPED__}
 __ROBEXT_CREATE_OUT_FILE__%
 \newsavebox\boxRobExt%
 \begin{lrbox}{\boxRobExt}%
@@ -1314,13 +1572,13 @@ __ROBEXT_CREATE_OUT_FILE__%
 __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
 \end{PlaceholderFromCode}
 
-\begin{PlaceholderFromCode}{__ROBEXT_CREATE_OUT_FILE__}
+\begin{PlaceholderFromCode}*{__ROBEXT_CREATE_OUT_FILE__}
 %% We save the height/depth of the content by using a savebox:
 \newwrite\writeRobExt%
 \immediate\openout\writeRobExt=\jobname-out.tex%
 \end{PlaceholderFromCode}
 
-\begin{PlaceholderFromCode}{__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__}
+\begin{PlaceholderFromCode}*{__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__}
 \immediate\write\writeRobExt{%
   \string\def\string\robExtWidth{\the\wd\boxRobExt}%
   \string\def\string\robExtHeight{\the\ht\boxRobExt}%
@@ -1328,14 +1586,58 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
 }%
 \end{PlaceholderFromCode}
 
+\robExtConfigure{
+  % Order matters for efficiency: first to be expanded must appear first
+  import latex placeholders/.style={
+    import placeholders={__ROBEXT_LATEX__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_DOCUMENT_CLASS__,__ROBEXT_PREAMBLE__,__ROBEXT_PREAMBLE_HYPERREF__,__ROBEXT_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_MAIN_CONTENT_WRAPPED__,__ROBEXT_CREATE_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT_ORIG__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_WAY_BACK__,__ROBEXT_CACHE_FOLDER__},
+  },
+  import latex include command placeholders/.style={
+    remove imported placeholders={__ROBEXT_LATEX__,__ROBEXT_PREAMBLE__,__ROBEXT_PREAMBLE_HYPERREF__,__ROBEXT_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_MAIN_CONTENT_WRAPPED__,__ROBEXT_CREATE_OUT_FILE__,__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__},
+    import placeholders={__ROBEXT_INCLUDEGRAPHICS_OPTIONS__,__ROBEXT_INCLUDEGRAPHICS_FILE__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_WAY_BACK__,__ROBEXT_CACHE_FOLDER__},
+  },
+}
+
+
+
 %% Compilation commands
 \setPlaceholder{__ROBEXT_COMPILATION_COMMAND_LATEX__}{__ROBEXT_LATEX_ENGINE__ __ROBEXT_COMPILATION_COMMAND_OPTIONS__ "__ROBEXT_SOURCE_FILE__"}
 \setPlaceholder{__ROBEXT_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error}
 \setPlaceholder{__ROBEXT_LATEX_ENGINE__}{pdflatex}
 
 \robExtConfigure{
+  % Order matters for efficiency: first to be expanded must appear first
+  import latex compilation placeholders/.style={
+    import placeholders={__ROBEXT_COMPILATION_COMMAND__,__ROBEXT_COMPILATION_COMMAND_LATEX__,__ROBEXT_COMPILATION_COMMAND_OPTIONS__,__ROBEXT_LATEX_ENGINE__,__ROBEXT_CACHE_FOLDER__,__ROBEXT_WAY_BACK__},
+  },
+  import latex no externalization placeholders/.style={
+    import placeholders={___ROBEXT_MAIN_CONTENT___,__ROBEXT_MAIN_CONTENT_ORIG__},
+  },
+}
+
+
+\robExtConfigure{
   % some useful presets
   latex/.style={
+    /utils/exec={%
+      \ifdefined\robExtEnableImportMechanism%
+        \robExtConfigure{%
+          clear imported placeholders,
+          set placeholder={__ROBEXT_MAIN_CONTENT__}{__ROBEXT_MAIN_CONTENT_ORIG__},
+          run before compilation/.style={
+            import latex compilation placeholders,
+          },
+          run before template/.style={
+            import latex placeholders,
+          },
+          run before include command/.style={
+            import latex include command placeholders
+          },
+          run before no externalization/.style={
+            import latex no externalization placeholders,
+          },
+        }%
+      \fi%
+    },
     set template={__ROBEXT_LATEX__},
     set compilation command={__ROBEXT_COMPILATION_COMMAND_LATEX__},
     %% Configure the latex compilation engine
@@ -1398,6 +1700,99 @@ __ROBEXT_WRITE_DEPTH_TO_OUT_FILE__%
   tikzpicture/.style={
     tikz,
     set placeholder={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}__ROBEXT_MAIN_CONTENT_ORIG__\end{tikzpicture}},
+  },
+}
+
+
+\robExtConfigure{
+  new compiled preset={compiled latex}{
+    latex,
+    import all placeholders,
+    % import placeholders={__ROBEXT_LATEX__},
+    set placeholder rec keep after group={__ROBEXT_TEMPLATE_COMPILED_LATEX__}{__ROBEXT_TEMPLATE__},
+    set placeholder rec keep after group={__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__}{__ROBEXT_COMPILATION_COMMAND__},
+  }{
+    clear imported placeholders,
+    % We import the placeholders we want to use
+    import placeholders={__ROBEXT_TEMPLATE_COMPILED_LATEX__,__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__},
+    set template={__ROBEXT_TEMPLATE_COMPILED_LATEX__},
+    set compilation command={__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__},
+    %show placeholder={__ROBEXT_TEMPLATE_COMPILED_LATEX__},
+    %show placeholder={__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__},
+    run before compilation/.style={
+      import placeholders={__ROBEXT_TEMPLATE_COMPILED_LATEX__,__ROBEXT_COMPILATION_COMMAND_COMPILED_LATEX__},
+    },
+    run before template/.style={
+      import placeholders={__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
+    },
+    run before include command/.style={
+      import placeholders={__ROBEXT_INCLUDEGRAPHICS_OPTIONS__,__ROBEXT_INCLUDEGRAPHICS_FILE__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_WAY_BACK__,__ROBEXT_CACHE_FOLDER__}
+    },
+    %% Configure the latex compilation engine
+    use latexmk/.style={
+      set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
+      recompile,
+    },
+    use lualatex/.style={
+      set placeholder={__ROBEXT_LATEX_ENGINE__}{lualatex},
+      recompile,
+    },
+    use xelatex/.style={
+      set placeholder={__ROBEXT_LATEX_ENGINE__}{xelatex},
+      recompile,
+    },
+    set latex options/.style={
+      set placeholder={__ROBEXT_LATEX_OPTIONS__}{#1},
+      recompile,
+    },
+    add to latex options/.style={
+      add to placeholder no space={__ROBEXT_LATEX_OPTIONS__}{,#1},
+      recompile,
+    },
+    set documentclass/.style={
+      set placeholder={__ROBEXT_DOCUMENT_CLASS__}{#1},
+      recompile,
+    },
+    set preamble/.style={
+      set placeholder={__ROBEXT_PREAMBLE__}{#1},
+      recompile,
+    },
+    add to preamble/.style={
+      add to placeholder={__ROBEXT_PREAMBLE__}{#1},
+      recompile,
+    },
+    add before main content/.style={
+      add before placeholder no space={__ROBEXT_MAIN_CONTENT__}{#1},
+      recompile,
+    },
+    add before preamble/.style={
+      add before placeholder={__ROBEXT_PREAMBLE__}{#1},
+      recompile,
+    },
+    set preamble hyperref/.style={
+      set placeholder={__ROBEXT_PREAMBLE_HYPERREF__}{#1},
+      recompile,
+    },
+    add to preamble hyperref/.style={
+      add to placeholder={__ROBEXT_PREAMBLE_HYPERREF__}{#1},
+      recompile,
+    },
+    set preamble after hyperref/.style={
+      set placeholder={__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{#1},
+      recompile,
+    },
+    add to preamble after hyperref/.style={
+      add to placeholder={__ROBEXT_PREAMBLE_AFTER_HYPERREF__}{#1},
+      recompile,
+    },
+    do not wrap code/.style={
+      set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__},
+      recompile,
+    },
+    do not add margins/.style={
+      set placeholder={__ROBEXT_LATEX_TRIM_LENGTH__}{0cm},
+      recompile,
+    },
   },
 }
 
