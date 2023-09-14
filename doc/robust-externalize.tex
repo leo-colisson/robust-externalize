@@ -26,6 +26,7 @@
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
+
 %% For verbatim environments:
 
 \NewDocumentEnvironment{codeAndResult}{}{\XSIMfilewritestart{\jobname-codeAndResult-tmp-file-you-can-remove.tmp}}%
@@ -103,7 +104,7 @@
 
 \textbf{WARNING: This library is young and has not been tested extensively (and is an important rewrite of a previous version). Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}, or let us know if it works!}
 
-\textbf{WARNING 2: Since we rewrote the library to use placeholders, the library is significantly slower (7 times slower!). I need to understand why, and see how to fix it. Hopefully I can fix it without important change, but it might introduce backward-incompatible changes in the future. So do not consider this version as stable, and definitely copy the .sty file if you plan to use it.}
+\textbf{WARNING 2: the coming version 1.1 improves significantly the compilation time compared with 1.0 that was surprisingly slow. Now, it is fairly well optimized (but the code needs a bit of cleaning and documentation before doing an official release)}
 
 
 \section{A taste of this library}
@@ -259,28 +260,37 @@ Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing 
 
 \paragraph{Do you have some benchmarks?}
 
-We benchmarked the library before a major rewrite introducing placeholders (benchmark was in commit \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{09a05a86ec9c04eb6687b75831ebb84185786ac5}), and the library was performing really well. On an early draft of a small paper containing 76 small tikz-cd based pictures (from my other zx-calculus library), we measured on a first version of this library:
+We completely rewrote the \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{original library} to introduce the notion of placeholders (before, the template was fixed forever), allowing for greater flexibility. The original rewrite (1.0) had really poor performance compared to the original library (only x3 improvement compared to no externalization, while the old library could be 20x faster), but we made some changes (v1.1) that correct this issue. Here is a benchmark we made on an article with 159 small pictures (ZX diagrams from the zx-calculus library):
 \begin{itemize}
-\item 35 seconds for a normal compilation without externalization
-\item 75 seconds for the first compilation with this library
-\item 2.4 seconds for the next runs
+\item without externalization: 1mn25
+\item with externalization, v1.1 (first run): 3mn05, so x2
+\item with externalization, v1.1 (next runs): 5.77s (it is 15x times faster)
+\item with externalization, v1.1, with a ``compiled'' template (less flexible) like in the old version: 4.0s (22x faster)
+\item with externalization, old library (next runs): 4.16s (so 21x faster)
 \end{itemize}
-So during the first compilation, we lost a x2 factor (roughly an additional time of .5 seconds per picture coming from the time to start \LaTeX{}, it seems like on average a picture takes .5 seconds to be built in my benchmark), but then we have a speedup of x15 (2.43s instead of 34.63s) for all subsequent runs. And I expect this to be even higher with more pictures and more complex documents.
 
-BUT on the latest version 1.0+unstable, the benchmark it actually not as good. Tested on a different file with 318 pictures:
+If you are worried by the time taken for the first run, you can also run it in manual mode and use for instance GNU |parallel| (or any tool of you choice) to run all commands in the file |\jobname-robExt-compile-missing-figures.sh| in parallel. To do that:
 \begin{itemize}
-\item without externalization: 1mn36
-\item with externalization (first run): 3mn25, more or less like in the original case
-\item with externalization (next runs): 20 seconds (hum… not really good, it is only 5x times faster)
-\item with |enable optimizations| enabled (next runs): 12 seconds (better, 8x faster), but can certainly do better
-\item with old version (next runs): 3.74 seconds (hum… why is the old version so much faster, it is 25x faster here!)
+\item First add |\robExtConfigure{enable manual mode}| in your file
+\item Create the cache folder, e.g.\ using |mkdir robustExternalize|
+\item Compile your file, with, e.g.\ |pdflatex yourfile.tex| (in my benchmark: 4.2s)
+\item This should create a file |yourfile-robExt-compile-missing-figures.sh|, with each line containing a compilation command like this (the command should be compatible with Windows, Mac and Linux, if not, let me know on github):
+\begin{verbatim}
+cd robustExternalize/ && pdflatex -halt-on-error "robExt-4A806941E86C6B657A0CB3D160CFFF3E.tex
+\end{verbatim}
+  \textbf{IMPORTANT}: \LaTeX{} might render \textbf{multiple times} the same picture if it is inside some particular environments (align, tables\dots), so this file can contain duplicates if you inserted cached data inside. To avoid running the same command twice, \textbf{be sure to remove duplicates!} On Linux, this can be done by piping the file into |sort| and |uniq| (if your files can depend on previously compiled elements as explained in \cref{sec:passOutputToOtherTemplate}, you should additionally preserve \mylink{https://unix.stackexchange.com/questions/194780/remove-duplicate-lines-while-keeping-the-order-of-the-lines}{the order of the lines}). Since this is anyway a rather advanced use case, we will not consider that case for simplicity.
+\item Run all these command in parallel, for instance on Linux you can install |parallel|, and run the following command (|--bar| displays a progress bar):
+\begin{verbatim}
+cat yourfile-robExt-compile-missing-figures.sh | sort | uniq | parallel --bar --jobs '200%'  
+\end{verbatim}
+(in my benchmark, it ran during 52s, so 1.6x faster than the original compilation)
+\item Recompile the original document with |pdflatex yourfile.tex|
 \end{itemize}
-After some experimentation, it seems like \LaTeX{} is really slow with string manipulations. The old version was doing a single rewrite of the string, while we do much more rewrite due to the placeholder system: it is much more flexible, but
-
+In my benchmark, the total time is 2x4.2s + 52s = 60s, so 1.5 times faster than a normal command (of course, this depends a lot on the preamble of the file that you compile, since the loading time of the file is the main bottleneck for the first compilation; the advantage here is that it is easy to include only the necessary things in the preamble, possibly creating different presets if it is easier to manage it this way).
 
 \paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
 
-\paragraph{Can you deal with baseline position ?} Yes, the depth of the box is automatically computed and used to include the figure by default.
+\paragraph{Can I deal with baseline position ?} Yes, the depth of the box is automatically computed and used to include the figure by default.
 
 \paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command and the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
 
@@ -595,6 +605,38 @@ We compute this data that is long to compute:
 
 We computed the cached value \myLongResult.
 \end{codeexample}
+
+\subsubsection{Compile a presete}
+
+Long story short: you can compile even faster (around 1.5x in our tests) by compiling presets, but beware that you will not be able to modify the placeholders except |add to preamble| with the default compiler we provide:
+
+\begin{codeexample}[vbox]
+ % We create a latex-based preset and compile it
+\robExtConfigure{
+  new preset={templateZX}{
+    latex,
+    add to preamble={
+      \usepackage{tikz}
+      \usepackage{tikz-cd}
+      \usepackage{zx-calculus}
+    },
+    %% possibly add some dependencies
+  },
+  % We compile it into a new preset
+  new compiled preset={compiled ZX}{templateZX, compile latex template}{},
+}
+
+% we use that preset automatically for ZX environments
+\cacheEnvironment{ZX}{compiled ZX}
+\cacheCommand{zx}{compiled ZX}
+
+% Usage: (you can't use placeholders except for the preamble, trade-off of the compiled template)
+\begin{ZX}<add to preamble={\def\sayHey#1{Hey #1!}}>
+  \zxX{\sayHey{Bob}}
+\end{ZX}
+\end{codeexample}
+
+For details, see \cref{sec:compileFaster}.
 
 \subsection{For non-\LaTeX{} code}
 
@@ -2036,7 +2078,7 @@ Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache
 \end{pgfmanualentry}
 
 
-\subsubsection{Pass compiled file to another template}
+\subsubsection{Pass compiled file to another template}\label{sec:passOutputToOtherTemplate}
 
 It can sometimes be handy to use the result of a previous cached file to cache another file, or to do anything else (e.g.\ it can also be practical to debug an issue). |name output| can be used to do that
 \begin{pgfmanualentry}
@@ -2068,6 +2110,52 @@ Note that if you do not want to display the first cached file, you can use |do n
 
 \end{pgfmanualentry}
 
+\subsubsection{Compile even faster}\label{sec:compileFaster}
+
+Long story short: you can compile even faster (around 1.5x in our tests) by compiling presets, but beware that you will not be able to modify the placeholders except |add to preamble| with the default compiler we provide:
+
+\begin{codeexample}[vbox]
+ % We create a latex-based preset and compile it
+\robExtConfigure{
+  new preset={templateZX}{
+    latex,
+    add to preamble={
+      \usepackage{tikz}
+      \usepackage{tikz-cd}
+      \usepackage{zx-calculus}
+    },
+    %% possibly add some dependencies
+  },
+  % We compile it into a new preset
+  new compiled preset={compiled ZX}{templateZX, compile latex template}{},
+}
+
+% we use that preset automatically for ZX environments
+\cacheEnvironment{ZX}{compiled ZX}
+\cacheCommand{zx}{compiled ZX}
+
+% Usage: (you can't use placeholders except for the preamble, trade-off of the compiled template)
+\begin{ZX}<add to preamble={\def\sayHey#1{Hey #1!}}>
+  \zxX{\sayHey{Bob}}
+\end{ZX}
+\end{codeexample}
+
+Explanations: in v1.1, we made substantial improvements in order to improve significantly the compilation time (our benchmark went from 20s (v1.0) to only 5.77s (v1.1)), but you might want to make this even faster: with a compiled preset, you can improve it further, experimentation showed an additional improvement factor of 1.4x (final compilation time was 4s in our tests, reminder: without the library it would take 1mn25s). The main bottleneck in term of time is the expansion of the placeholders (that allows great flexibility, but can add a significant time). At a high level, we keep track in a list of all declared placeholders, and loop over them to replace each of them until the string is left unmodified by a full turn. This is simple to implement, does not need to assume any shape for the placeholder\dots{} but not extremely efficient in \LaTeX{} where string and list manipulations are costly.
+
+We can play on multiple parameters to speed up the process:
+\begin{itemize}
+\item Disable completely the placeholders and only replace a small amount of fixed placeholders in a fixed order and stop expanding the placeholder. This is what we do by default when we compile a preset: it is the quickest solution, but you cannot use arbitrary placeholders.
+\item Start the expansion using a fixed (preset-dependent) list of placeholders, check if some templates are still present (assuming that templates must contain at least two consecutive underscores |__|), if not stop, otherwise go to the normal (less efficient) placeholder replacement. It is what we do for instance in the latex preset, and gives a great balance between efficiency and flexibility.
+\item Stop iterating over all placeholders, only choose the one meaningful (why would I care about python placeholders in latex?). For this, we introduce an import system, where you can create placeholders that are not added to the ``global'' list of placeholders, and import them where you want. In practice, you should not really need to use it unless you do more advanced stuff.
+\end{itemize}
+Another option could be to rewrite the code to search directly the list of placeholders in the string, but it is certainly not trivial to do in latex, would require even more constraints on the shape of placeholders, and would certainly still be slower than compiled stuff. But anyway the already implemented solutions already give fairly good performances.
+
+\paragraph{Compile a preset.}
+
+Todo: see example above.
+
+\paragraph{Compilation.}
+\paragraph{Compilation.}
 
 \subsection{Default presets}\label{sec:presets}
 
@@ -2742,6 +2830,8 @@ You can also use |debug| (or its alias |print command and source|) in order to d
 \begin{itemize}
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
+\item I tried many different options to optimize the compilation time, so the code is a bit cluttered now. Would be cool to reorganize.
+\item Update the doc with compilation, import, etc.
 \end{itemize}
 
 \section{Acknowledgments}
@@ -2764,6 +2854,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Allow restricted mode
   \item |debug| mode available
   \item Rename |set subfolder and way back| to |set cache folder and way back| (in a backward compatible way)
+  \item Waaaaaaay more efficient. Also added a method to compile presets.
   \end{itemize}
 \end{itemize}
 
