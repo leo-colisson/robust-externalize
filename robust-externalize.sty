@@ -1002,7 +1002,7 @@ if __name__ == '__main__':
     \seq_put_left:cn {l_robExt_placeholder_group_#1_seq} {##1}
   }
 }
-\let\addPlaceholderToGroupBefore\robExtAddPlaceholderToGroupBefore
+\let\addPlaceholdersToGroupBefore\robExtAddPlaceholdersToGroupBefore
 
 \NewDocumentCommand{\robExtRemovePlaceholdersFromGroup}{mm}{
   % Make sure we have a string here:
@@ -1017,11 +1017,12 @@ if __name__ == '__main__':
   }
 }
 \let\removePlaceholdersFromGroup\robExtRemovePlaceholdersFromGroup
+\let\removePlaceholderFromGroup\robExtRemovePlaceholdersFromGroup
 
 \NewDocumentCommand{\robExtClearGroupPlaceholders}{m}{
   \seq_clear_new:c {l_robExt_placeholder_group_#1_seq}
 }
-\let\clearGroupPlaceholder\robExtClearGroupPlaceholders
+\let\clearGroupPlaceholders\robExtClearGroupPlaceholders
 
 \NewDocumentCommand{\robExtCopyGroupPlaceholders}{mm}{
   \seq_set_eq:cc {l_robExt_placeholder_group_#1_seq} {l_robExt_placeholder_group_#2_seq}
@@ -1034,7 +1035,7 @@ if __name__ == '__main__':
     \seq_put_right:cn {l_robExt_placeholder_group_#1_seq} {##1}
   } 
 }
-\let\copyGroupPlaceholders\robExtCopyGroupPlaceholders
+\let\appendGroupPlaceholders\robExtAppendGroupPlaceholders
 
 \NewDocumentCommand{\robExtAppendBeforeGroupPlaceholders}{mm}{
   \seq_eq:Nc \l_robExt_tmp_seq {l_robExt_placeholder_group_#2_seq}
@@ -1044,7 +1045,7 @@ if __name__ == '__main__':
     \seq_put_left:cn {l_robExt_placeholder_group_#1_seq} {##1}
   }
 }
-\let\copyGroupPlaceholders\robExtCopyGroupPlaceholders
+\let\appendBeforeGroupPlaceholders\robExtAppendBeforeGroupPlaceholders
 
 \NewDocumentCommand{\robExtImportPlaceholdersFromGroup}{m}{
   \robExtAppendGroupPlaceholders{main}{#1}
@@ -1052,7 +1053,7 @@ if __name__ == '__main__':
 \let\importPlaceholdersFromGroup\robExtImportPlaceholdersFromGroup
 
 \NewDocumentCommand{\robExtImportAllPlaceholders}{}{
-  \seq_map_inline:Nn \l_robExt_list_groups {
+  \seq_map_inline:Nn \l_robExt_list_groups_seq {
     \robExtImportPlaceholdersFromGroup{##1}
   }
 }
@@ -1061,19 +1062,19 @@ if __name__ == '__main__':
 %%%% List groups, mostly for debugging purpose
 %%%%
 
-\seq_new:N \l_robExt_list_groups % contains the list of all groups
+\seq_new:N \l_robExt_list_groups_seq % contains the list of all groups
 
 \NewDocumentCommand{\robExtRegisterGroupPlaceholders}{m}{
   \seq_if_exist:cTF {l_robExt_placeholder_group_#1_seq}{}{
     \seq_clear_new:c {l_robExt_placeholder_group_#1_seq}
   }
-  \seq_put_right:Nn \l_robExt_list_groups {#1}
+  \seq_put_right:Nn \l_robExt_list_groups_seq {#1}
 }
 \let\registerGroupPlaceholders\robExtRegisterGroupPlaceholders
 \let\newGroupPlaceholders\robExtRegisterGroupPlaceholders
 
 \NewDocumentCommand{\robExtShowAllRegisteredGroupsAndPlaceholders}{s}{%
-  \seq_map_inline:Nn \l_robExt_list_groups {%
+  \seq_map_inline:Nn \l_robExt_list_groups_seq {%
     \message{^^J- Group ##1: ^^J}%
     \seq_map_inline:cn {l_robExt_placeholder_group_##1_seq} {%
       \message{, ####1 }%
@@ -1088,14 +1089,14 @@ if __name__ == '__main__':
 \let\showAllRegisteredGroupsAndPlaceholders\robExtShowAllRegisteredGroupsAndPlaceholders
 
 \NewDocumentCommand{\robExtPrintAllRegisteredGroups}{s}{%
-  \seq_map_inline:Nn \l_robExt_list_groups {%
+  \seq_map_inline:Nn \l_robExt_list_groups_seq {%
     \texttt{##1}\par
   }
 }
 \let\printAllRegisteredGroups\robExtPrintAllRegisteredGroups
 
 \NewDocumentCommand{\robExtPrintAllRegisteredGroupsAndPlaceholders}{s}{%
-  \seq_map_inline:Nn \l_robExt_list_groups {%
+  \seq_map_inline:Nn \l_robExt_list_groups_seq {%
     - ~ Group \texttt{##1}:\par
     \seq_map_inline:cn {l_robExt_placeholder_group_##1_seq} {%
       Placeholder \texttt{####1}%
@@ -1763,9 +1764,17 @@ if __name__ == '__main__':
   remove imported placeholders/.style={
     remove imported placeholder/.list={#1},
   },
+  print group placeholders/.code={\robExtPrintGroupPlaceholders{#1}},
   new group placeholders/.code={\robExtRegisterGroupPlaceholders{#1}},
   add placeholder to group/.code 2 args={\robExtAddPlaceholdersToGroup{#1}{#2}},
   add placeholders to group/.code 2 args={\robExtAddPlaceholdersToGroup{#1}{#2}},
+  remove placeholder from group/.code 2 args={\robExtRemovePlaceholdersFromGroup{#1}{#2}},
+  remove placeholders from group/.code 2 args={\robExtRemovePlaceholdersFromGroup{#1}{#2}},
+  copy group placeholders/.code 2 args={\robExtCopyGroupPlaceholders{#1}{#2}},
+  append group placeholders/.code 2 args={\robExtAppendGroupPlaceholders{#1}{#2}},
+  append before group placeholders/.code 2 args={\robExtAppendGroupPlaceholders{#1}{#2}},
+  import placeholders from group/.code={\robExtImportPlaceholdersFromGroup{#1}},
+  import all placeholders/.code={\robExtImportAllPlaceholders},
   % ok this is a different kind of group, here latex group { }
   import placeholder/.code={\robExtImportPlaceholder{#1}},
   import all placeholders/.code={\robExtImportAllPlaceholders},

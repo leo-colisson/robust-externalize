@@ -102,14 +102,14 @@
 
 \bigskip
 
-\textbf{WARNING: This library is young and might lack some testing (and is an important rewrite of a previous version), but v1.1 is definitely usable. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
+\textbf{WARNING: This library is young and might lack some testing (and is an important rewrite of a previous version), but v2.0 is definitely usable. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
 
-\textbf{WARNING 2: the coming version 1.1 improves significantly the compilation time compared with 1.0 that was surprisingly slow. Now, it is fairly well optimized (but the code needs a bit of cleaning and documentation before doing an official release)}
+\textbf{WARNING 2: the coming version 2.0 improves significantly the compilation time compared with 1.0 that was surprisingly slow. Now, it is fairly well optimized (but the code needs a bit of cleaning and documentation before doing an official release)}
 
 
 \section{A taste of this library}
 
-This library allows you to cache any language: not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays, but also arbitrary code. To use it, make sure to have v1.1 installed (see instructions below), and load:
+This library allows you to cache any language: not only \LaTeX{} documents and \tikzname{} images, taking into account depth and overlays, but also arbitrary code. To use it, make sure to have v2.0 installed (see instructions below), and load:
 \begin{verbatim}
 \usepackage{robust-externalize}
 \robExtConfigure{
@@ -324,7 +324,7 @@ Similarly, you might want to cache the result of some codes, for instance a text
 
 \paragraph{What is supported?}
 
-You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also send some data (e.g.\ : the current page) to the compiled pictures, and feed some data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}). Since v1.1, you can also cache automatically any environment.
+You can cache most things, including tikz pictures, (including ones with overlays (but not with remember picture), with depth etc.), python code etc. We tried to make the library as customizable as possible to be useful in most scenarios. You can also send some data (e.g.\ : the current page) to the compiled pictures, and feed some data back to the main document (say that you want to compute a value that takes time to compute, or compute the number of pages of the produced document in order to increase the number of pages accordingly\dots{}). Since v2.0, you can also cache automatically any environment.
 
 \paragraph{What is not supported?}
 
@@ -358,12 +358,12 @@ Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing 
 
 \paragraph{Do you have some benchmarks?}
 
-We completely rewrote the \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{original library} to introduce the notion of placeholders (before, the template was fixed forever), allowing for greater flexibility. The original rewrite (1.0) had really poor performance compared to the original library (only x3 improvement compared to no externalization, while the old library could be 20x faster), but we made some changes (v1.1) that correct this issue. Here is a benchmark we made on an article with 159 small pictures (ZX diagrams from the zx-calculus library):
+We completely rewrote the \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{original library} to introduce the notion of placeholders (before, the template was fixed forever), allowing for greater flexibility. The original rewrite (1.0) had really poor performance compared to the original library (only x3 improvement compared to no externalization, while the old library could be 20x faster), but we made some changes (v2.0) that correct this issue. Here is a benchmark we made on an article with 159 small pictures (ZX diagrams from the zx-calculus library):
 \begin{itemize}
 \item without externalization: 1mn25
-\item with externalization, v1.1 (first run, not in parallel): 3mn05, so takes twice the time; but (first run in parallel) takes 60s (so faster by a factor of 1.5).
-\item with externalization, v1.1 (next runs): 5.77s (it is 15x times faster)
-\item with externalization, v1.1, with a ``compiled'' template (less flexible) like in the old version: 4.0s (22x faster)
+\item with externalization, v2.0 (first run, not in parallel): 3mn05, so takes twice the time; but (first run in parallel) takes 60s (so faster by a factor of 1.5).
+\item with externalization, v2.0 (next runs): 5.77s (it is 15x times faster)
+\item with externalization, v2.0, with a ``compiled'' template (less flexible) like in the old version: 4.0s (22x faster)
 \item with externalization, old library (next runs): 4.16s (so 21x faster)
 \end{itemize}
 
@@ -426,7 +426,7 @@ To install the library, just copy the |robust-externalize.sty| file into the roo
 \usepackage{robust-externalize}
 \end{verbatim}
 
-If you want to display a message in the pdf on how to manually compile the file if |-shell-escape| is disabled, you can also load this configuration (only available on v1.1):
+If you want to display a message in the pdf on how to manually compile the file if |-shell-escape| is disabled, you can also load this configuration (only available on v2.0):
 
 \begin{verbatim}
 \robExtConfigure{
@@ -547,7 +547,7 @@ and you can also create a new preset, and why not mix multiple presets together:
 \end{codeexample}
 
 
-\textbf{Note:} the |add to preset| and |new preset| directives have been added in v1.1, together with the |tikzpicture| preset. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
+\textbf{Note:} the |add to preset| and |new preset| directives have been added in v2.0, together with the |tikzpicture| preset. In v1.0, you would do |tikz/.append style={...}| (and you can still do this if you prefer), the difference is that |.append style| and |.style| require the user to double all hashes like |\def\mymacro##1{Hello ##1.}| which can lead to confusing errors.
 
 You can also choose to overwrite the preset options for a single picture (or even a block of picture if you run the |\robExtConfigure| and |CacheMe| inside a group |{ ... }|):
 \begin{codeexample}[width=0pt,vbox]
@@ -700,7 +700,7 @@ We compute this data that is long to compute:
 We computed the cached value \myLongResult.
 \end{codeexample}
 
-\subsubsection{Compile a preset}\label{sec:compilePreset}
+\subsection{Compile a preset}\label{sec:compilePreset}
 
 Long story short: you can compile even faster (around 1.5x in our tests) by compiling presets, but beware that you will not be able to modify the placeholders except |add to preamble| with the default compiler we provide:
 
@@ -1018,7 +1018,7 @@ for name in ["Alice", "Bob"]:
 \end{CacheMeCode}
 }
 
-\subsubsection{Other languages}
+\subsubsection{Other languages}\label{sec:otherLanguages}
 
 We also provide support for other languages, notably |bash|, but it is relatively easy to add basic support for any new language. You only need to configure |set compilation command| to your command, |set template| to the file to compile (|__ROBEXT_MAIN_CONTENT__| contains the code typed by the user), and possibly a custom include command with |custom include command| if you do not want to do |\includegraphics| on the final pdf. For instance, to define a basic template for bash, you just need to use:
 
@@ -1244,7 +1244,7 @@ Compare with:
 \begin{pgfmanualentry}
   \extractcommand\rescanPlaceholderInVariableNoReplacement\marg{name macro}\marg{name placeholder}\@@
   \pgfmanualbody
-  (new v1.1) Create a new macro that executes the \LaTeX{} code in the placeholder.
+  (new v2.0) Create a new macro that executes the \LaTeX{} code in the placeholder.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -1263,11 +1263,12 @@ Compare with:
 
 
 \begin{pgfmanualentry}
-  \extractcommand\placeholderFromContent\marg{name placeholder}\marg{content placeholder}\@@
-  \extractcommand\setPlaceholder\marg{name placeholder}\marg{content placeholder}\@@
+  \extractcommand\placeholderFromContent\opt{*}\marg{name placeholder}\marg{content placeholder}\@@
+  \extractcommand\setPlaceholder\opt{*}\marg{name placeholder}\marg{content placeholder}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/set placeholder=\marg{name placeholder}\marg{content placeholder}\@nil
+  \extractkey/robExt/set placeholder no import=\marg{name placeholder}\marg{content placeholder}\@nil
   \extractkey/robExt/set placeholder from content=\marg{name placeholder}\marg{content placeholder}\@nil
   \makeatother%
   \pgfmanualbody
@@ -1283,7 +1284,170 @@ Compare with:
   As you can see, \textbf{the precise content is not exactly identical to the original string}: \LaTeX{} comments are removed, spaces are added after macros, some newlines are removed etc. While this is usually not an issue when dealing with \LaTeX{} code, it causes some troubles when dealing with non-\LaTeX{} code. For this reason, we define \textbf{other commands} (see for instance |PlaceholderFromCode| below) that can accept verbatim content; the downside being that \LaTeX{} forbids usage of these verbatim commands inside other macros, so you should always define them at the top level (this seems to be fundamental to how \LaTeX{} works, as any input to a macro gets interpreted first as a \LaTeX{} string, losing all comments for instance). Note that this is not as restrictive as it may sound, as it is always possible to define the needed placeholders before any macro, while using them inside the macro, possibly combining them with other placeholders (defined either before or inside the macro).
 \end{pgfmanualentry}
 
-But before seeing how to define placeholder containing arbitrary code, let us first see how we can define a placeholder recursively, by giving it a value based on its previous value (useful for instance in order to add stuff to it).
+
+\begin{pgfmanualentry}
+  \extractenvironement{PlaceholderFromCode}\opt{*}\marg{name placeholder}\@@
+  \extractenvironement{SetPlaceholderCode}\opt{*}\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  These two (aliased) environments are useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside).
+% \begin{codeexample}[width=0pt,vbox]
+%   \placeholderFromContent{__PYTHON_CODE__}{}
+%   The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__} and %
+%   after evaluation (no replacement), you get ``\evalPlaceholderNoReplacement{__LIKES__}''.
+% \end{codeexample}
+
+\begin{codeexample}[width=0pt,vbox]
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b
+\end{PlaceholderFromCode}
+\printImportedPlaceholdersExceptDefaults
+\end{codeexample}
+
+
+Note that |PlaceholderFromCode| should not be used inside other macros or inside some environments (notably the ones that need to evaluate the body of the environment, e.g. using |+b| argument or |environ|) as verbatim content is parsed first by the macro, meaning that some characters might be changed or removed. For instance, any percent character would be considered as a comment, removing the rest of the line. However, this should not be be problem if you use it outside of any macro or environment, or if you load it from a file. For instance this code:
+\begin{verbatim}
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderFromCode}
+\printImportedPlaceholdersExceptDefaults
+\end{verbatim}
+would produce:
+
+{
+\begin{PlaceholderFromCode}{__PYTHON_CODE__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderFromCode}
+\begin{codeexample}[width=0pt,vbox]
+\printImportedPlaceholdersExceptDefaults
+\end{codeexample}
+}
+Note that of course, you can define a placeholder before a macro and call it inside (explaining how we can generate this documentation).
+
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderPathFromFilename\opt{*}\marg{name placeholder}\marg{filename}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/set placeholder path from filename=\marg{name placeholder}\marg{filename}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  |\placeholderPathFromFilename{__MYLIB__}{mylib.py}| will copy |mylib.py| in the cache (setting its hash depending on its content), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the library in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderPathFromFilename{__MYLIB__}{mylib.py}
+  \printImportedPlaceholdersExceptDefaults
+  You can also get the path relative to the root folder:\\
+  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}
+\end{codeexample}
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderFromFileContent\opt{*}\marg{name placeholder}\marg{filename}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/set placeholder from file content=\marg{name placeholder}\marg{filename}\@nil
+  \extractkey/robExt/set placeholder from file content no import=\marg{name placeholder}\marg{filename}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  |\placeholderFromFileContent{__MYLIB__}{mylib.py}| will set the content of the placeholder |__MYLIB__| to the content of |mylib.py|.
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderFromFileContent{__MYLIB__}{mylib.py}
+  \printImportedPlaceholdersExceptDefaults
+\end{codeexample}
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\placeholderPathFromContent\opt{*}\marg{name placeholder}\opt{\oarg{suffix}}\marg{content}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/set placeholder path from content=\marg{name placeholder}\marg{suffix}\marg{content}\@nil
+  \extractkey/robExt/set placeholder path from content no import=\marg{name placeholder}\marg{suffix}\marg{content}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  |\placeholderPathFromContent{__MYLIB__}{some content}| will copy |some content| in a file in the cache (setting its hash depending on its content, the filename will end with |suffix| that defaults to |.tex|), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the file in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
+\begin{codeexample}[width=0pt,vbox]
+  \placeholderPathFromContent{__MYLIB__}[.py]{some contents b}
+  \printImportedPlaceholdersExceptDefaults
+  You can also get the path relative to the root folder:\\
+  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+  As a sanity check, this file contains
+  \verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
+\end{codeexample}
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractenvironement{PlaceholderPathFromCode}\opt{*}\opt{\oarg{suffix}}\marg{name placeholder}\@@
+  \pgfmanualbody
+
+  This environment is similar to |\placeholderPathFromContent| except that it accepts verbatim code (therefore \LaTeX{} comments, newlines etc. will not be removed). However, due to \LaTeX{} limitations, this environment cannot be used inside macros or some environments, or this property will not be preserved.
+  For instance, if you create your placeholder using:
+\begin{verbatim}
+\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderPathFromCode}
+\end{verbatim}
+%% The code cannot be placed inside codeexample as it needs to parse the body:
+\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
+def my_function(b): # this is a python code
+    c = {}
+    d[42] = 0
+    return b % 2
+\end{PlaceholderPathFromCode}
+You can then use it like:
+\begin{codeexample}[width=0pt,vbox]
+\printImportedPlaceholdersExceptDefaults
+You can also get the path relative to the root folder:\\
+\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
+As a sanity check, this file contains
+\verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
+\end{codeexample}
+Note that the star version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\copyPlaceholder\opt{*}\marg{new placeholder}\marg{old placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/copy placeholder=\marg{new placeholder}\marg{old placeholder}\@nil
+  \extractkey/robExt/copy placeholder no import=\marg{new placeholder}\marg{old placeholder}\@nil
+  \makeatother%
+  \pgfmanualbody
+
+  This creates a new placeholder with the content of |old placeholder|. Note that this is different from:\\
+  |\setPlaceholder{new placeholder}{old placeholder}|\\
+  because if we modify |old placeholder|, this will not affect |new placeholder|.
+\begin{codeexample}[width=0pt,vbox]
+  \setPlaceholder{__MY_CONTENT__}{Some content}
+  \copyPlaceholder{__MY_OLD_CONTENT__}{__MY_CONTENT__}
+  \setPlaceholder{__MY_CONTENT__}{The content used to be __MY_OLD_CONTENT__}
+  \printImportedPlaceholdersExceptDefaults
+\end{codeexample}
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
+\end{pgfmanualentry}
+
+Now, we see how we can define a placeholder recursively, by giving it a value based on its previous value (useful for instance in order to add stuff to it).
 
 \begin{pgfmanualentry}
   \extractcommand\setPlaceholderRec\marg{new placeholder}\marg{content with placeholder}\@@
@@ -1316,13 +1480,15 @@ The variation |\setPlaceholderRecReplaceFromList| allows us to specify a subset 
 \setPlaceholderRecReplaceFromList{__MY_PLACEHOLDER__,__NAME2__,__NAME3__}{__OTHER_PLACEHOLDER__}{Here we go: __MY_PLACEHOLDER__}
 \printImportedPlaceholdersExceptDefaults
 \end{codeexample}
-
+Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
 \end{pgfmanualentry}
 
 Note that sometimes, you might not want to use |\setPlaceholderRec| to simply append some data to the placeholder as it will also evaluate the inner placeholders (meaning that you will not be able to redefine them later). For this reason, we also provide functions to add something to the placeholder without evaluating it first:
 \begin{pgfmanualentry}
   \extractcommand\addToPlaceholder\opt{*}\marg{placeholder}\marg{content to add}\@@
+  \extractcommand\addToPlaceholderNoImport\opt{*}\marg{placeholder}\marg{content to add}\@@
   \extractcommand\addBeforePlaceholder\opt{*}\marg{placeholder}\marg{content to add}\@@
+  \extractcommand\addBeforePlaceholderNoImport\opt{*}\marg{placeholder}\marg{content to add}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/add to placeholder=\marg{name placeholder}\marg{content to add}\@nil
@@ -1330,6 +1496,11 @@ Note that sometimes, you might not want to use |\setPlaceholderRec| to simply ap
   \extractkey/robExt/add before placeholder=\marg{name placeholder}\marg{content to add}\@nil
   \extractkey/robExt/add before placeholder no space=\marg{name placeholder}\marg{content to add}\@nil
   \extractkey/robExt/add before main content=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add to placeholder no import=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add to placeholder no space no import=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before placeholder no import=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before placeholder no space no import=\marg{name placeholder}\marg{content to add}\@nil
+  \extractkey/robExt/add before main content no import=\marg{name placeholder}\marg{content to add}\@nil
   \makeatother%
   \pgfmanualbody
 
@@ -1349,13 +1520,14 @@ Note that sometimes, you might not want to use |\setPlaceholderRec| to simply ap
 }
 \cacheMe[my preset]{Here I am cached (\hello{Alice})} and \cacheMe[my preset, disable externalization]{Here I am not (\hello{Bob}).}
 \end{codeexample}
+The |no import| versions do not import the placeholder in the current group (only needed if you want to optimize the compilation time, see \cref{sec:importSystem} for details).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
-  \extractcommand\placeholderFromString\marg{latex3 string}\@@
-  \extractcommand\setPlaceholderFromString\marg{latex3 string}\@@
+  \extractcommand\placeholderFromString\opt{*}\marg{latex3 string}\@@
+  \extractcommand\setPlaceholderFromString\opt{*}\marg{latex3 string}\@@
   \pgfmanualbody
-  (new in v1.1) This allows you to assign an existing \LaTeX{}3 string to a placeholder.
+  (new in v2.0) This allows you to assign an existing \LaTeX{}3 string to a placeholder (the star version does not import the placeholder, see \cref{sec:importSystem}).
 \begin{codeexample}[width=0pt,vbox]
   \ExplSyntaxOn
   \setPlaceholderFromString{__my_percent_string__}{\c_percent_str}
@@ -1385,7 +1557,7 @@ We provide a list of placeholders that are useful to escape parts of the strings
   \extractkey/robExt/placeholder replace in place eval=\marg{placeholder}\marg{from}\marg{to}\@nil
   \makeatother%
   \pgfmanualbody
-  (new in v1.1) This allows you to replace a value in a placeholder. The |eval| variation first evaluates the string.
+  (new in v2.0) This allows you to replace a value in a placeholder. The |eval| variation first evaluates the string.
 \begin{codeexample}[width=0pt,vbox]
 \def\nameFrom{Bob}
 \def\nameTo{Dylan}
@@ -1407,7 +1579,7 @@ We provide a list of placeholders that are useful to escape parts of the strings
   \extractkey/robExt/placeholder double number hashes in place=\marg{placeholder}\@nil
   \makeatother%
   \pgfmanualbody
-  (new in v1.1) This allows you to either turn any |##| into |#| or the other way around (may be practical when dealing with arguments to functions).
+  (new in v2.0) This allows you to either turn any |##| into |#| or the other way around (may be practical when dealing with arguments to functions).
 \begin{codeexample}[width=0pt,vbox]
 \robExtConfigure{
   set placeholder={__DEMO__}{\def\hey##1{Hey ##1.}},
@@ -1425,7 +1597,7 @@ We provide a list of placeholders that are useful to escape parts of the strings
   \extractkey/robExt/remove placeholders=\marg{list,of,placeholder}\@nil
   \makeatother%
   \pgfmanualbody
-  (new in v1.1) Remove placeholders.
+  (new in v2.0) Remove placeholders.
 \begin{codeexample}[width=0pt,vbox]
 \robExtConfigure{
   set placeholder={__DEMOA__}{Alice},
@@ -1473,160 +1645,9 @@ Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_E
 Note that this works well for commands that expand completely, but some more complex commands might not expand properly (like |cref|). I need to investigate how to solve this issue, meanwhile you can still disable externalization for these pictures.
 \end{pgfmanualentry}
 
+\subsubsection{Groups: the import system}\label{sec:importSystem}
 
-\begin{pgfmanualentry}
-  \extractenvironement{PlaceholderFromCode}\marg{name placeholder}\@@
-  \extractenvironement{setPlaceholderCode}\marg{name placeholder}\@@
-  \pgfmanualbody
-
-  These two (aliased) environments are useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside).
-% \begin{codeexample}[width=0pt,vbox]
-%   \placeholderFromContent{__PYTHON_CODE__}{}
-%   The (unexpanded) template contains \printPlaceholderNoReplacement{__LIKES__} and %
-%   after evaluation (no replacement), you get ``\evalPlaceholderNoReplacement{__LIKES__}''.
-% \end{codeexample}
-
-\begin{codeexample}[width=0pt,vbox]
-\begin{PlaceholderFromCode}{__PYTHON_CODE__}
-def my_function(b): # this is a python code
-    c = {}
-    d[42] = 0
-    return b
-\end{PlaceholderFromCode}
-\printImportedPlaceholdersExceptDefaults
-\end{codeexample}
-
-
-Note that |PlaceholderFromCode| should not be used inside other macros or inside some environments (notably the ones that need to evaluate the body of the environment, e.g. using |+b| argument or |environ|) as verbatim content is parsed first by the macro, meaning that some characters might be changed or removed. For instance, any percent character would be considered as a comment, removing the rest of the line. However, this should not be be problem if you use it outside of any macro or environment, or if you load it from a file. For instance this code:
-\begin{verbatim}
-\begin{PlaceholderFromCode}{__PYTHON_CODE__}
-def my_function(b): # this is a python code
-    c = {}
-    d[42] = 0
-    return b % 2
-\end{PlaceholderFromCode}
-\printImportedPlaceholdersExceptDefaults
-\end{verbatim}
-would produce:
-
-{
-\begin{PlaceholderFromCode}{__PYTHON_CODE__}
-def my_function(b): # this is a python code
-    c = {}
-    d[42] = 0
-    return b % 2
-\end{PlaceholderFromCode}
-\begin{codeexample}[width=0pt,vbox]
-\printImportedPlaceholdersExceptDefaults
-\end{codeexample}
-}
-Note that of course, you can define a placeholder before a macro and call it inside (explaining how we can generate this documentation).
-\end{pgfmanualentry}
-
-\begin{pgfmanualentry}
-  \extractcommand\placeholderPathFromFilename\marg{name placeholder}\marg{filename}\@@
-  \makeatletter%
-  \def\extrakeytext{style, }
-  \extractkey/robExt/set placeholder path from filename=\marg{name placeholder}\marg{filename}\@nil
-  \makeatother%
-  \pgfmanualbody
-
-  |\placeholderPathFromFilename{__MYLIB__}{mylib.py}| will copy |mylib.py| in the cache (setting its hash depending on its content), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the library in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
-\begin{codeexample}[width=0pt,vbox]
-  \placeholderPathFromFilename{__MYLIB__}{mylib.py}
-  \printImportedPlaceholdersExceptDefaults
-  You can also get the path relative to the root folder:\\
-  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}
-\end{codeexample}
-\end{pgfmanualentry}
-
-
-\begin{pgfmanualentry}
-  \extractcommand\placeholderFromFileContent\marg{name placeholder}\marg{filename}\@@
-  \makeatletter%
-  \def\extrakeytext{style, }
-  \extractkey/robExt/set placeholder from file content=\marg{name placeholder}\marg{filename}\@nil
-  \makeatother%
-  \pgfmanualbody
-
-  |\placeholderFromFileContent{__MYLIB__}{mylib.py}| will set the content of the placeholder |__MYLIB__| to the content of |mylib.py|.
-\begin{codeexample}[width=0pt,vbox]
-  \placeholderFromFileContent{__MYLIB__}{mylib.py}
-  \printImportedPlaceholdersExceptDefaults
-\end{codeexample}
-\end{pgfmanualentry}
-
-\begin{pgfmanualentry}
-  \extractcommand\placeholderPathFromContent\marg{name placeholder}\opt{\oarg{suffix}}\marg{content}\@@
-  \makeatletter%
-  \def\extrakeytext{style, }
-  \extractkey/robExt/set placeholder path from content=\marg{name placeholder}\marg{suffix}\marg{content}\@nil
-  \makeatother%
-  \pgfmanualbody
-
-  |\placeholderPathFromContent{__MYLIB__}{some content}| will copy |some content| in a file in the cache (setting its hash depending on its content, the filename will end with |suffix| that defaults to |.tex|), and set the content of the placeholder |__MYLIB__| to the \textbf{path} of the file in the cache. Note that the path is relative to the cache folder (it is easier to use for instance if you want to call this library from a code already in the cache).
-\begin{codeexample}[width=0pt,vbox]
-  \placeholderPathFromContent{__MYLIB__}[.py]{some contents b}
-  \printImportedPlaceholdersExceptDefaults
-  You can also get the path relative to the root folder:\\
-  \robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
-  As a sanity check, this file contains
-  \verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
-\end{codeexample}
-\end{pgfmanualentry}
-
-\begin{pgfmanualentry}
-  \extractenvironement{PlaceholderPathFromCode}\opt{\oarg{suffix}}\marg{name placeholder}\@@
-  \pgfmanualbody
-
-  This environment is similar to |\placeholderPathFromContent| except that it accepts verbatim code (therefore \LaTeX{} comments, newlines etc. will not be removed). However, due to \LaTeX{} limitations, this environment cannot be used inside macros or some environments, or this property will not be preserved.
-  For instance, if you create your placeholder using:
-\begin{verbatim}
-\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
-def my_function(b): # this is a python code
-    c = {}
-    d[42] = 0
-    return b % 2
-\end{PlaceholderPathFromCode}
-\end{verbatim}
-%% The code cannot be placed inside codeexample as it needs to parse the body:
-\begin{PlaceholderPathFromCode}[.py]{__MYLIB__}
-def my_function(b): # this is a python code
-    c = {}
-    d[42] = 0
-    return b % 2
-\end{PlaceholderPathFromCode}
-You can then use it like:
-\begin{codeexample}[width=0pt,vbox]
-\printImportedPlaceholdersExceptDefaults
-You can also get the path relative to the root folder:\\
-\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}\\
-As a sanity check, this file contains
-\verbatiminput{\robExtAddCachePath{\getPlaceholderNoReplacement{__MYLIB__}}}
-\end{codeexample}
-\end{pgfmanualentry}
-
-
-\begin{pgfmanualentry}
-  \extractcommand\copyPlaceholder\marg{new placeholder}\marg{old placeholder}\@@
-  \makeatletter%
-  \def\extrakeytext{style, }
-  \extractkey/robExt/copy placeholder=\marg{new placeholder}\marg{old placeholder}\@nil
-  \makeatother%
-  \pgfmanualbody
-
-  This creates a new placeholder with the content of |old placeholder|. Note that this is different from:\\
-  |\setPlaceholder{new placeholder}{old placeholder}|\\
-  because if we modify |old placeholder|, this will not affect |new placeholder|.
-\begin{codeexample}[width=0pt,vbox]
-  \setPlaceholder{__MY_CONTENT__}{Some content}
-  \copyPlaceholder{__MY_OLD_CONTENT__}{__MY_CONTENT__}
-  \setPlaceholder{__MY_CONTENT__}{The content used to be __MY_OLD_CONTENT__}
-  \printImportedPlaceholdersExceptDefaults
-\end{codeexample}
-\end{pgfmanualentry}
-
-\subsubsection{The import system}\label{sec:importSystem}
+(This whole system was added v2.0.)
 
 In order to replace placeholders, we need to know their list, but to get the best possible performance we do not maintain a single list of all placeholders since \LaTeX{} is quite slow when doing list manipulations. Therefore, we group them inside smaller groups (e.g.\ one group for |latex|, one group for |python| etc), and the user is free to import groups. By default, new placeholders are imported inside the |main| group, and this group will be used when doing placeholder replacements. Note that for most of the case, we define a star variant of functions like |\setPlaceholder*{__FOO__}{bar}| (or |set placeholder no import| for styles) in order to create a placeholder without importing it (but this is certainly not used a lot by end users unless they want to make them even faster).
 
@@ -1636,6 +1657,7 @@ Note that basically all commands to create a placeholder have a command/environm
   \extractcommand\importPlaceholder\marg{name placeholder}\@@
   \extractcommand\importPlaceholdersFromGroup\marg{name placeholder}\@@
   \extractcommand\importAllPlaceholders\@@
+  \extractcommand\importPlaceholderFirst\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/import placeholder=\marg{name placeholder}\@nil
@@ -1704,6 +1726,7 @@ Note that basically all commands to create a placeholder have a command/environm
 
 \begin{pgfmanualentry}
   \extractcommand\printAllRegisteredGroups\@@
+  \extractcommand\printAllRegisteredGroupsAndPlaceholders\opt{*}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/print all registered groups\@nil
@@ -1712,7 +1735,7 @@ Note that basically all commands to create a placeholder have a command/environm
   \extractkey/robExt/show all registered groups and placeholders\@nil
   \makeatother%
   \pgfmanualbody
-  Print (or shows in the console for the alternative versions) all registered groups of placeholders, mostly for debugging purpose, with the star prints only the content of the inner placeholders.
+  Print (or shows in the console for the alternative versions) all registered groups of placeholders (possibly with the placeholders they contain), mostly for debugging purpose, with the star prints also the content of the inner placeholders.
 \begin{codeexample}[width=0pt,vbox]
 \printAllRegisteredGroups
 \end{codeexample}
@@ -1720,6 +1743,10 @@ Note that basically all commands to create a placeholder have a command/environm
 
 \begin{pgfmanualentry}
   \extractcommand\printGroupPlaceholders\opt{*}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/print group placeholders=\marg{name group}\@nil
+  \makeatother%
   \pgfmanualbody
   Print all placeholders (star = with content) of a given group.
 \begin{codeexample}[width=0pt,vbox]
@@ -1738,23 +1765,116 @@ Note that basically all commands to create a placeholder have a command/environm
 
 \begin{pgfmanualentry}
   \extractcommand\newGroupPlaceholders\marg{name group}\@@
+  \extractcommand\addPlaceholderToGroup\marg{name group}\marg{list,of,placeholders}\@@
+  \extractcommand\addPlaceholdersToGroup\marg{name group}\marg{list,of,placeholders}\@@
+  \extractcommand\removePlaceholderFromGroup\marg{name group}\marg{list,of,placeholders}\@@
+  \extractcommand\removePlaceholdersFromGroup\marg{name group}\marg{list,of,placeholders}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/new group placeholders=\marg{name group}\@nil
-  \extractkey/robExt/add placeholders to group=\marg{name group}\marg{name placeholder}\@nil
+  \extractkey/robExt/add placeholder to group=\marg{name group}\marg{name placeholder}\@nil
+  \extractkey/robExt/add placeholders to group=\marg{name group}\marg{list,of,placeholders}\@nil
+  \extractkey/robExt/add placeholders to group=\marg{name group}\marg{list,of,placeholders}\@nil
+  \extractkey/robExt/remove placeholders from group=\marg{name group}\marg{list,of,placeholders}\@nil
+  \extractkey/robExt/remove placeholder from group=\marg{name group}\marg{list,of,placeholders}\@nil
   \makeatother%
   \pgfmanualbody
   Create a new group and add placeholders to it (you can put multiple placeholders separated by commas).
 \begin{codeAndResult}
 \robExtConfigure{
-  new group placeholders={my dumy group},
+  new group placeholders={my dummy group},
   set placeholder no import={__name__}{Alice},
   add placeholders to group={my dummy group}{__name__},
 }
 \printGroupPlaceholders{my dummy group}
+\removePlaceholdersFromGroup{my dummy group}{__name__}
+\printGroupPlaceholders{my dummy group}
 \end{codeAndResult}
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \extractcommand\clearGroupPlaceholders\marg{name group}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  % \extractkey/robExt/new group placeholders=\marg{name group}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Remove all elements in a group.
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  new group placeholders={my dummy group},
+  set placeholder no import={__name__}{Alice},
+  add placeholders to group={my dummy group}{__name__},
+}
+\clearGroupPlaceholders{my dummy group}
+\printGroupPlaceholders{my dummy group}
+\end{codeexample}
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\copyGroupPlaceholders\marg{name group}\marg{name group to copy}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/copy group placeholders=\marg{name group}\marg{name group to copy}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Remove all elements in a group.
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  new group placeholders={my dummy group},
+  set placeholder no import={__name__}{Alice},
+  add placeholders to group={my dummy group}{__name__},
+}
+\copyGroupPlaceholders{my copy}{my dummy group}
+\printGroupPlaceholders{my copy}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\appendGroupPlaceholders\marg{name group}\marg{name group to append}\@@
+  \extractcommand\appendBeforeGroupPlaceholders\marg{name group}\marg{name group to append}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/append group placeholders=\marg{name group}\marg{name group to copy}\@nil
+  \extractkey/robExt/append before group placeholders=\marg{name group}\marg{name group to copy}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Append a group to another group (after or before).
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  new group placeholders={my dummy group},
+  set placeholder no import={__name__}{Alice},
+  add placeholders to group={my dummy group}{__name__},
+  new group placeholders={my dummy group2},
+  set placeholder no import={__name2__}{Bob},
+  add placeholders to group={my dummy group2}{__name2__},
+  append group placeholders={my dummy group}{my dummy group2},
+}
+\printGroupPlaceholders{my dummy group}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\importPlaceholdersFromGroup\marg{name group}\@@
+  \extractcommand\importAllPlaceholders\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/import placeholders from group=\marg{name group}\@nil
+  \extractkey/robExt/import all placeholders\@nil
+  \makeatother%
+  \pgfmanualbody
+  Import a group/all registered groups (note that this is equivalent to appending to the group called |main|). Note that for the later, you should be sure that the group is ``registered'', which is the case if you created it via |new group placeholders|.
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  new group placeholders={my dummy group},
+  set placeholder no import={__name__}{Alice},
+  add placeholder to group={my dummy group}{__name__},
+  import all placeholders,
+}
+\printImportedPlaceholdersExceptDefaults
+\end{codeexample}
+\end{pgfmanualentry}
 
 
 \subsection{Caching a content}
@@ -1793,7 +1913,7 @@ This content is cached $\delta$.
   \extractkey/robExt/add to preset=\marg{name preset}\marg{preset options}\@nil
   \makeatother%
   \pgfmanualbody
-  You can then create your own style (or preset) in |\robExtConfigure| (that is basically an alias for |\pgfkeys{/robExt/.cd,#1}|) containing your template, add your own placeholders and commands to configure them etc. We provide two helper functions since v1.1:\\
+  You can then create your own style (or preset) in |\robExtConfigure| (that is basically an alias for |\pgfkeys{/robExt/.cd,#1}|) containing your template, add your own placeholders and commands to configure them etc. We provide two helper functions since v2.0:\\
   |new preset={your preset}{your configuration}|\\
   and\\
   |add to preset={your preset}{your configuration}|\\
@@ -2130,7 +2250,7 @@ The inclusion command is the command that is run to include the cached file back
       \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
     \end{tikzpictureC}
   \end{codeexample}
-  The main difference between |manual mode| and |fallback to manual mode| is that |fallback to manual mode| will try to compile the file if |-shell-escape| is enabled, while |manual mode| will never run any command, even if |-shell-escape| is enabled. Note that |enable fallback to manual mode| is available starting from v1.1.
+  The main difference between |manual mode| and |fallback to manual mode| is that |fallback to manual mode| will try to compile the file if |-shell-escape| is enabled, while |manual mode| will never run any command, even if |-shell-escape| is enabled. Note that |enable fallback to manual mode| is available starting from v2.0.
   
   See \cref{sec:operationsCache} for more details.
 \end{pgfmanualentry}
@@ -2170,7 +2290,7 @@ If needed, you can configure the cache:
   |set cache folder and way back|\\
   and\\
   |set subfolder and way back|\\
-  are alias, but the first one was introduced in v1.1 as it is clearer, the second one being kept for backward compatibility.
+  are alias, but the first one was introduced in v2.0 as it is clearer, the second one being kept for backward compatibility.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2398,7 +2518,7 @@ Long story short: you can compile even faster (at least 1.5x in our tests, but w
 \end{pgfmanualentry}
 
 
-Explanations: in v1.1, we made substantial improvements in order to improve significantly the compilation time (our benchmark went from 20s (v1.0) to only 5.77s (v1.1)), but you might want to make this even faster: with a compiled preset, you can improve it further, experimentation showed an additional improvement factor of 1.4x (final compilation time was 4s in our tests, reminder: without the library it would take 1mn25s). The main bottleneck in term of time is the expansion of the placeholders (that allows great flexibility, but can add a significant time). At a high level, we keep track in a list of all declared placeholders, and loop over them to replace each of them until the string is left unmodified by a full turn. This is simple to implement, does not need to assume any shape for the placeholder\dots{} but not extremely efficient in \LaTeX{} where string and list manipulations are costly.
+Explanations: in v2.0, we made substantial improvements in order to improve significantly the compilation time (our benchmark went from 20s (v1.0) to only 5.77s (v2.0)), but you might want to make this even faster: with a compiled preset, you can improve it further, experimentation showed an additional improvement factor of 1.4x (final compilation time was 4s in our tests, reminder: without the library it would take 1mn25s). The main bottleneck in term of time is the expansion of the placeholders (that allows great flexibility, but can add a significant time). At a high level, we keep track in a list of all declared placeholders, and loop over them to replace each of them until the string is left unmodified by a full turn. This is simple to implement, does not need to assume any shape for the placeholder\dots{} but not extremely efficient in \LaTeX{} where string and list manipulations are costly.
 
 We can play on multiple parameters to speed up the process:
 \begin{itemize}
@@ -2461,7 +2581,7 @@ with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
   \extractkey/robExt/print command and source\@nil
   \makeatother%
   \pgfmanualbody
-  (new in v1.1) These two (alias) commands allow you to print the compilation command, the dependency file (useful to be sure you tracked all dependencies), and the source file:
+  (new in v2.0) These two (alias) commands allow you to print the compilation command, the dependency file (useful to be sure you tracked all dependencies), and the source file:
 \begin{codeexample}[width=0pt,vbox]
 \begin{CacheMe}{latex,
     add dependencies={common_inputs.tex},
@@ -2485,7 +2605,7 @@ The |latex| preset is used to cache any \LaTeX{} content, like tikz pictures. No
   \extractkey/robExt/latex\@nil
   \makeatother%
   \pgfmanualbody
-  This style sets the template |__ROBEXT_LATEX__| and the compilation command:\\ |__ROBEXT_COMPILATION_COMMAND_LATEX__|\\
+  This style sets the template |__ROBEXT_LATEX__| and the compilation command:\\ |__ROBEXT_LATEX_COMPILATION_COMMAND__|\\
   (cf \cref{sec:placeholders} for details), and adds a number of styles described below, to easily configure the most common options. You can use it as follows:
   \begin{codeexample}[width=0pt,vbox]
     The next picture is cached %
@@ -2532,7 +2652,7 @@ The next options can be used after calling the |latex| style:
   \extractkey/robExt/latex/set documentclass=\marg{documentclass}\@nil
   \makeatother%
   \pgfmanualbody
-  Set the documentclass of the document (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_DOCUMENT_CLASS__|.
+  Set the documentclass of the document (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_LATEX_DOCUMENT_CLASS__|.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2546,7 +2666,7 @@ The next options can be used after calling the |latex| style:
   \extractkey/robExt/latex/add to preamble after hyperref=\marg{code of preamble}\@nil
   \makeatother%
   \pgfmanualbody
-  Set/add element to the preamble (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_PREAMBLE__|. The variations |hyperref| and |after hyperref| are used to put stuff after the preambule, as |hyperref| typically needs to be loaded last (or nearly): packages that must be loaded after |hyperref| like |cref| can be added via |add to preamble after hyperref|.
+  Set/add element to the preamble (defaults to |standalone|). Internally, it sets the placeholder |__ROBEXT_LATEX_PREAMBLE__|. The variations |hyperref| and |after hyperref| are used to put stuff after the preambule, as |hyperref| typically needs to be loaded last (or nearly): packages that must be loaded after |hyperref| like |cref| can be added via |add to preamble after hyperref|.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2556,7 +2676,7 @@ The next options can be used after calling the |latex| style:
   \makeatother%
   \pgfmanualbody
   By default, the main content is wrapped into a box in order to measure its depth to properly set the baseline. If you do not want to do this wrapping, you can set this option. Internally, it is a shortcut for:\\
-  |set placeholder={__ROBEXT_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__}|
+  |set placeholder={__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__}|
   \textbf{IMPORTANT}: note that it means that you might need to adapt your code to take into account the fact that they are inside a box (I don't know of any other solution to compute the depth, but it does not mean that there is none).
 \end{pgfmanualentry}
 
@@ -2717,6 +2837,11 @@ This file contains:
 \verbatiminput{\robExtPathToInput}
 \end{codeAndResult}
 
+\subsubsection{Custom languages}
+
+To add support to new languages, see \cref{sec:otherLanguages} for an example.
+
+
 \subsection{List of special placeholders and presets}\label{sec:placeholders}
 
 This library defines a number of pre-existing placeholders, or placeholders playing a special role. We list some of them in this section. All placeholders created by this library start with |__ROBEXT_|. Note that you can list all predefined placeholders (at least those globally defined) using |\printImportedPlaceholdersExceptDefaults| (note that some other placeholders might be created directly in the style set right before the command, and may not appear in this list if you call it before setting the style).
@@ -2751,14 +2876,14 @@ Some placeholders are reserved only when dealing with \LaTeX{} code:
 \begin{itemize}
 \item |__ROBEXT_LATEX__| is the main entrypoint, containing all the latex template. It internally calls other placeholders listed below.
 \item |__ROBEXT_LATEX_OPTIONS__|: contains the options to compile the document, like |a4paper|. Empty by default.
-\item |__ROBEXT_DOCUMENT_CLASS__|: contains the class of the document. Defaults to |standalone|.
-\item |__ROBEXT_PREAMBLE__|: contains the preamble. Is empty by default.
-\item |__ROBEXT_MAIN_CONTENT_WRAPPED__|: content inside the |document| environment. It will wrap the actual content typed by the user |__ROBEXT_MAIN_CONTENT__| around a box to compute its depth. If you do not want this behavior, you can set |__ROBEXT_MAIN_CONTENT_WRAPPED__| to be equal to |__ROBEXT_MAIN_CONTENT__|. It calls internally |__ROBEXT_CREATE_OUT_FILE__| and |__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__| to do this computation.
-\item |__ROBEXT_CREATE_OUT_FILE__| creates a new file called |\jobname-out.tex| and open it in the handle called |\writeRobExt|
-\item |__ROBEXT_WRITE_DEPTH_TO_OUT_FILE__| writes the height, depth and width of the box |\boxRobExt| into the filed opened in |\writeRobExt|.
-\item |__ROBEXT_COMPILATION_COMMAND_LATEX__| is the command used to compile a \LaTeX{} document. It uses internally other placeholders:
+\item |__ROBEXT_LATEX_DOCUMENT_CLASS__|: contains the class of the document. Defaults to |standalone|.
+\item |__ROBEXT_LATEX_PREAMBLE__|: contains the preamble. Is empty by default.
+\item |__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__|: content inside the |document| environment. It will wrap the actual content typed by the user |__ROBEXT_MAIN_CONTENT__| around a box to compute its depth. If you do not want this behavior, you can set |__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__| to be equal to |__ROBEXT_MAIN_CONTENT__|. It calls internally |__ROBEXT_LATEX_CREATE_OUT_FILE__| and |__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__| to do this computation.
+\item |__ROBEXT_LATEX_CREATE_OUT_FILE__| creates a new file called |\jobname-out.tex| and open it in the handle called |\writeRobExt|
+\item |__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__| writes the height, depth and width of the box |\boxRobExt| into the filed opened in |\writeRobExt|.
+\item |__ROBEXT_LATEX_COMPILATION_COMMAND__| is the command used to compile a \LaTeX{} document. It uses internally other placeholders:
 \item |__ROBEXT_LATEX_ENGINE__| is the engine used to compile the document (defaults to |pdflatex|)
-\item |__ROBEXT_COMPILATION_COMMAND_OPTIONS__| contains the options used to compile the document (defaults to |-shell-escape -halt-on-error|)
+\item |__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__| contains the options used to compile the document (defaults to |-shell-escape -halt-on-error|)
 \end{itemize}
 
 \subsubsection{Placeholders related to python}
@@ -2817,7 +2942,7 @@ to cache all tikz pictures (unless externalization is disabled), but we also pro
   \extractcommand\robExtExternalizeAllTikzpicture\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
   \extractcommand\cacheTikz\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
   \pgfmanualbody
-  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v1.1). Since v1.1, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v2.0). Since v2.0, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
 \begin{codeexample}[width=0pt,vbox]
 \cacheTikz
 
@@ -2862,7 +2987,7 @@ Here is an example to specify arguments via parenthesis:
 \begin{pgfmanualentry}
   \extractcommand\robExtDisableTikzpictureOverwrite\@@
   \pgfmanualbody
-  This is useful to temporarily reset the current environment to their original value (since v1.1 it also resets other environments, not just |tikzpicture|). This must typically be called at the beginning of |command if no externalization| to avoid infinite recursion if you redefine it, but expect for this case the user is not expected to use this option.
+  This is useful to temporarily reset the current environment to their original value (since v2.0 it also resets other environments, not just |tikzpicture|). This must typically be called at the beginning of |command if no externalization| to avoid infinite recursion if you redefine it, but expect for this case the user is not expected to use this option.
 \end{pgfmanualentry}
 
 Let us say that you want to cache all elements of a given environment, like |minipage| or |zx-calculus| pictures (another package of mine):
@@ -3188,7 +3313,7 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
 \item I tried many different options to optimize the compilation time, so the code is a bit cluttered now. Would be cool to reorganize.
-\item Update the doc with compilation, import, etc.
+\item The doc more or less describes all features, but I might made tons of typo and forgot to document some advanced commands. But should be good enough for normal usage.
 \end{itemize}
 
 \section{Acknowledgments}
@@ -3198,9 +3323,10 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
-\item v1.1:
+\item v2.0:
   \begin{itemize}
   \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |cacheTikz|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
+  \item not really compatible: Renamed some latex placeholders to prefix all of them with |__ROBEXT_LATEX_|. Should not be a problem if you used the style made to change them.
   \item Added an alias to |\robExtExternalizeAllTikzpictures| called |\cacheTikz|. Now, this also configures |\tikz|.
   \item You can now use ampersands etc freely thanks to lrbox.
   \item You can now automatically cache environments using |\cacheEnvironment| and commands using |\cacheCommand|.
@@ -3212,6 +3338,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item |debug| mode available
   \item Rename |set subfolder and way back| to |set cache folder and way back| (in a backward compatible way)
   \item Waaaaaaay more efficient. Also added a method to compile presets.
+  \item I added the import system for efficiency reasons (not present in v1.0 at all). Note that I also added some other functions that I forgot to notify as new in the doc...
   \end{itemize}
 \end{itemize}
 
