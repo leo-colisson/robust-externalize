@@ -1079,6 +1079,28 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{CacheMeNoContent}}
 \end{codeAndResult}
 
+\subsection{Force to recompile or remove a cached item}
+
+You might want at some point to force to recompile a cached file, for instance because you made some changes into a non-tracked dependency, you upgraded some libraries etc. So what you need to do is to delete the cached file. We do not allow this library to remove files (especially not in \LaTeX{}) to avoid removing important file in case a bug occurs. However, it is easy to implement it yourself. First, you need to get the name of the cached file: you can use |name output=filetodelete| for this: it will create a macro |\filetodelete| and |\filetodeleteInCache|, where |filetodeleteInCache| contains the prefix of the file you want to delete. You can then either just print it in the pdf and remove it manually, or, if you cannot (e.g. on overleaf), you can call the remove command directly from the latex code (on Windows, you might need |del| instead, but double check) using:
+\begin{verbatim}
+\immediate\write18{rm "\filetodeleteInCache.pdf"}
+\end{verbatim}
+If you are worried that it might remove other files, you can maybe try to use:\\
+|touch "\filetodeleteInCache.test"|\\
+to check if a file is created:
+
+\begin{codeexample}[width=0cm,vbox]
+\begin{CacheMe}{tikzpicture, name output=filetodelete}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{CacheMe}\\
+
+You want to delete the file \texttt{\filetodeleteInCache.pdf}. %
+If you feel brave, you can do it automatically by uncommenting the following %
+line (you need to adapt it on Windows):
+% \immediate\write18{rm "\filetodeleteInCache.pdf"}
+\end{codeexample}
+
+
 \section{Documentation}
 
 \subsection{How it works}
