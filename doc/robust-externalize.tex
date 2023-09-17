@@ -94,7 +94,7 @@
   {\Large\bfseries Cache anything (\tikzname, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.0}\\[3mm]
+  {Léo Colisson \quad Version 2.0+unstable}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -3345,6 +3345,10 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
+\item future v2.0.1 (master on github, not released yet on CTAN):
+  \begin{itemize}
+  \item Fix a bug when compiling a template that was not exporting dependencies
+  \end{itemize}
 \item v2.0:
   \begin{itemize}
   \item \textbf{not backward compatible}: the preset |tikzpicture| should be used instead of |tikz|: |tikz| does not wrap anymore its content into |\begin{tikzpicture}| in order to be usable inside the command version |\tikz| (but |tikzpicture| does load |tikz| first).  Moreover, all arguments to |tikzpictureC| or |tikzpicture| (if you loaded |cacheTikz|) should be specified in the first argument, using |<your options>|. This is used to provide a more uniform interface with the new |\cacheEnvironment| command. Hopefully this should \textbf{not cause too much trouble} since the first version of the library has been published on CTAN only a few days ago.
