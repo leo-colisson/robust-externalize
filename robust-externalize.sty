@@ -742,7 +742,7 @@ if __name__ == '__main__':
 % %%% Evaluate a string by replacing the placeholders until there is none left
 % %%% the result will be in \robExtResult
 \cs_set:Nn \replace_until_impossible:N {
-  \robExtDebugMessage{We needed to run replace_until_impossible}
+  \robExtDebugMessage{We~needed~to~run~replace_until_impossible}
   % Try to replace directly if single placeholder
   \str_if_exist:cTF {  l_robExt_placeholder_ \l_robExt_result_str _str }{
     \str_set_eq:Nc {\l_robExt_result_str}{ l_robExt_placeholder_ \l_robExt_result_str _str }
@@ -786,9 +786,9 @@ if __name__ == '__main__':
 
 \NewDocumentCommand{\robExtGetPlaceholderInResult}{sO{}m}{
   \str_set_hash_robust:Nn \l_robExt_result_str { #3 }
-  \robExtDebugMessage{Begin to evaluate placeholder^^J \l_robExt_result_str}
+  \robExtDebugMessage{Begin~to~evaluate~placeholder^^J~\l_robExt_result_str}
   \replace_until_impossible:N { }
-  \robExtDebugMessage{Ended the replacement^^J \l_robExt_result_str}
+  \robExtDebugMessage{Ended~the~replacement^^J~\l_robExt_result_str}
   \tl_if_blank:nTF {#2} {} {
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
     % we remove the name of the placeholder at the end
@@ -807,9 +807,9 @@ if __name__ == '__main__':
   }{
     \PackageError{robExt}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #3 ~ does ~ not ~ exists.}
   }
-  \robExtDebugMessage{Starting to replace placeholder #3 to get \l_robExt_result_str}
+  \robExtDebugMessage{Starting~to~replace~placeholder~#3~to~get~\l_robExt_result_str}
   \replace_until_impossible:N { }
-  \robExtDebugMessage{Ended up with \l_robExt_result_str}
+  \robExtDebugMessage{Ended~up~with~\l_robExt_result_str}
   \tl_if_blank:nTF {#2} {} {
     % To avoid infinite recursion later and allow concatenation to a placeholder that does not exists
     % we remove the name of the placeholder at the end
@@ -1178,17 +1178,17 @@ if __name__ == '__main__':
   \cs_if_exist:NTF {#1} { % We only replace fixed state of placeholders
     \str_set_eq:Nc \l_robExt_result_str {l_robExt_placeholder_#3_str}
     \seq_map_inline:Nn {#1} {
-      \robExtDebugMessage{replacing ##1 in \l_robExt_result_str}
+      \robExtDebugMessage{replacing~##1~in~\l_robExt_result_str}
       \str_replace_all:Nnv \l_robExt_result_str {##1} {l_robExt_placeholder_##1_str}
     }
-    \robExtDebugMessage{Cool, we avoided the costly replace (only try).}
+    \robExtDebugMessage{Cool,~we~avoided~the~costly~replace~(only~try).}
   }{
     \cs_if_exist:NTF {#2} { % We start by replacing a fixed state of placeholders
       \str_set_eq:Nc \l_robExt_result_str {l_robExt_placeholder_#3_str}
-      \robExtDebugMessage{We start by replacing a fixed state of placeholders}
-      %\show#2
+      \robExtDebugMessage{We~start~by~replacing~a~fixed~state~of~placeholders}
       \seq_map_inline:Nn {#2} {
         \str_if_exist:cTF {l_robExt_placeholder_##1_str} {
+          \robExtDebugMessage{Replacing~##1~into~\use:c{l_robExt_placeholder_##1_str}}%
           \str_replace_all:Nnv \l_robExt_result_str {##1} {l_robExt_placeholder_##1_str}
         } {
           \robExtDebugMessage{Warning: ~ trying~to~replace~##1~that~does~not~exist.}
@@ -1208,19 +1208,19 @@ if __name__ == '__main__':
         % Now, we check if some __ are left:
         \str_if_in:NnTF { \l_robExt_result_minus_str } { __ } {
           % Some templates are left
-          \robExtDebugMessage{Still some templates are left.}
+          \robExtDebugMessage{Still~some~templates~are~left.}
           \replace_until_impossible:N { }
         } {
           % No more template: the end
-          \robExtDebugMessage{Cool, we avoided the costly replace.}
+          \robExtDebugMessage{Cool,~we~avoided~the~costly~replace: \l_robExt_result_str.}
         }
       }{
         % no way to know, must do it anyway
-        \robExtDebugMessage{Seems like not all templates contain underscore. Too bad, it will be slower}
+        \robExtDebugMessage{Seems~like~not~all~templates~contain~underscore.~Too~bad,~it~will~be~slower}
         \replace_until_impossible:N { }
       }
     }{
-      \robExtDebugMessage{No advice on how to start: doing it the long way}
+      \robExtDebugMessage{No~advice~on~how~to~start:~doing~it~the~long~way}
       \robExtGetPlaceholderInResultFromSinglePlaceholder{#3}
     }
   }
@@ -1266,7 +1266,7 @@ if __name__ == '__main__':
   %% - __ROBEXT_WAY_BACK__
   %% - __ROBEXT_CACHE_FOLDER__
   \ifdefined\robExtDisablePlaceholders%
-    \robExtDebugMessage{You have disabled placeholders (this is likely a compiled template)}%
+    \robExtDebugMessage{You~have~disabled~placeholders~(this~is~likely~a~compiled~template)}%
     \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_placeholder___ROBEXT_COMPILATION_COMMAND___str 
     \str_set_eq:NN \l_robExt_result_str \l_robExt_placeholder___ROBEXT_TEMPLATE___str%
     \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_MAIN_CONTENT__} {l_robExt_placeholder___ROBEXT_MAIN_CONTENT___str}
@@ -2463,7 +2463,7 @@ touch "${outputPdf}"
 }
 
 \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{tikz}O{tikzpicture}O{<>}}{%
-  \robExtCacheEnvironment[#3]{#2}{tikzpicture}%
+  \robExtCacheEnvironment[#3]{tikzpicture}{#2}%
   % Tikz has a more complicated parsing system
   \DeclareCommandCopy{\robExtCommandOrigtikz}{\tikz}% we save the function for later reset
   \robExtAddToCommandResetList{tikz}% we add it to the list of functions to reset
@@ -2512,7 +2512,7 @@ touch "${outputPdf}"
     \def\robExtEnvironmentOrigName{#2}%
     \CacheMe{%
       #3,%
-      set placeholder no import={__ROBEXT_MAIN_CONTENT__}{\begin{#2}__ROBEXT_MAIN_CONTENT_ORIG__\end{#2}},
+      set placeholder no import={__ROBEXT_MAIN_CONTENT__}{\begin{#2}__ROBEXT_MAIN_CONTENT_ORIG__\end{#2}},%
       ##1%
     }%
   }{\endCacheMe}%

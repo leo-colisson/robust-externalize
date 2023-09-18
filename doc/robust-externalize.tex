@@ -461,17 +461,19 @@ If you forget/do not want to enable |-shell-escape|, this will give you this kin
 If you only care about \tikzname's picture, you have 3 options:
 \begin{enumerate}
 \item Call once |\cacheTikz| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| or |tikzpicture| presets (that first loads |tikz|).
-\item Use the generic commands that allows you to wrap an arbitrary environment or command:
+\item Use the generic commands that allows you to wrap an arbitrary environment:
 \begin{verbatim}
 %        name environment ---v            v----- preset options
-\robExtCacheEnvironment{tikzpicture}{tikzpicture}
+\cacheEnvironment{tikzpicture}{tikzpicture}
 \end{verbatim}
-  Note that we do recommend to use |\robExtCacheCommand| for the macro version |\tikz| since |\tikz| has a quite complicated parsing strategy. |\cacheTikz| takes care of this already.
+  Note that you can also wrap commands (that you call with |\foo| instead of |\begin{foo}...\end{foo}|) using this:\\
+  |\cacheCommand{yourcommand}[O{default val}m]{your preset options}|\\
+  (|O{default val}m| means that the command accepts one optional argument with default value |default val| and one mandatory argument) but \textbf{we do recommend} to use |\cacheCommand| to cache |\tikz| since |\tikz| has a quite complicated parsing strategy (e.g.\ you can write |\tikz[options] \node{foo};| which has no mandatory argument enclosed in |{}|). |\cacheTikz| takes care of this already and caches both the environment |\begin{tikzpicture}| and the macro |\tikz|.
 \item Use |tikzpictureC| instead of |tikzpicture| (this is mostly done to easily convert existing code to this library, but works only for |tikz| pictures).
 \item Use the more general |CacheMe| environment, that can cache \tikzname, \LaTeX{}, python, and much more.
 \end{enumerate}
 
-These 3 options are illustrated below (note that the newly defined |tikzpicture| and |tikzpictureC| accept a second optional argument that contains the options to pass to |CacheMe| after loading the |tikzpicture| preset, that loads itself the |tikz| preset first):
+These 4 options are illustrated below (note that all commands accept a first optional argument enclosed in |<...>| that contains the options to pass to |CacheMe| after loading the |tikzpicture| preset, that loads itself the |tikz| preset first):
 
 Option 1:
 \begin{codeexample}[width=0pt]
@@ -481,6 +483,10 @@ Option 1:
 \cacheTikz
 
 I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpicture}. %
+
+I am a non-cached picture: \begin{tikzpicture}<disable externalization>[baseline=(A.base)]
   \node[draw,rounded corners,fill=pink!60](A){Hello World!};
 \end{tikzpicture}.
 \end{codeexample}
@@ -935,7 +941,6 @@ print_file.close()
     custom include command={
       % Useful to replace __MY_TITLE__:
       \evalPlaceholder{
-        % \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
         \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
           \lstinputlisting[frame=single,
             breakindent=.5\textwidth,
@@ -1006,7 +1011,6 @@ print_file.close()
     custom include command={
       % Useful to replace __MY_TITLE__:
       \evalPlaceholder{
-        % \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
         \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
           % \noindent Code:
           \lstinputlisting[frame=single,breakindent=.5\textwidth,frame=single,breaklines=true,style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
@@ -1100,6 +1104,8 @@ If you want to recompile a file (e.g. an untracked dependency was changed\dots{}
 Note that this assumes that your compilation command is idempotent (so running it twice is like running it once) since the aux files are not cached. If you want to clean aux files or if you run an older version, see the documentation of |recompile| in \cref{sec:configureCompilationCommand}.
 
 \section{Documentation}
+
+Before starting this documentation, note that all commands are prefixed with |robExt| and all environments are prefixed with |RobExt|, but we also often define aliases without this prefix. The user is free to use any version, but we recommend to use the non-prefixed version unless a clash with a package forbids you from using it. In the following, we will only print the non-prefixed name when it exists. Note also that we follow the convention that environment names start with an upper case letter while commands start with a lower case letter.
 
 \subsection{How it works}
 
@@ -1569,8 +1575,8 @@ We provide a list of placeholders that are useful to escape parts of the strings
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtPlaceholderReplaceInplace\marg{placeholder}\marg{from}\marg{to}\@@
-  \extractcommand\robExtPlaceholderReplaceInplaceEval\marg{placeholder}\marg{from}\marg{to}\@@
+  \extractcommand\placeholderReplaceInplace\marg{placeholder}\marg{from}\marg{to}\@@
+  \extractcommand\placeholderReplaceInplaceEval\marg{placeholder}\marg{from}\marg{to}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/placeholder replace in place=\marg{placeholder}\marg{from}\marg{to}\@nil
@@ -2906,6 +2912,8 @@ This file contains:
 \verbatiminput{\robExtPathToInput}
 \end{codeAndResult}
 
+You might also like to use |name output=yourfile| that will create two macros |\yourfile| and |\yourfileInCache|, equal respectively to the prefix |robExt-somehash| and |pathOfCache/robExt-somehash|. 
+
 \subsubsection{Custom languages}
 
 To add support to new languages, see \cref{sec:otherLanguages} for an example.
@@ -3049,6 +3057,19 @@ Here is an example to specify arguments via parenthesis:
 \tikz(add to preamble={\def\sayHello#1{Hello #1!}}) \node[fill=green, rounded corners]{\sayHello{Alice} \whereIAm};
 
 \tikz(disable externalization) \node[fill=green, rounded corners]{Foo \whereIAm};
+\end{codeexample}
+You can also change the default style loaded for tikz and tikzpicture (note that you might prefer to modify |tikz| directly using |add to preset|), but you need v2.1 (buggy in v2.0):
+
+\begin{codeexample}[vbox]
+% You might prefer to modify tikz directly using "add to preset"
+\cacheTikz[tikz, add to preamble={\def\hello{H}},][tikzpicture,
+  add to preamble={\def\hello{HH}},
+]
+
+\tikz[baseline=(A.base)] \node(A){In tikz \hello}; %
+\begin{tikzpicture}[baseline=(A.base)]
+  \node(A){In tikzpicture \hello};
+\end{tikzpicture}
 \end{codeexample}
 
 \end{pgfmanualentry}
@@ -3397,6 +3418,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Fix a bug when compiling a template that was not exporting dependencies
   \item Add |recompile| to recompile a file even if no dependencies changed.
   \item Add a hook |robust-externalize/just-before-writing-files|.
+  \item Fixed a bug in |\cacheTikz| that was not working with a custom argument for tikzpicture
   \end{itemize}
 \item v2.0:
   \begin{itemize}
