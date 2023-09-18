@@ -269,7 +269,18 @@ if __name__ == '__main__':
 % Contains the current compilation command (including the name of the file to compile).
 \str_new:N \l_robExt_currentCompilationCommand
 
-
+% To have a code compatible even on older versions
+% https://tex.stackexchange.com/questions/615010/how-can-i-use-latex-hooks-in-historical-versions-of-tex-live
+\providecommand\RobExtIfFormatAtLeastTF{\@ifl@t@r\fmtversion}
+\RobExtIfFormatAtLeastTF{2020-10-01}%
+{
+  % https://ctan.math.illinois.edu/macros/latex/base/lthooks-doc.pdf
+  \NewHook{robust-externalize/just-before-writing-files}
+  \def\robExtUseHookJustBeforeWritingFiles{\UseHook{robust-externalize/just-before-writing-files}}%
+}%
+{
+  \def\robExtUseHookJustBeforeWritingFiles{}
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Placeholders %%%%%%%%%%%%
@@ -1286,46 +1297,6 @@ if __name__ == '__main__':
   %%% First we get all dependencies stored in \l_robExt_dependencies to create a csv-like file:
   \str_clear:N \l_robExt_dependencies_mdfive
   \robExtGetNearlyFinalValueTemplateAndCompilationCommand
-  % \ifdefined\robExtDisablePlaceholders%
-  %   %% Compilation
-
-  %   \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_placeholder___ROBEXT_COMPILATION_COMMAND___str
-  %   \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_LATEX_CREATE_OUT_FILE__} {l_robExt_placeholder___ROBEXT_LATEX_CREATE_OUT_FILE___str}
-    
-  %   \str_set_eq:NN \l_robExt_result_str \l_robExt_placeholder___ROBEXT_TEMPLATE___str%
-  %   \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_LATEX_CREATE_OUT_FILE__} {l_robExt_placeholder___ROBEXT_LATEX_CREATE_OUT_FILE___str}
-  %   \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__} {l_robExt_placeholder___ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE___str}
-  %   % \show\l_robExt_placeholder___ROBEXT_MAIN_CONTENT___str
-  %   \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_MAIN_CONTENT__} {l_robExt_placeholder___ROBEXT_MAIN_CONTENT___str}
-  %   \str_replace_all:Nnv \l_robExt_result_str {__ROBEXT_MAIN_CONTENT_ORIG__} {l_robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str}
-  % \else%
-  %   %% Make sure to remove these placeholders as they should not be replaced.
-  %   %% Not that we cannot just give them their final value here, as it cannot yet be determined without
-  %   %% first computing the md5 hash.
-  %   \ifdefined\robExtEnableImportMechanism\else\robExtImportAllPlaceholders\fi%
-  %   % \robExtConfigure{run ~ early ~ before ~ compilation}
-  %   % \robExtConfigure{show ~imported~ placeholders}% debug
-  %   % \robExtRemovePlaceholder{__ROBEXT_SOURCE_FILE__}
-  %   % \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PDF__}
-  %   % \robExtRemovePlaceholder{__ROBEXT_OUTPUT_PREFIX__}
-  %   % it seems to take non negligible time let us replace them manually
-  %   % \robExtPlaceholderFromString{__ROBEXT_WAY_BACK__}{\robExtCacheFolderWayBack}
-  %   % \robExtPlaceholderFromString{__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
-  %   %%% We rescan the string in order to evaluate stuff like \myframes into "12,45,56".
-  %   % \robExtConfigure{run ~ before ~ compilation}
-  %   \robExtGetPlaceholderInResultFromSinglePlaceholder{__ROBEXT_COMPILATION_COMMAND__}
-  %   % \robExtConfigure{run ~ after ~ compilation}
-  %   % \ifdefined\robExtDoNotRescanFirstTime
-  %   \str_set_eq:NN \l_robExt_currentCompilationCommand \l_robExt_result_str
-  %   % \else
-  %   %   \tl_set_rescan:Nnx \l_robExt_currentCompilationCommand  {} { \l_robExt_result_str }
-  %   % \fi%
-  %   %% We get the template
-  %   % \robExtConfigure{run ~ before ~ template}
-  %   \robExtGetPlaceholderInResultFromSinglePlaceholder{__ROBEXT_TEMPLATE__}
-  %   % \robExtConfigure{run ~ after ~ template}
-  % \fi%
-  %\str_set_eq:NN \l_robExt_final_file_minus_hash_str \l_robExt_result_str
   % We first add on the first line the compilation command, and on the second line the template file.
   \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_result_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
   \seq_map_inline:Nn \l_robExt_dependencies {
@@ -1335,6 +1306,9 @@ if __name__ == '__main__':
   %% Compute the final hash (the hash of all dependencies, including the current picture that is on the first line):
   %% The last newline is needed as the write operation automatically adds a newline.
   \tl_set:Nx \robExtFinalHash {\pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
+  % Might be useful to clean the previously compiled files, or change the MD5 sum, for instance if we do
+  % not want to recompile when the file changes
+  \robExtUseHookJustBeforeWritingFiles%
   %% We add the figure in the list of files.
   \iow_now:Nx \g_robExt_write_list_all_figures {\robExtAddPrefixName{\robExtFinalHash.tex}}
   %% We can now set the placeholders, and recompute the final value of the file:
@@ -1372,6 +1346,16 @@ if __name__ == '__main__':
 % Think about the number of compilations.
 \NewDocumentCommand{\robExtCompileFile}{m}{
   \file_if_exist:xTF{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}{
+    \cs_if_exist:NTF {\robExtForceRecompilation}{
+      % We cannot do an OR with file_if_exist since it is not expandable, hence this trick
+      \let\l_robExt_do_not_compile\undefined
+    }{
+      \def\l_robExt_do_not_compile{}
+    }
+  }{
+    \let\l_robExt_do_not_compile\undefined
+  }
+  \cs_if_exist:NTF {\l_robExt_do_not_compile}{
     \message{No ~ need ~ to ~ recompile ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf}^^J}
   }{
     % No need to re-evaluate it
@@ -1381,11 +1365,6 @@ if __name__ == '__main__':
     \str_replace_all:Nnx \l_robExt_currentCompilationCommand {__ROBEXT_OUTPUT_PDF__}{\l_tmp_output_prefix_str .pdf}
     \str_replace_all:Nnx \l_robExt_currentCompilationCommand {__ROBEXT_WAY_BACK__}{\robExtCacheFolderWayBack}
     \str_replace_all:Nnx \l_robExt_currentCompilationCommand {__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
-    % \ifdefined\robExtDoNotRescanSecondTime
-    %   \str_set_eq:NN \l_robExt_finalCompilationCommand \l_robExt_currentCompilationCommand
-    % \else
-    %   \tl_set_rescan:Nnx \l_robExt_finalCompilationCommand  {} { \l_robExt_currentCompilationCommand }
-    % \fi%
     % Make sure this command is run from the cache folder
     \ifdefined\robExtCacheFolder
       \str_put_left:Nx \l_robExt_currentCompilationCommand {cd ~ \robExtCacheFolder \space && ~ }
@@ -1810,6 +1789,10 @@ if __name__ == '__main__':
   % allow commands like mkdir/cd/pdflatex to run in restricted mode.
   force compilation/.code={\def\robExtForceCompilation{}},
   do not force compilation/.code={\let\robExtForceCompilation\undefined},
+  % Recompile the file even if it has already been compiled (we do NOT clean the file as we do not feel
+  % safe to remove files from this code, but this can also be done by the user hooking into
+  recompile/.code={\def\robExtForceRecompilation{}},
+  do not recompile/.code={\let\robExtForceRecompilation\undefined},
   set compilation command/.code={\robExtSetCompilationCommand{#1}},
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={

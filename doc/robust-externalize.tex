@@ -91,7 +91,7 @@
     \color{gray}\Huge\ttfamily \char`\{\raisebox{.09em}{\textcolor{red!75!black}{robust\raisebox{-0.1em}{-}externalize}}\char`\}};
 
   \vspace{0.5em}
-  {\Large\bfseries Cache anything (\tikzname, python…),\\in a robust, efficient and pure way.}
+  {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
   {Léo Colisson \quad Version 2.0+unstable}\\[3mm]
@@ -177,7 +177,14 @@ And one not cached: %
     ]
   ]
 \end{forest}
-\end{codeAndResult}  
+\end{codeAndResult}
+People interested by |tikz-cd| might like this example:
+\begin{codeAndResult}
+\cacheEnvironment{tikzcd}{tikz, add to preamble={\usepackage{tikz-cd}}}
+\begin{tikzcd}
+  A \rar & B
+\end{tikzcd}
+\end{codeAndResult}
 \item For commands:
 \begin{codeAndResult}
 % We cache the command \zx
@@ -1081,25 +1088,16 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 
 \subsection{Force to recompile or remove a cached item}
 
-You might want at some point to force to recompile a cached file, for instance because you made some changes into a non-tracked dependency, you upgraded some libraries etc. So what you need to do is to delete the cached file. We do not allow this library to remove files (especially not in \LaTeX{}) to avoid removing important file in case a bug occurs. However, it is easy to implement it yourself. First, you need to get the name of the cached file: you can use |name output=filetodelete| for this: it will create a macro |\filetodelete| and |\filetodeleteInCache|, where |filetodeleteInCache| contains the prefix of the file you want to delete. You can then either just print it in the pdf and remove it manually, or, if you cannot (e.g. on overleaf), you can call the remove command directly from the latex code (on Windows, you might need |del| instead, but double check) using:
-\begin{verbatim}
-\immediate\write18{rm "\filetodeleteInCache.pdf"}
-\end{verbatim}
-If you are worried that it might remove other files, you can maybe try to use:\\
-|touch "\filetodeleteInCache.test"|\\
-to check if a file is created:
+If you want to recompile a file (e.g. an untracked dependency was changed\dots{} and you do not want to track it to avoid recompilation when you change a single line in this file), you can use the |recompile| style since v2.1:
 
-\begin{codeexample}[width=0cm,vbox]
-\begin{CacheMe}{tikzpicture, name output=filetodelete}[baseline=(A.base)]
-  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
-\end{CacheMe}\\
-
-You want to delete the file \texttt{\filetodeleteInCache.pdf}. %
-If you feel brave, you can do it automatically by uncommenting the following %
-line (you need to adapt it on Windows):
-% \immediate\write18{rm "\filetodeleteInCache.pdf"}
+\begin{codeexample}[vbox]
+\cacheEnvironment{tikzcd}{tikz, add to preamble={\usepackage{tikz-cd}}}
+\begin{tikzcd}<recompile>
+  A \rar & B
+\end{tikzcd}    
 \end{codeexample}
 
+Note that this assumes that your compilation command is idempotent (so running it twice is like running it once) since the aux files are not cached. If you want to clean aux files or if you run an older version, see the documentation of |recompile| in \cref{sec:configureCompilationCommand}.
 
 \section{Documentation}
 
@@ -2212,6 +2210,55 @@ plt.ylabel('Number of futurestud.io Tutorials')
   \makeatother%
   \pgfmanualbody
   By default, we compile cached documents only if |-shell-escape| is enabled. However, if the user allowed |pdflatex| (needed to compile latex documents), |cd| (not needed when using |no cache folder|), and |mkdir| (not needed when using |no cache folder| or if the cache folder that defaults to |robustExternalize| is already created) to run in restricted mode (so without enabling |-shell-escape|), then there is no need for |-shell-escape|. In that case, set |force compilation| and this library will compile even if |-shell-escape| is disabled.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/recompile\@nil
+  \extractkey/robExt/do not recompile\@nil
+  \makeatother%
+  \pgfmanualbody
+  (new to v2.1) |recompile| will force a compilation even if the image is already cached (mostly useful if you made a change to a non-tracked dependency). Note that since this library does not want to remove any file on the hard drive (we do not want to risk to remove important files in case of a bug), this command will NOT clear the auxiliary files already present, so for maximum purity, ensure that your compiling command is idempotent (so that compiling twice gives the same outcome as compiling once).
+
+\begin{codeexample}[vbox]
+\cacheEnvironment{tikzcd}{tikz, add to preamble={\usepackage{tikz-cd}}}
+\begin{tikzcd}<recompile>
+  A \rar & B
+\end{tikzcd}    
+\end{codeexample}
+  
+If you want to actually remove the aux files, you can either change the compilation command, or add something like this to remove the file (note that it will prompt a message before running the actual command), using the hook |robust-externalize/just-before-writing-files| that we introduced in v2.1:
+\begin{codeexample}[code only]
+\cacheTikz
+
+\robExtConfigure{
+  clean and recompile/.code={%
+    \AddToHook{robust-externalize/just-before-writing-files}{%
+      \edef\command{rm -f "\robExtAddCachePathAndName{\robExtFinalHash.pdf}" && %
+        rm -f "\robExtAddCachePathAndName{\robExtFinalHash.aux}"}%
+      \message{You will run the command ``\command''}%
+      \message{Press X if you do NOT want to run it, otherwise press ENTER.}%
+      \show\def% this is just used to wait a user input
+      \immediate\write18{\command}%
+    }%
+  },%
+}
+
+\begin{tikzpicture}<clean and recompile>
+  \node[fill=red] {B};
+\end{tikzpicture}
+\end{codeexample}
+Note that if you do not want to run a command from \LaTeX{}, or if you are on a version smaller than 2.1, you can also simply print the name of the file in the pdf and remove it manually:
+
+\begin{codeexample}[width=0cm,vbox]
+\begin{CacheMe}{tikzpicture, name output=filetodelete}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{CacheMe}\\
+
+You want to delete the file \texttt{\filetodeleteInCache.pdf}. %
+\end{codeexample}
+
 \end{pgfmanualentry}
 
 
@@ -3345,9 +3392,11 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
-\item future v2.0.1 (master on github, not released yet on CTAN):
+\item future v2.1 (master on github, not released yet on CTAN):
   \begin{itemize}
   \item Fix a bug when compiling a template that was not exporting dependencies
+  \item Add |recompile| to recompile a file even if no dependencies changed.
+  \item Add a hook |robust-externalize/just-before-writing-files|.
   \end{itemize}
 \item v2.0:
   \begin{itemize}
