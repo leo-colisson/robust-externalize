@@ -8,6 +8,7 @@
 \RequirePackage{verbatim} % For the \verbatim command, useful for debugging purpose for instance
 \RequirePackage{xsimverb} % To easily write verbatim code to files
 \RequirePackage{etoolbox} % To easily write verbatim code to files
+\RequirePackage{iftex} % computing md5 sum differs on lualatex/pdflatex/xelatex
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
@@ -189,6 +190,19 @@ if __name__ == '__main__':
     \expandafter \RenewCommandCopy \csname#1\expandafter\endcsname \csname#2\endcsname
     \expandafter \RenewCommandCopy \csname end#1\expandafter\endcsname \csname end#2\endcsname
 }
+
+%% Depending on the engine, computing md5 is done in different ways
+\ifluatex%
+  \def\robExt@pdfmdfivesum#1{%
+    \directlua{tex.print(string.upper(md5.sumhexa("\luaescapestring{#1}")))}%
+  }%
+\else%
+  \ifxetex%
+    \def\robExt@pdfmdfivesum{\mdfivesum}%
+  \else%
+    \def\robExt@pdfmdfivesum{\pdfmdfivesum}%
+  \fi%
+\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Paths %%%%%%%%%%%%
@@ -643,7 +657,7 @@ if __name__ == '__main__':
   }
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\robExt@pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
@@ -683,7 +697,7 @@ if __name__ == '__main__':
   \str_set_hash_robust:Nn \l_robExt_tmp_contain_file {#4}
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\robExt@pdfmdfivesum{\l_robExt_tmp_contain_file}#3}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
@@ -714,7 +728,7 @@ if __name__ == '__main__':
   }
   %% computes the new filename based on the md5
   \str_clear_new:N \l_robExt_tmp_filename
-  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
+  \str_set:Nx \l_robExt_tmp_filename_no_prefix {\robExt@pdfmdfivesum{\l_robExt_tmp_contain_file}#2}
   %% Writes the content to the file
   \robExtCheckIfPrefixFolderExists
   \iow_open:Nx \g_robExt_write_iow {\robExtAddCachePathAndName{\l_robExt_tmp_filename_no_prefix}}
@@ -1298,14 +1312,14 @@ if __name__ == '__main__':
   \str_clear:N \l_robExt_dependencies_mdfive
   \robExtGetNearlyFinalValueTemplateAndCompilationCommand
   % We first add on the first line the compilation command, and on the second line the template file.
-  \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\pdfmdfivesum{\l_robExt_result_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
+  \str_set:Nx \l_robExt_dependencies_mdfive {command,\l_robExt_currentCompilationCommand^^J\robExt@pdfmdfivesum{\l_robExt_result_str ^^J},^^J} %% ^^J is a newline: LaTeX will automatically add a new line when writing the file
   \seq_map_inline:Nn \l_robExt_dependencies {
     \str_put_right:Nx \l_robExt_dependencies_mdfive {\file_mdfive_hash:n{##1},##1^^J} %% ^^J is a newline
   }
   %%
   %% Compute the final hash (the hash of all dependencies, including the current picture that is on the first line):
   %% The last newline is needed as the write operation automatically adds a newline.
-  \tl_set:Nx \robExtFinalHash {\pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
+  \tl_set:Nx \robExtFinalHash {\robExt@pdfmdfivesum{\l_robExt_dependencies_mdfive^^J}}
   % Might be useful to clean the previously compiled files, or change the MD5 sum, for instance if we do
   % not want to recompile when the file changes
   \robExtUseHookJustBeforeWritingFiles%
