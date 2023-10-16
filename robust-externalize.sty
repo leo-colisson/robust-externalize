@@ -9,6 +9,7 @@
 \RequirePackage{xsimverb} % To easily write verbatim code to files
 \RequirePackage{etoolbox} % To easily write verbatim code to files
 \RequirePackage{iftex} % computing md5 sum differs on lualatex/pdflatex/xelatex
+\RequirePackage{xparse} % solve https://github.com/leo-colisson/robust-externalize/issues/6
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
@@ -76,6 +77,9 @@
 \cs_generate_variant:Nn \ior_str_get:NN { Nc }
 
 \cs_generate_variant:Nn \file_if_exist:nTF { xTF }
+
+\cs_generate_variant:Nn \cs_replacement_spec:N { c }
+\cs_generate_variant:Nn \cs_argument_spec:N { c }
 
 %%%
 %%% String manipulation
@@ -1872,11 +1876,61 @@ if __name__ == '__main__':
   disable externalization now/.code={\robExtDisableTikzpictureOverwrite\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
+  command if no externalization/.code={},
   command if no externalization/.code={\robExtDisableTikzpictureOverwrite\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}},
   print verbatim if no externalization/.style={
     command if no externalization/.code={%
       \robExtPrintPlaceholder{__ROBEXT_MAIN_CONTENT__}%
     },
+  },
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Forward macros if externalization is enabled %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  command if externalization/.code={},
+  fw/.style={forward=#1},
+  forward/.style={%
+    command if externalization/.append code={%
+      \robExtGetCommandDefinitionInMacro{#1}%
+      \expanded{%
+        \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+          \expandonce{\robExtDefinitionCommand}%
+        }%
+      }%
+    },
+  },
+  forward at letter/.style={%
+    command if externalization/.append code={%
+      \robExtGetCommandDefinitionInMacro{#1}%
+      \expanded{%
+        \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+          \noexpand\makeatletter%
+          \expandonce{\robExtDefinitionCommand}%
+          \noexpand\makeatother%
+        }%
+      }%
+    },
+  },
+  forward eval/.style={%
+    command if externalization/.append code={%
+      \expanded{%
+        \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+          \noexpand\def\noexpand#1{#1}%
+        }%
+      }%
+    },%
+  },
+  forward counter/.style={%
+    command if externalization/.append code={%
+      \expanded{%
+        \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+          \noexpand\makeatletter%
+          % Make sure the counter exists:
+          \noexpand\ifcsname c@#1\noexpand\endcsname\noexpand\else\noexpand\newcounter{#1}\noexpand\fi%
+          \noexpand\setcounter{#1}{\the\value{#1}}%
+          \noexpand\makeatother
+        }%
+      }%
+    },%
   },
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Run code before/after inclusion %%%
@@ -1909,6 +1963,10 @@ if __name__ == '__main__':
       command if no externalization,
     }%
   \else%
+    \pgfkeys{
+      /robExt/.cd,
+      command if externalization,
+    }%
     \ifdefined\robExtExecuteBefore\robExtExecuteBefore\fi%
     \robExtWriteFile{}%
     \robExtCompileFile{}%
@@ -1960,6 +2018,100 @@ if __name__ == '__main__':
 \let\CacheMeNoContent\RobExtCacheMeNoContent
 \let\endCacheMeNoContent\endRobExtCacheMeNoContent
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Forward a macro %%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% In this section, we provide commands to forward a macro, like
+%% \def\myMacro{stuff}
+%% \cacheMe<forward=\myMacro>
+%% Note that this will only be forwarded if externalization is enabled (otherwise the macro already exists)
+%% I published this code in this answer, thanks to egreg for some pointers
+%% https://tex.stackexchange.com/questions/697120/how-to-extract-the-definition-of-a-macro-to-write-in-a-file-for-instance
+\ExplSyntaxOn
+
+\cs_new:Nn \__robExt_getCommandDefinitionFromXparse:N
+{
+  \str_clear_new:N \l_robExt_definition_str
+  \GetDocumentCommandArgSpec { #1 }
+  \str_set:Nx \l_robExt_definition_str {
+    \c_backslash_str DeclareDocumentCommand
+    \c_left_brace_str
+    \c_backslash_str \cs_to_str:N #1
+    \c_right_brace_str
+    \c_left_brace_str \ArgumentSpecification \c_right_brace_str
+    \c_left_brace_str
+    \cs_replacement_spec:c { \cs_to_str:N #1 ~ code }
+    \c_right_brace_str
+  }%
+}
+
+\cs_new:Nn \__robExt_getCommandDefinitionFromDef:N
+{
+  \str_clear_new:N \l_robExt_definition_str
+  \str_set:Nx \l_robExt_definition_str {
+    \c_backslash_str def \c_backslash_str \cs_to_str:N #1
+    \cs_argument_spec:c { \cs_to_str:N #1 }
+    \c_left_brace_str
+    \cs_replacement_spec:c { \cs_to_str:N #1 }
+    \c_right_brace_str
+  }%
+}
+
+\def\robExt@extractDefaultNewcommand#1#2#3#4{
+  #4%
+}%
+
+\cs_new:Nn \__robExt_getCommandDefinitionFromNewcommand:N
+{
+  \str_clear_new:N \l_robExt_definition_str
+  \str_clear_new:N \l_robExt_tmp
+  %% \l_robExt_tmp will look like [#1]#2#3#4#5#6#7:
+  \str_set:Nx \l_robExt_tmp {\cs_argument_spec:c { \c_backslash_str \cs_to_str:N #1 }}%
+  %% We remove the brackets:
+  \str_replace_all:Nnn \l_robExt_tmp {[} {}
+  \str_replace_all:Nnn \l_robExt_tmp {]} {}
+  \str_set:Nx \l_robExt_definition_str {
+    %% this line will be like "\newdocumentcommand{\mymacro}"
+    \c_backslash_str newcommand \c_left_brace_str \c_backslash_str \cs_to_str:N #1 \c_right_brace_str
+    %% It must have at least one argument, since elements without optional arguments are turned into \def
+    %% Moreover, macros can't have more than 1 argument, so it will be easier to parse, we just need the last digit
+    [\str_range:Nnn \l_robExt_tmp {-1} {-1}] %% <- this is the number of mandatory arguments
+    [\expandafter \robExt@extractDefaultNewcommand #1 ] %% <- this is the value of the default argument
+    \c_left_brace_str
+    \cs_replacement_spec:c { \c_backslash_str \cs_to_str:N #1 }
+    \c_right_brace_str
+  }%
+}
+
+% \robExtGetCommandDefinitionInMacro{\myMacro} will populate
+% \l_robExt_definition_str and \robExtDefinitionCommand
+% with a string to execute to write it properly.
+\NewDocumentCommand{\robExtGetCommandDefinitionInMacro}{m}{
+  \cs_if_exist:NTF #1 {
+    \cs_if_exist:cTF {\cs_to_str:N #1 ~ code}{
+      % xparse-based definition
+      \__robExt_getCommandDefinitionFromXparse:N #1%
+    } {
+      \cs_if_exist:cTF {\c_backslash_str \cs_to_str:N #1}{
+        % \newcommand-based definition
+        \__robExt_getCommandDefinitionFromNewcommand:N #1
+      }{
+        % \def-based definition
+        \__robExt_getCommandDefinitionFromDef:N #1
+      }
+    }
+  }{
+    \PackageError{robExt}{The~macro~#1~does~not~exist}
+  }
+  \let\robExtDefinitionCommand\l_robExt_definition_str
+}
+
+\NewDocumentCommand{\robExtGetCommandDefinition}{m}{%
+  \robExtGetCommandDefinitionInMacro{#1}%
+  \l_robExt_definition_str%
+}
+\ExplSyntaxOff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Default presets %%%%%%%%%%%%

@@ -293,6 +293,22 @@ You can also include files from the root folder, if you want, recompile all pict
 \end{CacheMe}
 \end{codeexample}
 
+Since v2.1, we also provide easy ways to export counters:
+\begin{codeexample}[width=0pt]
+\begin{tikzpictureC}<forward counter=page>
+  \node[rounded corners, fill=red]{The current page is \thepage.};
+\end{tikzpictureC}    
+\end{codeexample}
+or even macros (we can also export evaluated macros):
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\newcommand{\MyNodeWithNewCommand}[2][draw,thick]{\node[rounded corners,fill=red,#1]{#2};}
+\begin{tikzpicture}<forward=\MyNodeWithNewCommand>
+  \MyNodeWithNewCommand{Alice}
+  \MyNodeWithNewCommand[xshift=2cm]{Bob}
+\end{tikzpicture}
+\end{codeexample}
+
 
 We also provide many other things, among others:
 \begin{itemize}
@@ -682,6 +698,17 @@ You can feed data from the main document to the cached file using placeholders, 
 \end{tikzpictureC}
 \end{codeexample}
 
+However, since v2.1, we also provide a method to specifically export a counter using |forward counter=my counter| and a macro using |forward=\macroToExport|, possibly by evaluating first using |forward eval=\macroToEval|:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\NewDocumentCommand{\MyNode}{O{}m}{\node[rounded corners,fill=red,#1]{#2};}
+\begin{tikzpicture}<forward=\MyNode>
+  \MyNode{Alice}
+  \MyNode[xshift=2cm]{Bob}
+\end{tikzpicture}
+\end{codeexample}
+
+For details, see \cref{sec:forward}.
 \subsection{Defining macros}
 
 You can define macros in the preamble:
@@ -2435,6 +2462,7 @@ You might want (sometimes or always) to disable externalization, for instance to
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/command if no externalization\@nil
+  \extractkey/robExt/command if externalization\@nil
   \makeatother%
   \pgfmanualbody
   You can easily change the command to run if externalization is disabled using by setting the \textbf{.code} of this key. By default, it is configured as:\\
@@ -2443,7 +2471,8 @@ command if no externalization/.code={%
   \robExtDisableTikzpictureOverwrite\evalPlaceholder{__ROBEXT_MAIN_CONTENT__}%
 }
 \end{verbatim}
-Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\cacheTikz|). Note that if you write your own style, try to modify |__ROBEXT_MAIN_CONTENT__| so that it can be included as-it in a document: this way you do not need to change this command.
+  Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\cacheTikz|). Note that if you write your own style, try to modify |__ROBEXT_MAIN_CONTENT__| so that it can be included as-it in a document: this way you do not need to change this command.
+  You can also use |command if externalization/.append code={...}| if you want to run a code only if externalization is enabled (this is used for instance by the |forward| functionality).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2494,7 +2523,7 @@ uname -srv > "${outputTxt}"
   By doing |execute after each externalization={some code}|, you will run some code after the externalization. This might be practical for instance to update a counter (e.g. the number of pages\dots) based on the result of the compiled file.
 \end{pgfmanualentry}
 
-\subsubsection{Dependencies}
+\subsubsection{Dependencies}\label{sec:dependenciesDoc}
 
 In order to enforce reproducibility, you should tell what are the files that your code depends on, by adding this file as a dependency. This has the advantage that if this file is changed, your code is automatically recompiled. On the other hand, you might not want this behavior (e.g. if this file often changes in a non-important way): in that case, just don't add the file as a dependency (but keep that in mind as you might not be able to recompile your file if you clear the cache if you introduced breaking changes).
 
@@ -2519,6 +2548,104 @@ In order to enforce reproducibility, you should tell what are the files that you
 Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache folder (containing the |.tex| that will be cached) to the root folder.\\ This way, you can easily input files contained in the root folder.
 \end{pgfmanualentry}
 
+\subsubsection{Forward macros}\label{sec:forward}
+
+(since v2.1)
+
+So far, we have seen multiple approaches to use a macro in both the main document and in cached pictures, having different advantages:
+\begin{itemize}
+\item if we define the macro in a file say |common_inputs.tex|, if we include that file in both files \textbf{and} if we add it to the list of dependencies (\cref{sec:dependenciesDoc}), then you will have great purity (if |common_inputs.tex| changes, all files are recompiled), but this might be a problem if you often change the file |common_inputs.tex| since you will need to recompile all pictures every time you add a new macro
+\item If you follow the same procedure, but \textbf{without} adding the file in the list of dependencies, then you will save compilation time (no need to recompile everything if you add a macro in |common_inputs.tex|), but you will lose purity (if you change the definition of a macro in that file, you will need to manually specify the list of figures to recompile, e.g. using |recompile|).
+\item You can also create multiple files like |common_inputs_functionality_A.tex| and |common_inputs_functionality_B.tex|, and use the first solution (maybe by creating a preset that automatically calls |add to preamble| and |add dependencies|), and only input the appropriate file depending on the set of macro that you need. This gives a tradeoff of above approaches (good purity, with less recompilation), but you will still compile often if you put many macros in a single file (and nobody wants to create one macro per file!).
+\end{itemize}
+
+In this section, we provide a third solution that tries to solve the above issue (purity without frequent recompilations), by allowing the user to forward only a specific macro, with something like |forward=\myMacro|. Of course, this has the downside that you need to specify the list of all macros to forward (if you have many macros that you often want to import in some pictures, you can also create a preset that automatically loads all macros at once, and possibly call this preset at the beginning of each section to set it on a per-section basis).
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/forward=macro to forward\@nil
+  \extractkey/robExt/fw=macro to forward\@nil
+  \extractkey/robExt/forward at letter=macro to forward\@nil
+  \makeatother%
+  \pgfmanualbody
+  |forward| (alias |fw|) will forward the definition of a macro to the picture if externalization is enabled:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\def\myName{Alice}
+\begin{tikzpicture}<forward=\myName>
+  \node[fill=red]{\myName};
+\end{tikzpicture}
+\end{codeexample}
+Note that it works for macro defined with |\def|, |\newcommand| (or alike) and |\NewDocumentCommand| (or other xparse commands). For instance with xparse:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\NewDocumentCommand{\MyNode}{O{}m}{\node[rounded corners,fill=red,#1]{#2};}
+\begin{tikzpicture}<forward=\MyNode>
+  \MyNode{Alice}
+  \MyNode[xshift=2cm]{Bob}
+\end{tikzpicture}
+\end{codeexample}
+and with |\newcommand|:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\newcommand{\MyNodeWithNewCommand}[2][draw,thick]{\node[rounded corners,fill=red,#1]{#2};}
+\begin{tikzpicture}<forward=\MyNodeWithNewCommand>
+  \MyNodeWithNewCommand{Alice}
+  \MyNodeWithNewCommand[xshift=2cm]{Bob}
+\end{tikzpicture}
+\end{codeexample}
+Note that this might not work with quite involved macros. Notably, if the macro is defined by calling other macros, you need to also forward these macros.
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\def\myName{Alice}
+\NewDocumentCommand{\MyNodeWithInnerMacros}{O{}m}{\node[rounded corners,fill=red,#1]{\myName: #2};}
+\begin{tikzpicture}<forward=\MyNodeWithInnerMacros,forward=\myName>
+  \MyNodeWithInnerMacros{she is tall}
+\end{tikzpicture}
+\end{codeexample}
+Really involved macros (e.g.\ defined inside libraries) might call many other macros, possibly using the @ letter (used only in module code). If you REALLY want, you can forward such macros if you forward \textbf{all} macros that are used internally, using |forward at letter| that will automatically wrap the macro inside |\makeatletter...\makeatother|, but you should certainly use |add to preamble={\usepackage{yourlib}}| if you need to do something like that:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\makeatletter
+\def\module@name{Alice}
+\newcommand{\MyNodeWithAtCommands}[2][draw,thick]{\node[rounded corners,fill=red,#1]{\module@name};}
+\begin{tikzpicture}<forward at letter=\MyNodeWithAtCommands,forward at letter=\module@name>
+  \MyNodeWithAtCommands{Alice}
+\end{tikzpicture}
+\makeatother
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/forward eval=macro to eval and forward\@nil
+  \makeatother%
+  \pgfmanualbody
+  Evaluate a macro, and defines it using this new value when compiling the function. This might be useful for instance if your macro depends on other macros that you do not want to export:
+\begin{codeexample}[width=0pt]
+\def\name{Alice}
+\def\fullName{\name}
+\begin{tikzpictureC}<forward eval=\fullName>
+  \node[rounded corners, fill=red]{\fullName.};
+\end{tikzpictureC}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/forward counter=counter to forward\@nil
+  \makeatother%
+  \pgfmanualbody
+  Forward a counter:
+\begin{codeexample}[width=0pt]
+\begin{tikzpictureC}<forward counter=page>
+  \node[rounded corners, fill=red]{The current page is \thepage.};
+\end{tikzpictureC}    
+\end{codeexample}
+\end{pgfmanualentry}
 
 \subsubsection{Pass compiled file to another template}\label{sec:passOutputToOtherTemplate}
 
@@ -3420,6 +3547,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Add |recompile| to recompile a file even if no dependencies changed.
   \item Add a hook |robust-externalize/just-before-writing-files|.
   \item Fixed a bug in |\cacheTikz| that was not working with a custom argument for tikzpicture
+  \item Added options |forward*| to forward macros and counters
   \end{itemize}
 \item v2.0:
   \begin{itemize}
