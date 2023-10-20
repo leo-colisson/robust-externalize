@@ -1465,16 +1465,22 @@ if __name__ == '__main__':
           \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
         \else
           \ifdefined\robExtFallbackManualMode
-            \framebox[\linewidth]
+            \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
             {
-              \begin{minipage}{\linewidth}
-                \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
-              \end{minipage}
+              % We already executed the command (we have not fallback to manual mode), but the pdf was not generated.
+              \PackageError{robExt}{The ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ \robExtAddCachePathAndName{\robExtFinalHash.log}.}{}
+            }{
+              \framebox[\linewidth]
+              {
+                \begin{minipage}{\linewidth}
+                  \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+                \end{minipage}
+              }
+              % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
+              \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
             }
-            % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
-            \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
           \else
-            \PackageError{robExt}{For ~ an ~ unknown ~ reason ~ the ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above.}{}
+            \PackageError{robExt}{The ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ \robExtAddCachePathAndName{\robExtFinalHash.log}.}{}
           \fi
         \fi
       }%
