@@ -1879,6 +1879,7 @@ if __name__ == '__main__':
   %% Note: this does not work reliably for now
   %% TODO: fix this!
   disable externalization/.code={\def\robExtDisableExternalization{}},
+  de/.style={disable externalization},
   disable externalization now/.code={\robExtDisableTikzpictureOverwrite\def\robExtDisableExternalization{}},
   enable externalization/.code={\let\robExtDisableExternalization\undefined},
   % Useful to wrap, for instance, text
