@@ -313,12 +313,13 @@ or even macros (we can also export evaluated macros):
 We also provide many other things, among others:
 \begin{itemize}
 \item To achieve a pleasant and configurable interface (e.g. pass options to a preset with default values), we introduced placeholders, that can be of independent interest.
-\item A way to compile a template via:\\
+\item To get maximum purity while minimizing the number of rebuild, we provide functions to forward macros defined in the parent document, and the set of macros that must be forwarded can be automatically detected for each element to cache. It is also possible to conditionally import a library if the element contains a given macro.
+\item We provide a way to compile a template via:\\
   |new compiled preset={compiled ZX}{templateZX, compile latex template}{}|\\
   in order to make the compilation even faster (but you cannot use presets except |add to preamble|)
-\item A highly configurable template, compilation and inclusion system, to cache basically anything
-\item A way to compile all images in parallel during the first run, so that the first run becomes faster to compile than a normal run
-\item Commands to automatically clean the cache while keeping pictures in use
+\item We give a highly configurable template, compilation and inclusion system, to cache basically anything
+\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| (make sure to have GNU |parallel| installed on Linux/Mac and rush on Windows if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
+\item We furnish commands to automatically clean the cache while keeping cached elements that are still needed.
 \item And more\dots
 \end{itemize}
 
@@ -390,30 +391,21 @@ We completely rewrote the \href{https://github.com/leo-colisson/robust-externali
 \item with externalization, old library (next runs): 4.16s (so 21x faster)
 \end{itemize}
 
-\paragraph{Can I compile pictures in parallel to speed up the first run?} If you are worried by the time taken for the first run, you can also run it in manual mode and use for instance GNU |parallel| (or any tool of you choice) to run all commands in the file |\jobname-robExt-compile-missing-figures.sh| in parallel. To do that:
-\begin{itemize}
-\item First add |\robExtConfigure{enable manual mode}| in your file
-\item Create the cache folder, e.g.\ using |mkdir robustExternalize|
-\item Compile your file, with, e.g.\ |pdflatex yourfile.tex| (in my benchmark: 4.2s)
-\item This should create a file |yourfile-robExt-compile-missing-figures.sh|, with each line containing a compilation command like this (the command should be compatible with Windows, Mac and Linux, if not, let me know on github):
-\begin{verbatim}
-cd robustExternalize/ && pdflatex -halt-on-error "robExt-4A806941E86C6B657A0CB3D160CFFF3E.tex
-\end{verbatim}
-  \textbf{IMPORTANT}: \LaTeX{} might render \textbf{multiple times} the same picture if it is inside some particular environments (align, tables\dots), so this file can contain duplicates if you inserted cached data inside. To avoid running the same command twice, \textbf{be sure to remove duplicates!} On Linux, this can be done by piping the file into |sort| and |uniq| (if your files can depend on previously compiled elements as explained in \cref{sec:passOutputToOtherTemplate}, you should additionally preserve \mylink{https://unix.stackexchange.com/questions/194780/remove-duplicate-lines-while-keeping-the-order-of-the-lines}{the order of the lines}). Since this is anyway a rather advanced use case, we will not consider that case for simplicity.
-\item Run all these command in parallel, for instance on Linux you can install |parallel|, and run the following command (|--bar| displays a progress bar):
-\begin{verbatim}
-cat yourfile-robExt-compile-missing-figures.sh | sort | uniq | parallel --bar --jobs '200%'  
-\end{verbatim}
-(in my benchmark, it ran during 52s, so 1.6x faster than the original compilation)
-\item Recompile the original document with |pdflatex yourfile.tex|
-\end{itemize}
-In my benchmark, the total time is 2x4.2s + 52s = 60s, so 1.5 times faster than a normal command (of course, this depends a lot on the preamble of the file that you compile, since the loading time of the file is the main bottleneck for the first compilation; the advantage here is that it is easy to include only the necessary things in the preamble of cached pictures, possibly creating different presets if it is easier to manage it this way).
+\paragraph{Can I compile pictures in parallel to speed up notably the first run?}
+
+The first run might be particularly long to compile since many elements are still not cached and re-starting \LaTeX{} on each picture can take quite some time. If you have v2.1 or above, and if you have installed GNU parallel (on linux), or rush (on Windows) (\url{https://github.com/shenwei356/rush/}), you can simply compile all images in parallel by typing at the beginning of the file:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel
+}
+\end{codeexample}
+In my benchmark, I observed a compilation 1.5x faster than a normal compilation without any caching involved. We provide more options in \cref{sec:compileParallel}.
 
 \paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
 
 \paragraph{Can I deal with baseline position and overlays ?} Yes, the depth of the box is automatically computed and used to include the figure by default, and additional margin is added to the image (30cm by default) to allow overlay text.
 
-\paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command and the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
+\paragraph{How is purity enforced?} Purity is the property that if you remove the cached files and recompile your document, you should end-up with the same output. To enforce purity, we compute the hash of the final program, including the compilation command, the dependency files used for instance in |\input{include.tex}| (unless you prefer not to, for instance to keep parts of the process impure for efficiency reasons), the forwarded macros, and put the code in a file named based on this hash. Then we compile it if it has not been used before, and include the output. Changing a single character in the file, the tracked dependencies, or the compilation command will lead to a new hash, and therefore to a new generated picture.
 
 \paragraph{What if I don't want purity for all files?} If you do not want your files to be recompiled if you modify a given file, then just do not add this file to the list of dependencies.
 
@@ -423,21 +415,25 @@ In my benchmark, the total time is 2x4.2s + 52s = 60s, so 1.5 times faster than 
 
 Pros of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
-\item The above library is likely to be quicker on the first run since it packs everything in a single file (so you save the time to run latex for each picture). On the other hand, we can load in the preamble exactly what is needed for the picture (we do not load all the preamble of the main file), so our startup time is not huge (it adds 1s per picture in my tests when using the |zx-calculus| library), and you can still either run it in parallel to save time (as far as I know this is not possible with |memoize|), or commit the cached file to help with recompiling the document elsewhere.
-\item It seems to be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz pictures are automatically memoized (we provide |\cacheTikz| for that, but you still need to specify the preamble once).
-\item Even if it does not officially support contexts, context might be automatically transmitted (while we need to explicitly pass the context). However, this can break purity (see below).
+\item The above library might be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz pictures are automatically memoized (we provide |\cacheTikz| for that, but you still need to specify the preamble once).
+\item This library allows to compile multiple pictures while loading \LaTeX{} only once, saving the time to start \LaTeX{} for each picture. However, it is not clear that it brings a faster compilation time compared to our library for multiple reasons:
+  \begin{itemize}
+  \item While during the first run all pictures are compiled with a single \LaTeX{} instance\footnote{We could also do something similar using some scripting to merge multiple cached files together, but this is not yet implemented.} (and inserted at the beginning of the document), they still need to extract each picture in a separate pdf file to include it at the right place in the document. This is done by default using |pdflatex|, which means that you need to call |pdflatex| once per picture, mitigating the advantage of compiling all pictures at once. Note that they also provide a python script to separate the pictures more efficiently, but this needs further manual interventions.
+  \item We provide an option |compile in parallel| to compile all images in parallel, and the time is in my benchmark 1.5x faster than a normal compilation without any caching. Using this option, we should therefore compile faster than |memoized| that is not able to run jobs in parallel.
+  \end{itemize}
+\item Even if it does not officially support contexts, context might be automatically transmitted (while we need to do a bit of work to manually or semi-automatically define the context needed to compile a picture). However, this can break purity (see below).
 \end{itemize}
 
 Cons of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
-\item The purity is not enforced so strongly since all images are in the same file. Notably, the hash only depends on the picture, but not on its context. So for instance if you define |\def\mycolor{blue}| before the picture, and use |\mycolor| inside the picture, if you change later the color to, say, |\def\mycolor{red}|, the picture will not be recompiled (so cleaning the cache and recompiling would produce a different result). In our case, the purity is always strictly enforced (unless you choose not to) since the context must be explicitly passed to the compiled file.
+\item The purity is not enforced so strongly since all images are in the same file. Notably, the hash only depends on the picture, but not on its context. So for instance if you define |\def\mycolor{blue}| before the picture, and use |\mycolor| inside the picture, if you change later the color to, say, |\def\mycolor{red}|, the picture will not be recompiled (so cleaning the cache and recompiling would produce a different result). In our case, the purity is always strictly enforced (unless you choose not to) since the context must be passed (explicitly or semi-automatically) to the compiled file.
 \item As a result, the above library has poor support for contexts (in our case, you can easily, for instance, make a picture depend on the current page, and recompile the picture only if the current page changes: you can also do it the other way, and change some counters, say, depending on the cached file).
-\item The above library only focuses on \LaTeX{} while our library works for any language
-\item The above library can only produce pdf formats, while we can generate any format (text, tex, jpg\dots{} and even videos that I include in my beamer presentations\dots{} but it is another question).
+\item The above library only focuses on \LaTeX{} while our library works for any language.
+\item The above library can only cache in pdf format, while we can generate any format (text, tex, jpg\dots{} and even videos that I include in my beamer presentations\dots{} but it is another topic!).
 \item We have an arguably more complete documentation.
 \end{itemize}
 
-Note that |remember picture| is not working in both libraries.
+Note that |remember picture| is not supported in both libraries, but we can provide multiple methods to disable externalizations when |remember picture| is used.
 
 \section{Tutorial}
 
@@ -479,7 +475,7 @@ If you only care about \tikzname's picture, you have 3 options:
 \item Call once |\cacheTikz| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| or |tikzpicture| presets (that first loads |tikz|).
 \item Use the generic commands that allows you to wrap an arbitrary environment:
 \begin{verbatim}
-%        name environment ---v            v----- preset options
+%  name environment ---v            v----- preset options
 \cacheEnvironment{tikzpicture}{tikzpicture}
 \end{verbatim}
   Note that you can also wrap commands (that you call with |\foo| instead of |\begin{foo}...\end{foo}|) using this:\\
@@ -738,6 +734,21 @@ We compute this data that is long to compute:
 \end{CacheMe}
 
 We computed the cached value \myLongResult.
+\end{codeexample}
+
+\subsection{Compile in parallel}
+Make sure to have GNU parallel installed (linux/mac) or rush (windows), and type in your preamble:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel
+}
+\end{codeexample}
+to compile all figures in parallel (you need to compile your document twice). Your document should build significantly faster, even faster than a normal run. If you want to compile in parallel
+only if you have more than 5 new elements to cache, do:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel after=5
+}
 \end{codeexample}
 
 \subsection{Compile a preset}\label{sec:compilePreset}
@@ -2679,9 +2690,62 @@ Note that if you do not want to display the first cached file, you can use |do n
 
 \end{pgfmanualentry}
 
-\subsubsection{Compile even faster}\label{sec:compileFaster}
+\subsubsection{Compile in parallel}\label{sec:compileParallel}
 
-Long story short: you can compile even faster (at least 1.5x in our tests, but we expect this to be more visible on larger tests due to the loading time of the preamble of the main document that takes most of the time of the compilation) by compiling presets, but beware that you will not be able to modify the placeholders except |add to preamble| with the default compiler we provide:
+(introduced in v2.1, read below on how to do it manually on v2.0)
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/compile in parallel=\oarg{nb of pictures to compile normally} (default 0)\@nil
+  \extractkey/robExt/compile in parallel after=\oarg{nb pictures to compile normally} (default 0)\@nil
+  \makeatother%
+  \pgfmanualbody
+  These two commands are alias. Typing in the preamble:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel
+}
+\end{codeexample}
+will cause the cached elements to be compiled in parallel (this requires two compilations of the main project). For this to work out of the box, you need to have GNU |parallel| installed (on linux or Mac) or rush (\url{https://github.com/shenwei356/rush/}) on Windows. Typing |compile in parallel after=3| will start the compilation in parallel only if you have more than 3 new elements to compile, and compile the first 3 elements normally (useful when you work on one picture at a time since you do not need to compile twice the document).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/compile in parallel command=\marg{command to run} (default 0)\@nil
+  \makeatother%
+  \pgfmanualbody
+  You can customize the compilation command to run via something like:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel command={parallel --jobs 200\% :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}},
+}
+\end{codeexample}
+\end{pgfmanualentry}
+
+NB: in version smaller than v2.1 (or if you prefer the manual method), you can instead run it in manual mode and use for instance GNU |parallel| (or any tool of you choice) to run all commands in the file |\jobname-robExt-compile-missing-figures.sh| in parallel. To do that:
+\begin{itemize}
+\item First add |\robExtConfigure{enable manual mode}| in your file
+\item Create the cache folder, e.g.\ using |mkdir robustExternalize|
+\item Compile your file, with, e.g.\ |pdflatex yourfile.tex| (in my benchmark: 4.2s)
+\item This should create a file |yourfile-robExt-compile-missing-figures.sh|, with each line containing a compilation command like this (the command should be compatible with Windows, Mac and Linux, if not, let me know on github):
+\begin{verbatim}
+cd robustExternalize/ && pdflatex -halt-on-error "robExt-4A806941E86C6B657A0CB3D160CFFF3E.tex
+\end{verbatim}
+  \textbf{IMPORTANT}: \LaTeX{} might render \textbf{multiple times} the same picture if it is inside some particular environments (align, tables\dots), so this file can contain duplicates if you inserted cached data inside. To avoid running the same command twice, \textbf{be sure to remove duplicates!} On Linux, this can be done by piping the file into |sort| and |uniq| (if your files can depend on previously compiled elements as explained in \cref{sec:passOutputToOtherTemplate}, you should additionally preserve \mylink{https://unix.stackexchange.com/questions/194780/remove-duplicate-lines-while-keeping-the-order-of-the-lines}{the order of the lines}). Since this is anyway a rather advanced use case, we will not consider that case for simplicity.
+\item Run all these command in parallel, for instance on Linux you can install |parallel|, and run the following command (|--bar| displays a progress bar):
+\begin{verbatim}
+cat yourfile-robExt-compile-missing-figures.sh | sort | uniq | parallel --bar --jobs '200%'  
+\end{verbatim}
+(note that since v2.1, it is not necessary to remove duplicates using |sort| and |uniq| since the file contains no more duplicates) In my benchmark, it ran during 52s, so 1.6x faster than the original compilation)
+\item Recompile the original document with |pdflatex yourfile.tex|
+\end{itemize}
+In my benchmark, the total time is 2x4.2s + 52s = 60s, so 1.5 times faster than a normal command (of course, this depends a lot on the preamble of the file that you compile, since the loading time of the file is the main bottleneck for the first compilation; the advantage here is that it is easy to include only the necessary things in the preamble of cached pictures, possibly creating different presets if it is easier to manage it this way).
+
+\subsubsection{Compile a template to compile even faster}\label{sec:compileFaster}
+
+Long story short: you can compile even faster (at least 1.5x in our tests, but we expect this to be more visible on larger tests due to the loading time of the preamble of the main document that takes most of the time of the compilation) by compiling presets, but beware that you will not be able to modify the placeholders except |add to preamble| with the default compiler we provide. The gain comes from the fact that instead of trying to find all placeholders to replace in the string, we can directly replace a few hard-coded placeholders to save time (yes, \LaTeX{} is not really efficient so it can make a difference\dots).
 
 
 \begin{pgfmanualentry}

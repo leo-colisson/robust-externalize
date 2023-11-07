@@ -1,5 +1,5 @@
 \ProvidesPackage{robust-externalize}[2.0+unstable Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
-% todo: understand why python scripts with raise NameError("42") do not make latex crash.
+% todo: 
 % change order argument replace from list, it is hard to read this way
 
 \RequirePackage{pgfkeys} % We use the /robExt/... path to store our keys.
@@ -10,18 +10,14 @@
 \RequirePackage{etoolbox} % To easily write verbatim code to files
 \RequirePackage{iftex} % computing md5 sum differs on lualatex/pdflatex/xelatex
 \RequirePackage{xparse} % solve https://github.com/leo-colisson/robust-externalize/issues/6
+\RequirePackage{atveryend} % to compile in parallel all images
+\RequirePackage{ifplatform} % check if windows
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
-% - create pre-made settings for tikz, tikz-cd, ...
-% - check compatibility with windows
-% - write documentation
-
-%%% Under the hood, this library is quite simple: each picture must, somehow, provide:
-%% - \l_robExt_final_file LaTeX3 string containing the content of the final file
-%% - 
-%% Then, the library will hash everything to create a unique name (of the content, the template code, and the set of dependency filenames),
-%% it will create a file "MD5.tex" containing the pre-template+content+post-template, and it will compile it.
+% - implement a simple way to parallelize compilation directly from latex. In linux, use gnu parallel. On windows,
+% use "rush" and use the command line rush -i file.txt "cmd /C \"{}\"", that will run the command inside cmd.
+% https://github.com/shenwei356/rush
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Utils %%%%%%%%%%%%
@@ -111,6 +107,24 @@
   \str_set_hash_robust:Nn \l_robExt_tmp_str {#1}
   \tl_rescan:nv {}{ l_robExt_tmp_str }
 }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% Error messages %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% In LaTeX3 error messages are defined here, this allows people to translate them, filter them, change them,
+%% make them more verbose etc.
+\msg_new:nnn {robExt}{underscore in name}{Error:~all~the~placeholders~should~contain~two~consecutive~underscores~in~their~name.}
+\msg_new:nnn {robExt}{placeholder not existing}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #3 ~ does ~ not ~ exists.}
+\msg_new:nnn {robExt}{forgot template}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}
+\msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
+\msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
+\msg_new:nnn {robExt}{missing compiled pdf}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
+\msg_new:nnn {robExt}{missing compiled pdf parallel}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
+
+% warnings
+\msg_new:nnn {robExt}{recommend two underscores in placeholders}{We~recommend~to~use~only~placeholders~containing~two~consecutive~underscores~in~their~name}
+\msg_new:nnn {robExt}{enabled parallel no shell escape}{Warning:~you~enabled~parallel~compilation~but~shell-escape~is~disabled.}
+\msg_new:nnn {robExt}{rerun because parallel}{Warning:~Compiling~all~missing~figures~in~parallel~with~"#1".~You~need~to~rerun~LaTeX~to~include~them.}
 
 \ExplSyntaxOff
 
@@ -250,6 +264,7 @@ if __name__ == '__main__':
     }
   \fi
 }
+
 
 \NewExpandableDocumentCommand{\robExtGetPrefixPath}{}{%
   \ifdefined\robExtCacheFolder%
@@ -492,11 +507,11 @@ if __name__ == '__main__':
 \NewDocumentCommand{\checkIfPlaceholderNameIsLegal}{m}{
   \cs_if_exist:NTF {\robExtPlaceholderOnlyWithUnderscores} {
     \str_if_in:nnTF {#1}{__}{}{
-      \PackageError{robExt}{Error:~all~the~placeholders~should~contain~two~consecutive~underscores~in~their~name.}{}
+      \msg_error:nn{robExt}{underscore in name}
     }
   } {
     \str_if_in:nnTF {#1}{__}{}{
-      \message{WARNING:~we~recommend~to~use~only~placeholders~containing~two~consecutive~underscores~in~their~name.}
+      \msg_warning:nn{robExt}{recommend two underscores in placeholders}
     }
   }
 }
@@ -827,7 +842,7 @@ if __name__ == '__main__':
   \cs_if_exist:cTF { l_robExt_placeholder_#3_str }{
     \str_set_eq:Nc { \l_robExt_result_str }{ l_robExt_placeholder_#3_str }
   }{
-    \PackageError{robExt}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #3 ~ does ~ not ~ exists.}
+    \msg_error:nn{robExt}{placeholder not existing}
   }
   \robExtDebugMessage{Starting~to~replace~placeholder~#3~to~get~\l_robExt_result_str}
   \replace_until_impossible:N { }
@@ -1347,7 +1362,7 @@ if __name__ == '__main__':
     \message{The\space file\space \robExtAddCachePathAndName{\robExtFinalHash.tex} \space already\space exists.^^J}
   }{
     \str_if_eq:VnTF { \l_robExt_result_str }{__ROBEXT_TEMPLATE__} {
-      \PackageError{robExt}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}{}
+      \msg_error:nn{robExt}{forgot template}
     }{
       % Check if the output directory exists
       \robExtCheckIfPrefixFolderExists
@@ -1390,10 +1405,34 @@ if __name__ == '__main__':
     % Make sure this command is run from the cache folder
     \ifdefined\robExtCacheFolder
       \str_put_left:Nx \l_robExt_currentCompilationCommand {cd ~ \robExtCacheFolder \space && ~ }
+    \fi%
+    %%% We enable manual mode if we enabled "compile in parallel after=N" and we compiled more than N elements
+    % Check if we want to run stuff in parallel
+    \ifdefined\robExt@compile@parallel@after
+      % TODO: ****
+      \int_gset:Nn \g__robExt_number_figures_just_compiled_or_to_compile {\g__robExt_number_figures_just_compiled_or_to_compile + 1}
+      % We check if the number of figures that we already compiled is large enough to start parallel compilation
+      \int_compare:nNnTF {
+        \g__robExt_number_figures_just_compiled_or_to_compile} > {\robExt@compile@parallel@after
+      } {
+        \def\robExtManualMode
+      } {}
     \fi
     \ifdefined\robExtManualMode
       \message{[robExt] Manual mode enabled: please, manually compile the images using \l_robExt_currentCompilationCommand or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
-      \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_currentCompilationCommand}% a new line is automatically added
+      % Avoid writing the same command multiple times (might occur in environments that execute the
+      % same command multiple times like align etc)
+      \cs_if_exist:cTF {l__robExt_missing_figure_\l_robExt_currentCompilationCommand :}{}{
+        \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_currentCompilationCommand}% a new line is automatically added
+        \cs_gset:cn {l__robExt_missing_figure_\l_robExt_currentCompilationCommand :} {}
+        \ifdefined\robExt@compile@parallel@after
+          \gdef\robExt@compile@parallel@must@compile{}
+          \seq_gput_right:Nx \g__robExt_files_compiled_in_parallel {\robExtAddCachePathAndName{\robExtFinalHash}}
+          % Gets the line with the error for easier debugging
+          \cs_gset:cx {g__robExt_lines_error_\robExtAddCachePathAndName{\robExtFinalHash}:} {\msg_line_number:}
+          \cs_gset:cx {g__robExt_compilation_command_\robExtAddCachePathAndName{\robExtFinalHash}:} {\l_robExt_currentCompilationCommand}
+        \fi
+      }
     \else
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
       {
@@ -1401,10 +1440,19 @@ if __name__ == '__main__':
         \sys_shell_now:x {\l_robExt_currentCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
       }{
         \ifdefined\robExtFallbackManualMode
-          \message{[robExt] Fallback to manual mode: please, manually compile the images using \l_robExt_currentCompilationCommand or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
-          \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_currentCompilationCommand}% a new line is automatically added
+          % Avoid writing the same command multiple times (might occur in environments that execute the
+          % same command multiple times like align etc)
+          \cs_if_exist:cTF {l__robExt_missing_figure_\l_robExt_currentCompilationCommand :}{}{
+            \message{[robExt] Fallback to manual mode: please, manually compile the images using \l_robExt_currentCompilationCommand or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
+            \iow_now:Nx \g_robExt_write_manually_compile_all_missing_figures {\l_robExt_currentCompilationCommand}% a new line is automatically added
+            \cs_gset:cn {l__robExt_missing_figure_\l_robExt_currentCompilationCommand :} {}
+            \ifdefined\robExt@compile@parallel@after
+              \gdef\robExt@compile@parallel@must@compile{}
+              \seq_gput_right:Nx \g__robExt_files_compiled_in_parallel {\robExtAddCachePathAndName{\robExtFinalHash}}
+            \fi
+          }
         \else
-          \PackageError{robExt}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}{}
+          \msg_error:nn{robExt}{need shell escape}
         \fi
       }
     \fi
@@ -1472,7 +1520,7 @@ if __name__ == '__main__':
             \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
             {
               % We already executed the command (we have not fallback to manual mode), but the pdf was not generated.
-              \PackageError{robExt}{The ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ \robExtAddCachePathAndName{\robExtFinalHash.log}.}{}
+              \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
             }{
               \framebox[\linewidth]
               {
@@ -1484,7 +1532,7 @@ if __name__ == '__main__':
               \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
             }
           \else
-            \PackageError{robExt}{The ~ pdf ~ file ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf} ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ \robExtAddCachePathAndName{\robExtFinalHash.log}.}{}
+            \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
           \fi
         \fi
       }%
@@ -2102,7 +2150,66 @@ if __name__ == '__main__':
       \expandafter\xdef\csname #1InCache\endcsname{\robExtAddCachePathAndName{\robExtFinalHash}}%
     }%
   },
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Compile in parallel automatically
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  compile in parallel/.style={compile in parallel after=#1},
+  compile in parallel/.default=0,
+  compile in parallel after/.code={%
+    \gdef\robExt@compile@parallel@after{#1}%
+  },
+  compile in parallel/.default=0,
+  compile in parallel command/.store in=\robExt@compile@parallel@command,
 }
+
+\ExplSyntaxOn
+\int_new:N \g__robExt_number_figures_just_compiled_or_to_compile
+\int_set:Nn \g__robExt_number_figures_just_compiled_or_to_compile {0}
+% Will hold the list of input files to compile in parallel. This is needed to
+% check at the end to find the processes that failed to build.
+\seq_new:N \g__robExt_files_compiled_in_parallel
+
+\AfterLastShipout{
+  % Check if we want to run stuff in parallel
+  \ifdefined\robExt@compile@parallel@after
+    % Check if we must compile
+    \ifdefined\robExt@compile@parallel@must@compile
+      % Check if we can compile
+      \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation}}
+      {
+        % Check if a command was provided
+        \ifdefined\robExt@compile@parallel@command\else
+          \ifwindows
+            % parallel is not easily installable on Windows, so we use rush instead from
+            % https://github.com/shenwei356/rush
+            % (to install, just extract and copy the folder to the Windows path in the rush documentation)
+            \xdef\robExt@compile@parallel@command{rush~-i~"\jobname-\robExtAddPrefixName{compile-missing-figures.sh}"~"cmd~/C~'{}'"}
+          \else
+            \xdef\robExt@compile@parallel@command{parallel~--jobs 200\%~::::~'\jobname-\robExtAddPrefixName{compile-missing-figures.sh}'}
+          \fi
+        \fi
+        \msg_warning:nn{robExt}{rerun because parallel}{\robExt@compile@parallel@command}
+        % We close the file or reading it is empty
+        \iow_close:N \g_robExt_write_manually_compile_all_missing_figures
+        \sys_shell_now:x {\robExt@compile@parallel@command}
+        % We check if some files failed to compile
+        \seq_map_inline:Nn \g__robExt_files_compiled_in_parallel {
+          \message{#1}
+          \file_if_exist:xTF{#1.pdf}{\message{File #1.pdf is ok.}}{
+            \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}
+          }
+        }
+      } {
+        \ifdefined\robExtFallbackManualMode
+          \msg_warning:nn{robExt}{enabled parallel no shell escape}
+        \else
+          \msg_error:nn{robExt}{need shell escape parallel}
+        \fi
+      }
+    \fi
+  \fi
+}
+\ExplSyntaxOff
 
 % Not really made for the end user
 % It assumes that __ROBEXT_COMPILATION_COMMAND__ and __ROBEXT_TEMPLATE__ is set
@@ -2252,7 +2359,7 @@ if __name__ == '__main__':
       }
     }
   }{
-    \PackageError{robExt}{The~macro~#1~does~not~exist}
+    \msg_error:nn{robExt}{The~macro~#1~does~not~exist}
   }
   \let\robExtDefinitionCommand\l_robExt_definition_str
 }
