@@ -15,9 +15,6 @@
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
-% - implement a simple way to parallelize compilation directly from latex. In linux, use gnu parallel. On windows,
-% use "rush" and use the command line rush -i file.txt "cmd /C \"{}\"", that will run the command inside cmd.
-% https://github.com/shenwei356/rush
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Utils %%%%%%%%%%%%
@@ -2171,8 +2168,23 @@ if __name__ == '__main__':
   compile in parallel after/.code={%
     \gdef\robExt@compile@parallel@after{#1}%
   },
-  compile in parallel/.default=0,
+  compile in parallel after/.default=0,
   compile in parallel command/.store in=\robExt@compile@parallel@command,
+  % Different backends to compile in parallel
+  compile in parallel with gnu parallel/.style={
+    compile in parallel command={parallel --jobs #1 :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}'},
+  },
+  compile in parallel with gnu parallel/.default={200\%},
+  compile in parallel with xargs/.style={
+    compile in parallel command={xargs -t -a '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}' -I "{}" -P #1 \robExtParallelShell\space '{}'},
+  },
+  compile in parallel with xargs/.default={16},
+  % By default, we compile with xargs and 16 processes:
+  compile in parallel with xargs,
+  compile in parallel with rush/.style={
+    compile in parallel command={rush -i "\jobname-\robExtAddPrefixName{compile-missing-figures.sh}" #1 "\robExtParallelShell\space '{}'"},
+  },
+  compile in parallel with rush/.default={},
 }
 
 \ExplSyntaxOn
@@ -2190,25 +2202,23 @@ if __name__ == '__main__':
       % Check if we can compile
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation}}
       {
-        % Check if a command was provided
-        \ifdefined\robExt@compile@parallel@command\else
+        % Check if a command was provided. Not called before because \ifwindows needs shell escape that might be disabled
+        \ifdefined\robExtParallelShell\else
           \ifwindows
-            % parallel is not easily installable on Windows, so we use rush instead from
-            % https://github.com/shenwei356/rush
-            % (to install, just extract and copy the folder to the Windows path in the rush documentation)
-            \xdef\robExt@compile@parallel@command{rush~-i~"\jobname-\robExtAddPrefixName{compile-missing-figures.sh}"~"cmd~/C~'{}'"}
+            \def\robExtParallelShell{cmd~/C}
           \else
-            \xdef\robExt@compile@parallel@command{parallel~--jobs 200\%~::::~'\jobname-\robExtAddPrefixName{compile-missing-figures.sh}'}
+            \def\robExtParallelShell{sh~-c}
           \fi
         \fi
-        \msg_warning:nn{robExt}{rerun because parallel}{\robExt@compile@parallel@command}
         % We close the file or reading it is empty
         \iow_close:N \g_robExt_write_manually_compile_all_missing_figures
+        \msg_warning:nnx{robExt}{rerun because parallel}{\robExt@compile@parallel@command}
+        \message{\robExt@compile@parallel@command}
         \sys_shell_now:x {\robExt@compile@parallel@command}
         % We check if some files failed to compile
         \seq_map_inline:Nn \g__robExt_files_compiled_in_parallel {
           \message{#1}
-          \file_if_exist:xTF{#1.pdf}{\message{File #1.pdf is ok.}}{
+          \file_if_exist:xTF{#1.pdf}{}{
             \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}
           }
         }

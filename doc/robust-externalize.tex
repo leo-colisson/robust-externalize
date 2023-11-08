@@ -337,7 +337,7 @@ We also provide a number of other functionalities, among others:
   |new compiled preset={compiled ZX}{templateZX, compile latex template}{}|\\
   in order to make the compilation even faster (but you cannot use presets except |add to preamble|)
 \item We give a highly configurable template, compilation and inclusion system, to cache basically anything
-\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| (make sure to have GNU |parallel| installed on Linux/Mac and rush on Windows if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
+\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| or |\robExtConfigure{compile in parallel after=5}| (make sure to have xargs installed, which is available by default on linux but must be installed on Windows via by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
 \item We furnish commands to automatically clean the cache while keeping cached elements that are still needed.
 \item And more\dots
 \end{itemize}
@@ -412,7 +412,7 @@ We completely rewrote the \href{https://github.com/leo-colisson/robust-externali
 
 \paragraph{Can I compile pictures in parallel to speed up notably the first run?}
 
-The first run might be particularly long to compile since many elements are still not cached and re-starting \LaTeX{} on each picture can take quite some time. If you have v2.1 or above, and if you have installed GNU parallel (on linux), or rush (on Windows) (\url{https://github.com/shenwei356/rush/}), you can simply compile all images in parallel by typing at the beginning of the file:
+The first run might be particularly long to compile since many elements are still not cached and re-starting \LaTeX{} on each picture can take quite some time. If you have v2.1 or above, and if you have xargs installed (installed by default on most linux, on Windows you need to install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), you can simply compile all images in parallel by typing at the beginning of the file:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel
@@ -702,6 +702,24 @@ Which gives you {
   \todo{Check how to use cacheCommand and cacheEnvironment}
 }
 
+You can also disable externalization on elements that contain a specific string/regexp. For instance, you can disable externalization on all elements containing |remember picture|:
+\begin{codeexample}[vbox]
+\cacheTikz
+\robExtConfigure{
+  add to preset={tikz}{
+    % \b means "word boundary", and spaces must be escaped
+    if matches={\b remember\ picture\b}{disable externalization},
+  },
+}
+\begin{tikzpicture}[remember picture]
+  \node[fill=green](my node){Point to me};
+\end{tikzpicture} %
+Some text %
+\begin{tikzpicture}[overlay, remember picture]
+  \draw[->] (0,0) to[bend left] (my node);
+\end{tikzpicture}
+\end{codeexample}
+
 
 \subsection{Feeding data from the main document to the cached documents}\label{sec:forwardIntro}
 
@@ -801,14 +819,14 @@ We computed the cached value \myLongResult.
 \end{codeexample}
 
 \subsection{Compile in parallel}
-Make sure to have GNU parallel installed (linux/mac) or rush (windows), and type in your preamble:
+Make sure to have xargs installed (installed by default on most linux, on Windows you need to install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), and type in your preamble:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel
 }
 \end{codeexample}
 to compile all figures in parallel (you need to compile your document twice). Your document should build significantly faster, even faster than a normal run. If you want to compile in parallel
-only if you have more than 5 new elements to cache, do:
+only if you have more than, say, 5 new elements to cache, do:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel after=5
@@ -2818,7 +2836,7 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
   \extractkey/robExt/if matches=\marg{latex3 regexp}\marg{style to apply}\@nil
   \makeatother%
   \pgfmanualbody
-  Apply the corresponding style if the regexp (in \LaTeX{}3 format) is matched.
+  Apply the corresponding style if the regexp (in \LaTeX{}3 format, so spaces must be escaped like |\ |) is matched.
 \begin{codeexample}[vbox]
 \robExtConfigure{
   add to preset={my python}{
@@ -2831,6 +2849,23 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
 \begin{CacheMeCode}{my python}
 print(cos(1)+sin(2))
 \end{CacheMeCode}
+\end{codeexample}
+This can also be practical to disable caching if some pictures uses |remember picture| (which is not supported by this library):
+\begin{codeexample}[vbox]
+\cacheTikz
+\robExtConfigure{
+  add to preset={tikzpicture}{
+    % \b means "word boundary", and spaces must be escaped
+    if matches={\b remember\ picture\b}{disable externalization},
+  },
+}
+\begin{tikzpicture}[remember picture]
+  \node[fill=green](my original node){Point to me};
+\end{tikzpicture} %
+Some text %
+\begin{tikzpicture}[overlay, remember picture]
+  \draw[->] (0,0) to[bend left] (my original node);
+\end{tikzpicture}
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -2873,8 +2908,8 @@ Note that if you do not want to display the first cached file, you can use |do n
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
-  \extractkey/robExt/compile in parallel=\oarg{nb of pictures to compile normally} (default 0)\@nil
-  \extractkey/robExt/compile in parallel after=\oarg{nb pictures to compile normally} (default 0)\@nil
+  \extractkey/robExt/compile in parallel=\opt{nb of pictures to compile normally} (default 0)\@nil
+  \extractkey/robExt/compile in parallel after=\opt{nb pictures to compile normally} (default 0)\@nil
   \makeatother%
   \pgfmanualbody
   These two commands are alias. Typing in the preamble:
@@ -2889,13 +2924,30 @@ will cause the cached elements to be compiled in parallel (this requires two com
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
-  \extractkey/robExt/compile in parallel command=\marg{command to run} (default 0)\@nil
+  \extractkey/robExt/compile in parallel command=\marg{command to run}\@nil
+  \extractkey/robExt/compile in parallel with xargs=\opt{number threads} (default 16\%)\@nil
+  \extractkey/robExt/compile in parallel with gnu parallel=\opt{--jobs option} (default 200\%)\@nil
+  \extractkey/robExt/compile in parallel with rush=\opt{additional options} (default )\@nil
   \makeatother%
   \pgfmanualbody
   You can customize the compilation command to run via something like:
 \begin{codeexample}[code only]
 \robExtConfigure{
-  compile in parallel command={parallel --jobs 200\% :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}},
+  compile in parallel command={
+    parallel --jobs 200\% :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}
+  },
+}
+\end{codeexample}
+The other styles are predefined commands to compile with xargs (by default, already installed in linux, on Windows you can get it by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), gnu parallel, or rush (\url{https://github.com/shenwei356/rush/}). You can use these commands directly like:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel with gnu parallel
+}
+\end{codeexample}
+or use the optional parameter to configure the number of threads (xargs starts with 16 threads by default, and gnu parallel takes twice the number of CPU threads available), like in:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel with xargs=64,% Compiles with 64 processes at a time
 }
 \end{codeexample}
 \end{pgfmanualentry}
@@ -2909,7 +2961,7 @@ NB: in version smaller than v2.1 (or if you prefer the manual method), you can i
 \begin{verbatim}
 cd robustExternalize/ && pdflatex -halt-on-error "robExt-4A806941E86C6B657A0CB3D160CFFF3E.tex
 \end{verbatim}
-  \textbf{IMPORTANT}: \LaTeX{} might render \textbf{multiple times} the same picture if it is inside some particular environments (align, tables\dots), so this file can contain duplicates if you inserted cached data inside. To avoid running the same command twice, \textbf{be sure to remove duplicates!} On Linux, this can be done by piping the file into |sort| and |uniq| (if your files can depend on previously compiled elements as explained in \cref{sec:passOutputToOtherTemplate}, you should additionally preserve \mylink{https://unix.stackexchange.com/questions/194780/remove-duplicate-lines-while-keeping-the-order-of-the-lines}{the order of the lines}). Since this is anyway a rather advanced use case, we will not consider that case for simplicity.
+  \textbf{IMPORTANT}: \LaTeX{} might render \textbf{multiple times} the same picture if it is inside some particular environments (align, tables\dots), so this file can contain duplicates if you inserted cached data inside. In version 2.1 this is solved, but on older versions, to avoid running the same command twice, \textbf{be sure to remove duplicates!} On Linux, this can be done by piping the file into |sort| and |uniq| (if your files can depend on previously compiled elements as explained in \cref{sec:passOutputToOtherTemplate}, you should additionally preserve \mylink{https://unix.stackexchange.com/questions/194780/remove-duplicate-lines-while-keeping-the-order-of-the-lines}{the order of the lines}). Since this is anyway a rather advanced use case, we will not consider that case for simplicity.
 \item Run all these command in parallel, for instance on Linux you can install |parallel|, and run the following command (|--bar| displays a progress bar):
 \begin{verbatim}
 cat yourfile-robExt-compile-missing-figures.sh | sort | uniq | parallel --bar --jobs '200%'  
