@@ -2158,10 +2158,25 @@ if __name__ == '__main__':
         }%
       }%
     },%
-  },
+  },%
+  forward color/.style={
+    command if externalization/.append code={%
+      \extractcolorspecs{#1}{\zx@tmp@model}{\zx@tmp@cmd}%
+      \expanded{%
+        \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+          \noexpand\definecolor{#1}{\zx@tmp@model}{\zx@tmp@cmd}%
+        }%
+      }%
+    },%
+  },%
   %% This will try to automatically forward some macros. For this, you must first define
   %% 
   auto forward/.code={\robExtAutoForward},
+  auto forward color/.style 2 args={%
+    add to preset={#1}{
+      if matches={\b #2\b}{forward color=#2},
+    },
+  },
   load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
   %% This will
   if matches/.code 2 args={\robExtIfMatches{#1}{#2}},
@@ -2229,11 +2244,11 @@ if __name__ == '__main__':
       {
         % Check if a command was provided. Not called before because \ifwindows needs shell escape that might be disabled
         \ifdefined\robExtParallelShell\else
-          \ifwindows
+          \sys_if_platform_windows:TF {
             \def\robExtParallelShell{cmd~/C}
-          \else
+          }{
             \def\robExtParallelShell{sh~-c}
-          \fi
+          }
         \fi
         % We close the file or reading it is empty
         \iow_close:N \g_robExt_write_manually_compile_all_missing_figures

@@ -2744,6 +2744,57 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
+  \extractkey/robExt/forward color=color to forward\@nil
+  \extractkey/robExt/auto forward color=\marg{preset}\marg{color to forward}\@nil
+  \makeatother%
+  \pgfmanualbody
+  |forward color| forwards a color (defined with xcolor). It works with colors defined with |\definecolor|:
+\begin{codeexample}[width=0pt]
+\definecolor{myred}{HTML}{F01122}
+\begin{tikzpictureC}<forward color=myred>
+  \node[fill=myred]{A};
+\end{tikzpictureC}
+\end{codeexample}
+but also with colors defined with |\colorlet|:
+\begin{codeexample}[width=0pt]
+\definecolor{myred}{HTML}{F01122}
+\colorlet{myviolet}{blue!50!myred}
+\begin{tikzpictureC}<forward color=myviolet>
+  \node[fill=myviolet,yshift=-1cm]{B};
+\end{tikzpictureC}
+\end{codeexample}
+Note that using |if matches|, you can also automatically forward colors:
+\begin{codeexample}[width=0pt]
+\definecolor{myred}{HTML}{F01122}
+\colorlet{myviolet}{blue!50!myred}
+\colorlet{mypink}{pink!90!orange}
+\robExtConfigure{
+  add to preset={tikz}{
+    % \b is for word boundary
+    if matches={\b mypink\b}{forward color=mypink},
+  },
+}
+\begin{tikzpictureC}
+  \node[fill=mypink,yshift=-1cm]{B};
+\end{tikzpictureC}
+\end{codeexample}
+but since this is a bit long to type, we provide a shortcut:
+\begin{codeexample}[width=0pt]
+\definecolor{myred}{HTML}{F01122}
+\colorlet{myviolet}{blue!50!myred}
+\colorlet{mypink}{pink!90!orange}
+\robExtConfigure{
+  auto forward color={tikz}{mypink},
+}
+\begin{tikzpictureC}
+  \node[fill=mypink,yshift=-1cm]{B};
+\end{tikzpictureC}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
   \extractkey/robExt/auto forward\@nil
   \makeatother%
   \pgfmanualbody
