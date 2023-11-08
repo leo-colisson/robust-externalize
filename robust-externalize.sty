@@ -123,6 +123,37 @@
 \msg_new:nnn {robExt}{enabled parallel no shell escape}{Warning:~you~enabled~parallel~compilation~but~shell-escape~is~disabled.}
 \msg_new:nnn {robExt}{rerun because parallel}{Warning:~Compiling~all~missing~figures~in~parallel~with~"#1".~You~need~to~rerun~LaTeX~to~include~them.}
 
+% dummy placeholders added if image is not present
+\def\robExtImagePlaceholderIfManualMode{
+  \framebox[\linewidth]
+  {
+    \begin{minipage}{\linewidth}
+      \textbf{Manual ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+    \end{minipage}
+  }
+}
+
+\def\robExtImagePlaceholderIfFallbackMode{
+  \framebox[\linewidth]
+  {
+    \begin{minipage}{\linewidth}
+      \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+    \end{minipage}
+  }
+}
+
+\def\robExtImagePlaceholderIfParallelCompilation{
+  \framebox[\linewidth]
+  {
+    \begin{minipage}{\linewidth}
+      \textbf{The~file:\\
+        \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\\
+        is~compiled~in~parallel~mode.~You~need~to~recompile~your~document~to~include~it.}
+    \end{minipage}
+  }
+}
+
+
 \ExplSyntaxOff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1503,33 +1534,27 @@ if __name__ == '__main__':
         \fi%
         %\robExtConfigure{run ~ after ~ include ~ command}%
       }{
-        \ifdefined\robExtManualMode
-          \framebox[\linewidth]
-          {
-            \begin{minipage}{\linewidth}
-              \textbf{Draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
-            \end{minipage}
-          }
-          %\fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
-          \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+        \ifdefined\robExt@compile@parallel@after
+          \robExtImagePlaceholderIfParallelCompilation
         \else
-          \ifdefined\robExtFallbackManualMode
-            \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
-            {
-              % We already executed the command (we have not fallback to manual mode), but the pdf was not generated.
-              \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
-            }{
-              \framebox[\linewidth]
-              {
-                \begin{minipage}{\linewidth}
-                  \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l_robExt_currentCompilationCommand}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
-                \end{minipage}
-              }
-              % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
-              \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
-            }
+          \ifdefined\robExtManualMode
+            \robExtImagePlaceholderIfManualMode
+            % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
+            \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
           \else
-            \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
+            \ifdefined\robExtFallbackManualMode
+              \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
+              {
+                % We already executed the command (we have not fallback to manual mode), but the pdf was not generated.
+                \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
+              }{
+                \robExtImagePlaceholderIfFallbackMode
+                % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
+                \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+              }
+            \else
+              \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
+            \fi
           \fi
         \fi
       }%
