@@ -309,8 +309,27 @@ or even macros (we can also export evaluated macros):
 \end{tikzpicture}
 \end{codeexample}
 
+Since manually forwarding elements can be quite verbose, it is also possible to automatically apply some styles depending on the content of the element to cache. For instance, we provide a way to automatically forward some macros:
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
 
-We also provide many other things, among others:
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=red,#1]{#2};}
+\newcommandAutoForward{\MyGreenNode}[2][draw,thick]{\node[rounded corners,fill=green,#1]{#2};}
+
+\begin{tikzpicture}
+  \MyNode{Recompiled only if MyNode is changed}
+  \MyNode[xshift=8cm]{but not if the (unused) MyGreenNode is changed.}
+\end{tikzpicture}\\
+
+\begin{tikzpicture}
+  \MyGreenNode{Recompiled only if MyGreenNode is changed}
+  \MyGreenNode[xshift=8cm]{but not if the (unused) MyNode is changed.}
+\end{tikzpicture}
+\end{codeexample}
+
+
+We also provide a number of other functionalities, among others:
 \begin{itemize}
 \item To achieve a pleasant and configurable interface (e.g. pass options to a preset with default values), we introduced placeholders, that can be of independent interest.
 \item To get maximum purity while minimizing the number of rebuild, we provide functions to forward macros defined in the parent document, and the set of macros that must be forwarded can be automatically detected for each element to cache. It is also possible to conditionally import a library if the element contains a given macro.
@@ -684,7 +703,7 @@ Which gives you {
 }
 
 
-\subsection{Feeding data from the main document to the picture}
+\subsection{Feeding data from the main document to the cached documents}\label{sec:forwardIntro}
 
 You can feed data from the main document to the cached file using placeholders, since |set placeholder eval={__foo__}{\bar}| will evaluate |\bar| and put the result in |__foo__|. For instance, if the picture depends on the current page, you can do:
 
@@ -704,7 +723,52 @@ However, since v2.1, we also provide a method to specifically export a counter u
 \end{tikzpicture}
 \end{codeexample}
 
-For details, see \cref{sec:forward}.
+To avoid manually writing |forward=...| for each picture, we can instead load |auto forward| and define the macro for instance using |\newcommandAutoForward|:
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=red,#1]{#2};}
+\newcommandAutoForward{\MyGreenNode}[2][draw,thick]{\node[rounded corners,fill=green,#1]{#2};}
+
+\begin{tikzpicture}
+  \MyNode{Recompiled only if MyNode is changed}
+  \MyNode[xshift=8cm]{but not if the (unused) MyGreenNode is changed.}
+\end{tikzpicture}\\
+
+\begin{tikzpicture}
+  \MyGreenNode{Recompiled only if MyGreenNode is changed}
+  \MyGreenNode[xshift=8cm]{but not if the (unused) MyNode is changed.}
+\end{tikzpicture}
+\end{codeexample}
+
+If a macro depends on another macro/package, it is possible to load any additional style like using the last optional argument of |\newcommandAutoForward|:
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\newcommandAutoForward{\MyName}{Alice}
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=red,#1]{\ding{164} \MyName: #2};}[forward=\MyName, add to preamble={\usepackage{pifont}}]
+
+\begin{tikzpicture}
+  \MyNode{Recompiled if MyNode or MyName are changed}
+\end{tikzpicture}
+\end{codeexample}
+
+If instead of forwarding the macro you want to, say, load a package or any other style, you should use instead |\robExtConfigIfMacroPresent|:
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\robExtConfigIfMacroPresent{\ding}{add to preamble={\usepackage{pifont}}}
+
+\begin{tikzpicture}
+  \node[fill=green, circle]{\ding{164}};
+\end{tikzpicture}
+\end{codeexample}
+
+For more details and functions, see \cref{sec:forward}.
+
 \subsection{Defining macros}
 
 You can define macros in the preamble:
@@ -2425,6 +2489,7 @@ You might want (sometimes or always) to disable externalization, for instance to
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/disable externalization\@nil
+  \extractkey/robExt/de\@nil
   \extractkey/robExt/disable externalization now\@nil
   \extractkey/robExt/enable externalization\@nil
   \makeatother%
@@ -2563,14 +2628,14 @@ Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache
 
 (since v2.1)
 
-So far, we have seen multiple approaches to use a macro in both the main document and in cached pictures, having different advantages:
+You can also see the tutorial (\cref{sec:forwardIntro}) for some examples. So far, we have seen multiple approaches to use a macro in both the main document and in cached pictures, having different advantages:
 \begin{itemize}
 \item if we define the macro in a file say |common_inputs.tex|, if we include that file in both files \textbf{and} if we add it to the list of dependencies (\cref{sec:dependenciesDoc}), then you will have great purity (if |common_inputs.tex| changes, all files are recompiled), but this might be a problem if you often change the file |common_inputs.tex| since you will need to recompile all pictures every time you add a new macro
 \item If you follow the same procedure, but \textbf{without} adding the file in the list of dependencies, then you will save compilation time (no need to recompile everything if you add a macro in |common_inputs.tex|), but you will lose purity (if you change the definition of a macro in that file, you will need to manually specify the list of figures to recompile, e.g. using |recompile|).
 \item You can also create multiple files like |common_inputs_functionality_A.tex| and |common_inputs_functionality_B.tex|, and use the first solution (maybe by creating a preset that automatically calls |add to preamble| and |add dependencies|), and only input the appropriate file depending on the set of macro that you need. This gives a tradeoff of above approaches (good purity, with less recompilation), but you will still compile often if you put many macros in a single file (and nobody wants to create one macro per file!).
 \end{itemize}
 
-In this section, we provide a third solution that tries to solve the above issue (purity without frequent recompilations), by allowing the user to forward only a specific macro, with something like |forward=\myMacro|. Of course, this has the downside that you need to specify the list of all macros to forward (if you have many macros that you often want to import in some pictures, you can also create a preset that automatically loads all macros at once, and possibly call this preset at the beginning of each section to set it on a per-section basis).
+In this section, we provide a third solution that tries to solve the above issue (purity without frequent recompilations), by allowing the user to forward only a specific macro, with something like |forward=\myMacro|. In order to avoid to manually forward all macros used for each picture, we also provide some functions to automatically detect the macros to forward.
 
 \begin{pgfmanualentry}
   \makeatletter%
@@ -2655,6 +2720,117 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
 \begin{tikzpictureC}<forward counter=page>
   \node[rounded corners, fill=red]{The current page is \thepage.};
 \end{tikzpictureC}    
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/auto forward\@nil
+  \makeatother%
+  \pgfmanualbody
+  Enable automatic forwarding of macros marked with |*AutoForward| commands or |\configIfMacroPresent|. This command naively extracts all used macro via a simple regexp match and forwards them/execute the style configured in |\configIfMacroPresent| if it exists.
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=red,#1]{#2};}
+\newcommandAutoForward{\MyGreenNode}[2][draw,thick]{\node[rounded corners,fill=green,#1]{#2};}
+
+\begin{tikzpicture}
+  \MyNode{Recompiled only if MyNode is changed}
+  \MyNode[xshift=8cm]{but not if the (unused) MyGreenNode is changed.}
+\end{tikzpicture}\\
+
+\begin{tikzpicture}
+  \MyGreenNode{Recompiled only if MyGreenNode is changed}
+  \MyGreenNode[xshift=8cm]{but not if the (unused) MyNode is changed.}
+\end{tikzpicture}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\configIfMacroPresent\marg{macro}\marg{style to run if macro is present}\@@
+  \pgfmanualbody
+  Runs the corresponding style if the macro |macro| is present (make sure to enable |auto forward|).
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\configIfMacroPresent{\ding}{add to preamble={\usepackage{pifont}}}
+
+\begin{tikzpicture}
+  \node[fill=green, circle]{\ding{164}};
+\end{tikzpicture}  
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\newcommandAutoForward\marg{macro}\opt{\oarg{nb args}}\opt{\oarg{optional default value}}\marg{definition}\opt{\oarg{additional style}}\@@
+  \extractcommand\renewcommandAutoForward\marg{macro}\opt{\oarg{nb args}}\opt{\oarg{optional default value}}\marg{definition}\opt{\oarg{additional style}}\@@
+  \extractcommand\providecommandAutoForward\marg{macro}\opt{\oarg{nb args}}\opt{\oarg{optional default value}}\marg{definition}\opt{\oarg{additional style}}\@@
+  \extractcommand\NewDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\RenewDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\ProvideDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\DeclareDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\defAutoForward\marg{macro}\opt{\oarg{def-style arg spec}}\marg{macro}\opt{\oarg{additional style}}\@@
+  \pgfmanualbody
+\begin{verbatim}
+\newcommandAutoForward{\macro}[nb args][default value]{def}[STYLE]
+\end{verbatim}
+  is like
+\begin{verbatim}
+\newcommand{\macro}[nb args][default value]{def}
+\end{verbatim}
+  but it additionally runs
+\begin{verbatim}
+\configIfMacroPresent{\macro}{forward=\macro,STYLE}
+\end{verbatim}
+  to automatically forward the macro if it is used. This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/load auto forward macro config=\marg{macro}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Like |forward| except that it loads the configuration that would have been loaded if the macro was present in the file. This is mostly useful to say that a macro depends on the style of another macro without copy/pasting the style of the second macro inside the first one.
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
+
+\newcommandAutoForward{\MyName}{\ding{164} Alice}[add to preamble={\usepackage{pifont}}]
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=green,#1]{\MyName: #2};}[
+  load auto forward macro config=\MyName
+]
+
+\begin{tikzpicture}
+  \MyNode{Recompiled only if MyNode is changed}
+  \MyNode[yshift=-1cm]{or if MyName is changed}
+\end{tikzpicture}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/if matches=\marg{latex3 regexp}\marg{style to apply}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Apply the corresponding style if the regexp (in \LaTeX{}3 format) is matched.
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  add to preset={my python}{
+    python print code and result,
+    % \b is for word border, and ( needs to be escaped in regexp
+    if matches={\b cos\(}{add import={from math import cos}},
+    if matches={\b sin\(}{add import={from math import sin}},
+  },
+}
+\begin{CacheMeCode}{my python}
+print(cos(1)+sin(2))
+\end{CacheMeCode}
 \end{codeexample}
 \end{pgfmanualentry}
 
@@ -3054,6 +3230,28 @@ You can set |__ROBEXT_PYTHON_TCOLORBOX_PROPS__| the options of the tcolorbox,\\ 
 \usepackage{pythonhighlight}
 \usepackage{tcolorbox}
 \end{verbatim}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/python/add import\@nil
+  \makeatother%
+  \pgfmanualbody
+  (since v2.1) Add an import statement in the first part of the file.
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  add to preset={my python}{
+    python print code and result,
+    add import={from math import cos},
+    add import={from math import sin},
+  },
+}
+\begin{CacheMeCode}{my python}
+print(cos(1)+sin(2))
+\end{CacheMeCode}
+\end{codeexample}
+
 \end{pgfmanualentry}
 
 \subsubsection{Bash}
@@ -3595,6 +3793,7 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \item Deal with remember picture
 \item I tried many different options to optimize the compilation time, so the code is a bit cluttered now. Would be cool to reorganize.
 \item The doc more or less describes all features, but I might made tons of typo and forgot to document some advanced commands. But should be good enough for normal usage.
+\item Since externalizing is all about speed, it would be nice to do more benchmarks, in particular to see if automatically forwarding macros slows down the process in a noticeable way.
 \end{itemize}
 
 \section{Acknowledgments}
@@ -3612,6 +3811,8 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Add a hook |robust-externalize/just-before-writing-files|.
   \item Fixed a bug in |\cacheTikz| that was not working with a custom argument for tikzpicture
   \item Added options |forward*| to forward macros and counters
+  \item Added |auto forward| and co
+  \item Added |compile in parallel| and co
   \end{itemize}
 \item v2.0:
   \begin{itemize}

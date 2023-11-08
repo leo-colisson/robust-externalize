@@ -1621,10 +1621,23 @@ if __name__ == '__main__':
 \let\configIfMacroPresent\robExtConfigIfMacroPresent
 
 \NewDocumentCommand{\robExtAutoForwardMacro}{mO{}}{%
-  \robExtConfigIfMacroPresent{#1}{forward=#1,#2}%a
+  \robExtConfigIfMacroPresent{#1}{
+    forward=#1,#2
+  }%a
 }
 \let\autoForwardMacro\robExtAutoForwardMacro
 
+\NewDocumentCommand{\robExtLoadAutoForwardMacroConfig}{m}{
+  \str_set:Nx \l_robExt_tmp_str {\cs_to_str:N #1}
+  \cs_if_exist:cTF {l__robExt_execute_if_macro_present\l_robExt_tmp_str}{
+    % if the macro is present twice, we want to run \forward only once
+    \cs_if_exist:cTF {l__robExt_execute_if_macro_present_already_forwarded\l_robExt_tmp_str :}{}{
+      \use:c {l__robExt_execute_if_macro_present\l_robExt_tmp_str}
+      % define it so that we do not import twice next time
+      \cs_set:cx {l__robExt_execute_if_macro_present_already_forwarded\l_robExt_tmp_str :} {}
+    }
+  }{}
+}
 
 % % Pre-compile a regexp to get all macros: not sure why precompiling gives me an error
 % \regex_const:Nn \l__robExt_get_all_macros_regex { \\[A-Za-z]+ }
@@ -1633,8 +1646,7 @@ if __name__ == '__main__':
   \seq_clear_new:N \l__robExt_matches_seq
   \regex_extract_all:nVN {\\[A-Za-z]+} \l_robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str \l__robExt_matches_seq%
   \seq_map_inline:Nn \l__robExt_matches_seq {
-    \str_set:Nx \l_robExt_tmp_str {\cs_to_str:N ##1}
-    \cs_if_exist_use:c {l__robExt_execute_if_macro_present\l_robExt_tmp_str}
+    \robExtLoadAutoForwardMacroConfig{##1}
   }
 }
 
@@ -2128,6 +2140,7 @@ if __name__ == '__main__':
   %% This will try to automatically forward some macros. For this, you must first define
   %% 
   auto forward/.code={\robExtAutoForward},
+  load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
   %% This will
   if matches/.code 2 args={\robExtIfMatches{#1}{#2}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -2329,8 +2342,10 @@ if __name__ == '__main__':
   \str_replace_all:Nnn \l_robExt_tmp {[} {}
   \str_replace_all:Nnn \l_robExt_tmp {]} {}
   \str_set:Nx \l_robExt_definition_str {
+    %% Make sure the command does not exist
+    \c_backslash_str providecommand \c_backslash_str \cs_to_str:N #1 \c_left_brace_str \c_right_brace_str
     %% this line will be like "\newdocumentcommand{\mymacro}"
-    \c_backslash_str newcommand \c_left_brace_str \c_backslash_str \cs_to_str:N #1 \c_right_brace_str
+    \c_backslash_str renewcommand \c_left_brace_str \c_backslash_str \cs_to_str:N #1 \c_right_brace_str
     %% It must have at least one argument, since elements without optional arguments are turned into \def
     %% Moreover, macros can't have more than 1 argument, so it will be easier to parse, we just need the last digit
     [\str_range:Nnn \l_robExt_tmp {-1} {-1}] %% <- this is the number of mandatory arguments
