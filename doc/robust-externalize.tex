@@ -760,9 +760,6 @@ To avoid manually writing |forward=...| for each picture, we can instead load |a
 \end{tikzpicture}
 \end{codeexample}
 
-
-\textbf{WARNING: auto-forwarding (and more generally all options that need to read the document to add new style) can add a noticeable time to the compilation since regex search in \LaTeX{} is quite slow. For instance, on a benchmark with a compiled preset, without any caching the document takes 1mn54 to compile, with the compiled preset it takes 4.5s to compile (25x faster), and with auto forward it takes 7.8s to compile. Any new |if matches regex| also adds 2s to the whole compilation time in this benchmark, but |if matches| and |forward color| seems to add a negligible time.}
-
 If a macro depends on another macro/package, it is possible to load any additional style like using the last optional argument of |\newcommandAutoForward|:
 \begin{codeexample}[vbox]
 \cacheTikz  
@@ -2558,7 +2555,24 @@ You might want (sometimes or always) to disable externalization, for instance to
       \robExtConfigure{disable externalization now}
       \tikz\node[fill=green]{The short version of tikz can be confusing.};
     }
-  \end{codeexample}  
+  \end{codeexample}
+  Since v2.1 you can also automatically disable externalization if the input contains a given string, for instance |remember picture| (that is not cachable with this library):
+\begin{codeexample}[vbox]
+\cacheTikz
+\robExtConfigure{
+  add to preset={tikzpicture}{
+    % \b means "word boundary", and spaces must be escaped
+    if matches={remember picture}{disable externalization},
+  },
+}
+\begin{tikzpicture}[remember picture]
+  \node[fill=green](my original node){Point to me};
+\end{tikzpicture} %
+Some text %
+\begin{tikzpicture}[overlay, remember picture]
+  \draw[->] (0,0) to[bend left] (my original node);
+\end{tikzpicture}
+\end{codeexample}  
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2848,7 +2862,6 @@ but since this is a bit long to type, we provide a shortcut:
   \node[fill=green, circle]{\ding{164}};
 \end{tikzpicture}  
 \end{codeexample}
-\textbf{WARNING: auto-forwarding can add a noticeable time to the compilation since regex search in \LaTeX{} is quite slow. For instance, on a benchmark (v2.0+2023-11-09) with a compiled preset, without any caching the document takes 1mn54 to compile, with the compiled preset it takes 4.5s to compile (25x faster), and with auto forward it takes 7.8s to compile. Any new |if matches regex| also adds 2s to the whole compilation time in this benchmark, but |if matches| and |forward color| seems to add a negligible time.}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -3935,7 +3948,7 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \begin{itemize}
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
-\item Since externalizing is all about speed, it would be nice to do more benchmarks, in particular to see if automatically forwarding macros slows down the process in a noticeable way.
+\item Since externalizing is all about speed, it would be nice to do more benchmarks.
 \end{itemize}
 
 \section{Acknowledgments}
