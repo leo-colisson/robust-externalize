@@ -1517,8 +1517,12 @@ if __name__ == '__main__':
           \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}
         } { % We ran no compilation command: we print instead a placeholder depending on the context:
           \cs_if_exist:NTF \robExt@compile@parallel@must@compile {
-            % we are supposed to compile the current picture in parallel
-            \robExtImagePlaceholderIfParallelCompilation
+            % we are supposed to compile the current picture in parallel, let'us check if it will be possible:
+            \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation} {
+              \robExtImagePlaceholderIfParallelCompilation
+            }{
+              \robExtImagePlaceholderIfManualMode
+            }
           }{
             \cs_if_exist:NTF \robExtManualMode {
               \robExtImagePlaceholderIfManualMode
