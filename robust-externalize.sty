@@ -2282,9 +2282,9 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtCacheMe}{O{}m}{%
   {% Group
     \pgfkeys{%
-      /robExt/.cd,
-      set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},
-      default style,
+      /robExt/.cd,%
+      set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},%
+      default style,%
       #1,
     }%
     \robExtEvaluateCompileAndInclude%
