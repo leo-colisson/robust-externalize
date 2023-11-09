@@ -63,7 +63,9 @@
 \cs_generate_variant:Nn \cs_replacement_spec:N { c }
 \cs_generate_variant:Nn \cs_argument_spec:N { c }
 
-\cs_generate_variant:Nn \regex_extract_all:nnN { VVN, nVN }
+\cs_generate_variant:Nn \regex_extract_all:nnN { VVN, nVN, VVN }
+\cs_generate_variant:Nn \regex_extract_all:NnN { NVN }
+
 
 \cs_generate_variant:Nn \regex_match:nnTF { nVTF }
 
@@ -1631,12 +1633,13 @@ if __name__ == '__main__':
   }{}
 }
 
-% % Pre-compile a regexp to get all macros: not sure why precompiling gives me an error
+% % Pre-compile a regex to get all macros: not sure why precompiling gives me an error
 % \regex_const:Nn \l__robExt_get_all_macros_regex { \\[A-Za-z]+ }
 % This will be directly called by "auto forward"
+\regex_const:Nn \l__robExt_macro_regex { \\[A-Za-z]+ }
 \NewDocumentCommand{\robExtAutoForward}{}{
   \seq_clear_new:N \l__robExt_matches_seq
-  \regex_extract_all:nVN {\\[A-Za-z]+} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str \l__robExt_matches_seq%
+  \regex_extract_all:NVN \l__robExt_macro_regex \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str \l__robExt_matches_seq%
   \seq_map_inline:Nn \l__robExt_matches_seq {
     \robExtLoadAutoForwardMacroConfig{##1}
   }
@@ -1726,10 +1729,14 @@ if __name__ == '__main__':
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % called by style "if matches".
-% \robExtRegexMatches{my regexp}{my style} will apply "my style" if "__ROBEXT_MAIN_CONTENT_ORIG__" matches
+% \robExtRegexMatches{my regex}{my style} will apply "my style" if "__ROBEXT_MAIN_CONTENT_ORIG__" matches
 % "my regex".
-\NewDocumentCommand{\robExtIfMatches}{mm}{
+\NewDocumentCommand{\robExtIfMatchesRegex}{mm}{
   \regex_match:nVTF {#1} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {\pgfkeysalso{#2}} {}
+}
+
+\NewDocumentCommand{\robExtIfMatchesString}{mm}{
+  \str_if_in:NnTF \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {#1} {\pgfkeysalso{#2}} {}
 }
 
 \ExplSyntaxOff
@@ -2144,12 +2151,15 @@ if __name__ == '__main__':
   auto forward/.code={\robExtAutoForward},
   auto forward color/.style 2 args={%
     add to preset={#1}{
-      if matches={\b #2\b}{forward color=#2},
+      % if matches={\b #2\b}{forward color=#2},
+      % the Regex is maybe more precise (avoid unnecessary forwards) but is way faster
+      if matches={#2}{forward color=#2},
     },
   },
   load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
   %% This will
-  if matches/.code 2 args={\robExtIfMatches{#1}{#2}},
+  if matches regex/.code 2 args={\robExtIfMatchesRegex{#1}{#2}},
+  if matches/.code 2 args={\robExtIfMatchesString{#1}{#2}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Run code before/after inclusion %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 

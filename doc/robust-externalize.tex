@@ -328,7 +328,6 @@ Since manually forwarding elements can be quite verbose, it is also possible to 
 \end{tikzpicture}
 \end{codeexample}
 
-
 We also provide a number of other functionalities, among others:
 \begin{itemize}
 \item To achieve a pleasant and configurable interface (e.g. pass options to a preset with default values), we introduced placeholders, that can be of independent interest.
@@ -704,13 +703,12 @@ Which gives you {
   \todo{Check how to use cacheCommand and cacheEnvironment}
 }
 
-You can also disable externalization on elements that contain a specific string/regexp. For instance, you can disable externalization on all elements containing |remember picture|:
+You can also disable externalization on elements that contain a specific string/regex. For instance, you can disable externalization on all elements containing |remember picture|:
 \begin{codeexample}[vbox]
 \cacheTikz
 \robExtConfigure{
   add to preset={tikz}{
-    % \b means "word boundary", and spaces must be escaped
-    if matches={\b remember\ picture\b}{disable externalization},
+    if matches={remember picture}{disable externalization},
   },
 }
 \begin{tikzpicture}[remember picture]
@@ -743,7 +741,7 @@ However, since v2.1, we also provide a method to specifically export a counter u
 \end{tikzpicture}
 \end{codeexample}
 
-To avoid manually writing |forward=...| for each picture, we can instead load |auto forward| and define the macro for instance using |\newcommandAutoForward|:
+To avoid manually writing |forward=...| for each picture, we can instead load |auto forward| and define the macro for instance using |\newcommandAutoForward| (we also provide alternatives for xparse and def-based definitions):
 \begin{codeexample}[vbox]
 \cacheTikz  
 \robExtConfigure{add to preset={tikz}{auto forward}}
@@ -761,6 +759,9 @@ To avoid manually writing |forward=...| for each picture, we can instead load |a
   \MyGreenNode[xshift=8cm]{but not if the (unused) MyNode is changed.}
 \end{tikzpicture}
 \end{codeexample}
+
+
+\textbf{WARNING: auto-forwarding (and more generally all options that need to read the document to add new style) can add a noticeable time to the compilation since regex search in \LaTeX{} is quite slow. For instance, on a benchmark with a compiled preset, without any caching the document takes 1mn54 to compile, with the compiled preset it takes 4.5s to compile (25x faster), and with auto forward it takes 7.8s to compile. Any new |if matches regex| also adds 2s to the whole compilation time in this benchmark, but |if matches| and |forward color| seems to add a negligible time.}
 
 If a macro depends on another macro/package, it is possible to load any additional style like using the last optional argument of |\newcommandAutoForward|:
 \begin{codeexample}[vbox]
@@ -829,7 +830,7 @@ Make sure to have xargs installed (installed by default on most linux, on Window
   compile in parallel
 }
 \end{codeexample}
-to compile all figures in parallel (you need to compile your document twice). Your document should build significantly faster, even faster than a normal run. If you want to compile in parallel
+to compile all figures in parallel (you need to compile your document twice). Your document should build significantly faster, possibly faster than a normal run. If you want to compile in parallel
 only if you have more than, say, 5 new elements to cache, do:
 \begin{codeexample}[code only]
 \robExtConfigure{
@@ -2786,8 +2787,7 @@ Note that using |if matches|, you can also automatically forward colors:
 \colorlet{mypink}{pink!90!orange}
 \robExtConfigure{
   add to preset={tikz}{
-    % \b is for word boundary
-    if matches={\b mypink\b}{forward color=mypink},
+    if matches={mypink}{forward color=mypink},
   },
 }
 \begin{tikzpictureC}
@@ -2814,7 +2814,7 @@ but since this is a bit long to type, we provide a shortcut:
   \extractkey/robExt/auto forward\@nil
   \makeatother%
   \pgfmanualbody
-  Enable automatic forwarding of macros marked with |*AutoForward| commands or |\configIfMacroPresent|. This command naively extracts all used macro via a simple regexp match and forwards them/execute the style configured in |\configIfMacroPresent| if it exists.
+  Enable automatic forwarding of macros marked with |*AutoForward| commands or |\configIfMacroPresent|. This command naively extracts all used macro via a simple regex match and forwards them/execute the style configured in |\configIfMacroPresent| if it exists.
 \begin{codeexample}[vbox]
 \cacheTikz  
 \robExtConfigure{add to preset={tikz}{auto forward}}
@@ -2848,6 +2848,7 @@ but since this is a bit long to type, we provide a shortcut:
   \node[fill=green, circle]{\ding{164}};
 \end{tikzpicture}  
 \end{codeexample}
+\textbf{WARNING: auto-forwarding can add a noticeable time to the compilation since regex search in \LaTeX{} is quite slow. For instance, on a benchmark (v2.0+2023-11-09) with a compiled preset, without any caching the document takes 1mn54 to compile, with the compiled preset it takes 4.5s to compile (25x faster), and with auto forward it takes 7.8s to compile. Any new |if matches regex| also adds 2s to the whole compilation time in this benchmark, but |if matches| and |forward color| seems to add a negligible time.}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2900,17 +2901,32 @@ but since this is a bit long to type, we provide a shortcut:
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
-  \extractkey/robExt/if matches=\marg{latex3 regexp}\marg{style to apply}\@nil
+  \extractkey/robExt/if matches=\marg{string}\marg{style to apply}\@nil
+  \extractkey/robExt/if matches regex=\marg{latex3 regex}\marg{style to apply}\@nil
   \makeatother%
   \pgfmanualbody
-  Apply the corresponding style if the regexp (in \LaTeX{}3 format, so spaces must be escaped like |\ |) is matched.
+  Apply the corresponding style if the string (resp.\ regex in \LaTeX{}3 format) matches is matched in the content. The regex version can be more expressive, but is wayyy slower.
 \begin{codeexample}[vbox]
 \robExtConfigure{
   add to preset={my python}{
     python print code and result,
-    % \b is for word border, and ( needs to be escaped in regexp
-    if matches={\b cos\(}{add import={from math import cos}},
-    if matches={\b sin\(}{add import={from math import sin}},
+    % \b is for word border, and ( needs to be escaped in regex
+    if matches={cos(}{add import={from math import cos}},
+    if matches={sin(}{add import={from math import sin}},
+  },
+}
+\begin{CacheMeCode}{my python}
+print(cos(1)+sin(2))
+\end{CacheMeCode}
+\end{codeexample}
+With regex:
+\begin{codeexample}[vbox]
+\robExtConfigure{
+  add to preset={my python}{
+    python print code and result,
+    % \b is for word border, and ( needs to be escaped in regex
+    if matches regex={\b cos\(}{add import={from math import cos}},
+    if matches regex={\b sin\(}{add import={from math import sin}},
   },
 }
 \begin{CacheMeCode}{my python}
@@ -2923,7 +2939,7 @@ This can also be practical to disable caching if some pictures uses |remember pi
 \robExtConfigure{
   add to preset={tikzpicture}{
     % \b means "word boundary", and spaces must be escaped
-    if matches={\b remember\ picture\b}{disable externalization},
+    if matches={remember picture}{disable externalization},
   },
 }
 \begin{tikzpicture}[remember picture]
