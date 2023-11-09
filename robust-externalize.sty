@@ -1423,6 +1423,8 @@ if __name__ == '__main__':
   \cs_if_exist:NTF {\l_robExt_do_not_compile}{
     \message{No ~ need ~ to ~ recompile ~ \robExtAddCachePathAndName{\robExtFinalHash.pdf}^^J}
   }{
+    % Used to know later if we have run a compilation command at that step or not
+    \cs_undefine:N \l__robExt_I_just_ran_a_compilation_command:
     % No need to re-evaluate it
     % \robExtGetPlaceholderInResultFromSinglePlaceholder{__ROBEXT_COMPILATION_COMMAND__}
     \str_replace_all:Nnx \l_robExt_currentCompilationCommand {__ROBEXT_OUTPUT_PREFIX__}{\l_tmp_output_prefix_str}
@@ -1466,6 +1468,10 @@ if __name__ == '__main__':
       {
         \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l_robExt_currentCompilationCommand.}
         \sys_shell_now:x {\l_robExt_currentCompilationCommand} % The ~ are used in ExplSyntaxOn to add space
+        %% We notify that we are running the compilation command, this way it is possible to check later
+        %% if the file is not present because of some compilation error or because we are in manual mode
+        %% or fallback
+        \cs_set:Nn \l__robExt_I_just_ran_a_compilation_command: {}
       }{
         \ifdefined\robExtFallbackManualMode
           % Avoid writing the same command multiple times (might occur in environments that execute the
@@ -1534,29 +1540,24 @@ if __name__ == '__main__':
         \fi%
         %\robExtConfigure{run ~ after ~ include ~ command}%
       }{
-        \ifdefined\robExt@compile@parallel@after
-          \robExtImagePlaceholderIfParallelCompilation
-        \else
-          \ifdefined\robExtManualMode
-            \robExtImagePlaceholderIfManualMode
-            % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
-            \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
-          \else
-            \ifdefined\robExtFallbackManualMode
-              \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N {\robExtForceCompilation} }
-              {
-                % We already executed the command (we have not fallback to manual mode), but the pdf was not generated.
-                \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
-              }{
-                \robExtImagePlaceholderIfFallbackMode
-                % \fbox{\textbf{Draft ~ Mode: ~ you ~ are ~ in ~ manual ~ mode:}\par\textbf{ ~ please ~ compile ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ \ifdefined\robExtCacheFolder cd \robExtCacheFolder; \fi bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}}
-                \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
-              }
-            \else
-              \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
-            \fi
-          \fi
-        \fi
+        % Check if we tried to run a compilation command at the previous step:
+        \cs_if_exist:NTF \l__robExt_I_just_ran_a_compilation_command: {
+          % We ran a compilation command but it failed: we print an error message
+          \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l_robExt_currentCompilationCommand}
+        } { % We ran no compilation command: we print instead a placeholder depending on the context:
+          \cs_if_exist:NTF \robExt@compile@parallel@must@compile {
+            % we are supposed to compile the current picture in parallel
+            \robExtImagePlaceholderIfParallelCompilation
+          }{
+            \cs_if_exist:NTF \robExtManualMode {
+              \robExtImagePlaceholderIfManualMode
+              \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+            }{
+              \robExtImagePlaceholderIfFallbackMode
+              \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+            }
+          }
+        }
       }%
     }%
   \fi%
