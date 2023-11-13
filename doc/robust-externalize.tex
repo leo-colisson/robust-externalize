@@ -3957,7 +3957,11 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
-\item future v2.1 (master on github, not released yet on CTAN):
+\item Future v2.1.1 (master on github, not released yet on CTAN):
+  \begin{itemize}
+  \item Fix issue with |compile in parallel| on MacOs (xargs there is not GNU xargs and is missing |-a| option)
+  \end{itemize}
+\item v2.1:
   \begin{itemize}
   \item Fix a bug when compiling the main document with lualatex or xelatex
   \item Fix a bug when compiling a template that was not exporting dependencies
