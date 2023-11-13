@@ -3014,7 +3014,7 @@ Note that if you do not want to display the first cached file, you can use |do n
   compile in parallel
 }
 \end{codeexample}
-will cause the cached elements to be compiled in parallel (this requires two compilations of the main project). For this to work out of the box, you need to have GNU |parallel| installed (on linux or Mac) or rush (\url{https://github.com/shenwei356/rush/}) on Windows. Typing |compile in parallel after=3| will start the compilation in parallel only if you have more than 3 new elements to compile, and compile the first 3 elements normally (useful when you work on one picture at a time since you do not need to compile twice the document).
+will cause the cached elements to be compiled in parallel (this requires two compilations of the main project). For this to work out of the box, you need to have |xargs| installed (on windows, install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} to get |xargs|). Typing |compile in parallel after=3| will start the compilation in parallel only if you have more than 3 new elements to compile, and compile the first 3 elements normally (useful when you work on one picture at a time since you do not need to compile twice the document).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -3023,7 +3023,6 @@ will cause the cached elements to be compiled in parallel (this requires two com
   \extractkey/robExt/compile in parallel command=\marg{command to run}\@nil
   \extractkey/robExt/compile in parallel with xargs=\opt{number threads} (default 16\%)\@nil
   \extractkey/robExt/compile in parallel with gnu parallel=\opt{--jobs option} (default 200\%)\@nil
-  \extractkey/robExt/compile in parallel with rush=\opt{additional options} (default )\@nil
   \makeatother%
   \pgfmanualbody
   You can customize the compilation command to run via something like:
@@ -3034,7 +3033,7 @@ will cause the cached elements to be compiled in parallel (this requires two com
   },
 }
 \end{codeexample}
-The other styles are predefined commands to compile with xargs (by default, already installed in linux, on Windows you can get it by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), gnu parallel, or rush (\url{https://github.com/shenwei356/rush/}). You can use these commands directly like:
+The other styles are predefined commands to compile with xargs (by default, already installed in linux, on Windows you can get it by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}) or gnu parallel. You can use these commands directly like:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel with gnu parallel

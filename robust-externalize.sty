@@ -2223,15 +2223,14 @@ if __name__ == '__main__':
   },
   compile in parallel with gnu parallel/.default={200\%},
   compile in parallel with xargs/.style={
-    compile in parallel command={xargs -t -a '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}' -I "{}" -P #1 \robExtParallelShell\space '{}'},
+    % Use " instead of ' as Windows does not consider ' as a valid surrounding for strings
+    compile in parallel command={xargs -t -I "{}" -P #1 \robExtParallelShell\space "{}" < "\jobname-\robExtAddPrefixName{compile-missing-figures.sh}"},
   },
+  % With 0 it spawns as many shells at possible, i.e. it compiles all 200 pictures at the same time, making the
+  % system a laggy, and it is actually *slower* (2:05mn vs 1:15mn) than when using 16 threads.
   compile in parallel with xargs/.default={16},
   % By default, we compile with xargs and 16 processes:
   compile in parallel with xargs,
-  compile in parallel with rush/.style={
-    compile in parallel command={rush -i "\jobname-\robExtAddPrefixName{compile-missing-figures.sh}" #1 "\robExtParallelShell\space '{}'"},
-  },
-  compile in parallel with rush/.default={},
 }
 
 \ExplSyntaxOn
