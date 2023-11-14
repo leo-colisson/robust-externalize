@@ -94,7 +94,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.1}\\[3mm]
+  {Léo Colisson \quad Version 2.2}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -118,7 +118,7 @@ This library allows you to cache any language: not only \LaTeX{} documents and \
   enable fallback to manual mode,
 }
 \end{verbatim}
-Then type something like this (note the |C| for |cached| at the end of |tikzpictureC|, see below to override the original command), and compile with |pdflatex -shell-escape yourfile.tex| (or \textcolor{red}{\textbf{read below if you do not want to use }}|-shell-escape|):
+Then type something like this (note the |C| for |cached| at the end of |tikzpictureC|, see below to override the original command), and compile with |pdflatex -shell-escape yourfile.tex| (or \textcolor{red}{\textbf{read below if you do not want to use }}|-shell-escape|\textcolor{red}{\textbf{ (note that overleaf enables shell-escape by default, and it not needed once all pictures are cached)}}):
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
     add to preset={tikz}{
@@ -2794,14 +2794,14 @@ but also with colors defined with |\colorlet|:
   \node[fill=myviolet,yshift=-1cm]{B};
 \end{tikzpictureC}
 \end{codeexample}
-Note that using |if matches|, you can also automatically forward colors:
+Note that using |if matches word|, you can also automatically forward colors:
 \begin{codeexample}[width=0pt]
 \definecolor{myred}{HTML}{F01122}
 \colorlet{myviolet}{blue!50!myred}
 \colorlet{mypink}{pink!90!orange}
 \robExtConfigure{
   add to preset={tikz}{
-    if matches={mypink}{forward color=mypink},
+    if matches word={mypink}{forward color=mypink},
   },
 }
 \begin{tikzpictureC}
@@ -2846,6 +2846,7 @@ but since this is a bit long to type, we provide a shortcut:
   \MyGreenNode[xshift=8cm]{but not if the (unused) MyNode is changed.}
 \end{tikzpicture}
 \end{codeexample}
+
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2892,8 +2893,22 @@ but since this is a bit long to type, we provide a shortcut:
 \configIfMacroPresent{\macro}{forward=\macro,STYLE}
 \end{verbatim}
   to automatically forward the macro if it is used. It is really practical to automatically define a macro and forward it:
+\begin{codeexample}[vbox]
+\cacheTikz  
+\robExtConfigure{add to preset={tikz}{auto forward}}
 
-  This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|). |\genericAutoForward| and |\genericAutoForwardStringMatch| are a bit special (for now these two commands are alias, but only use the first one if the string is surrounded by non-letter characters as we plan to make that special case more efficient later), as it can be used to run any code assuming that |string to match| is present. For instance, you can use it to automatically forward the code that defines a new tikz style assuming |mystyle| is preset:
+\newcommandAutoForward{\MyName}{\ding{164} Alice}[add to preamble={\usepackage{pifont}}]
+\newcommandAutoForward{\MyNode}[2][draw,thick]{\node[rounded corners,fill=green,#1]{\MyName: #2};}[
+  load auto forward macro config=\MyName
+]
+
+\begin{tikzpicture}
+  \MyNode{Recompiled only if MyNode is changed}
+  \MyNode[yshift=-1cm]{or if MyName is changed}
+\end{tikzpicture}
+\end{codeexample}
+
+  This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|). |\genericAutoForward| and |\genericAutoForwardStringMatch| are a bit special (for now these two commands are alias, but only use the first one if the string is surrounded by non-letter characters as we plan to make that special case more efficient later as it uses internally |if matches word|), as it can be used to run any code assuming that |string to match| is present. For instance, you can use it to automatically forward the code that defines a new tikz style assuming |mystyle| is preset:
 \begin{codeexample}[width=0pt]
 \cacheTikz
 \genericAutoForward{mystyle}{
@@ -2904,7 +2919,30 @@ but since this is a bit long to type, we provide a shortcut:
   \node[mystyle=green]{A};
 \end{tikzpicture}    
 \end{codeexample}
-This will also run the code to define it in the current document (practical for instance if some pictures are not externalized), use the stared version of |\genericAutoForward| if you do not want to run the code in the current document. By default, the code is added to the |latex| preset, but you can choose another preset if you want using the optional option. The additional style might be specified to run other style if the matches is true.
+This will also run the code to define it in the current document (practical for instance if some pictures are not externalized), use the stared version of |\genericAutoForward| if you do not want to run the code in the current document. By default, the code is added to the |latex| preset, but you can choose another preset if you want using the optional option. The additional style might be specified to run other style if the matches is true. Note that you should be able to use definitions inside the code (a bug in v2.1 was making this code fail):
+\begin{codeexample}[width=0pt]
+\genericAutoForward{mystyle}{
+  \tikzset{mystyle/.style={fill=#1!10!white,text=#1!50!black}}
+}
+\newcommandAutoForward{\myName}{Alice}
+\robExtConfigure{
+  add to preset={tikz}{
+    auto forward, % not needed for genericAutoForward, but for newcommandAutoForward
+    if matches word={pmatrix}{add to preamble={\usepackage{amsmath}}}
+  }
+}
+
+\begin{tikzpicture}
+  \node[mystyle=green]{%
+    \def\hey#1{Hey #1 :)}% You can define macros inside the cached elements
+    \hey{Coucou \myName} %
+    $\begin{pmatrix}% Fixing a bug introduced in v2.1, we can also use macros
+      A & B\\
+      C & D\\
+    \end{pmatrix}$
+  };
+\end{tikzpicture}
+\end{codeexample}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2934,10 +2972,11 @@ This will also run the code to define it in the current document (practical for 
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/if matches=\marg{string}\marg{style to apply}\@nil
+  \extractkey/robExt/if matches word=\marg{string}\marg{style to apply}\@nil
   \extractkey/robExt/if matches regex=\marg{latex3 regex}\marg{style to apply}\@nil
   \makeatother%
   \pgfmanualbody
-  Apply the corresponding style if the string (resp.\ regex in \LaTeX{}3 format) matches is matched in the content. The regex version can be more expressive, but is wayyy slower.
+  Apply the corresponding style if the string (resp.\ regex in \LaTeX{}3 format) matches is matched in the content. As of today, |if matches word| and |if matches| are equivalent, but I plan to make |if watches word| more efficient\footnote{Scaling with $O(s)$ instead of $O(sn)$, where $s$ is the size of the string typed in |cacheMe| and $n$ is the number of times |if matches| is used, for instance when replacing multiple strings.}, and make it only match words that are made of consecutive letters |[A-Za-z]|. The regex version can be more expressive, but is significantly slower (it can easily multiply by 2 the compilation time).
 \begin{codeexample}[vbox]
 \robExtConfigure{
   add to preset={my python}{
@@ -3996,12 +4035,15 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
-\item Future v2.2 (master on github, not released yet on CTAN):
+\item Future v2.3 (master on github, not released yet on CTAN):
+\item v2.2 
   \begin{itemize}
+  \item v2.1 introduced two important bugs where hashes could not be used in a |\cacheMe| environment, and |auto forward| was not working if the string was containing an environment. This is fixed now.
   \item Fix issue with |compile in parallel| on MacOs (xargs there is not GNU xargs and is missing |-a| option)
   \item Added |*ExpandableDocumentCommandAutoForward|.
   \item Added |\genericAutoForward| to forward arbitrary code.
   \item Added |if windows| and |if unix| tests.
+  \item Added details on the future difference between |if matches| and |if matches word|.
   \end{itemize}
 \item v2.1:
   \begin{itemize}

@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2.1 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2.2 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -1665,11 +1665,11 @@ if __name__ == '__main__':
     \tl_set_rescan:NnV \robExtUserInputCacheMe {} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
   \fi
   \robExt@normalBraces\robExtUserInputCacheMe
-  \expandafter\robExt@getfromstringA\robExtUserInputCacheMe\end
+  \expandafter\robExt@getfromstringA\robExtUserInputCacheMe\robExt@getfromstringA%\robExt@getfromstringA is added to know when to stop
 }
 
 % https://tex.stackexchange.com/questions/700834/efficiently-program-search-of-macro-in-string/700844
-\def\robExt@getfromstringA#1{\ifx#1\end \else
+\def\robExt@getfromstringA#1{\ifx#1\robExt@getfromstringA \else
   %\ifcsname L:\string#1\endcsname \addto\listmacros{#1}\fi
   \robExtLoadAutoForwardMacroConfig{#1}%
   \expandafter\robExt@getfromstringA\fi
@@ -1788,7 +1788,7 @@ if __name__ == '__main__':
   \robExt@set@hash@robust\zxTmpMacro{#5}%
   \robExtConfigure{%
     add to preset={#2}{%
-      if matches={#3}{
+      if matches word={#3}{
         command if externalization/.append code={
           \expanded{%
             \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
@@ -1802,7 +1802,27 @@ if __name__ == '__main__':
   }%
 }
 \let\genericAutoForward\robExtGenericAutoForward
-\let\genericAutoForwardStringMatch\robExtGenericAutoForward
+
+% uses "if matches" instead of "if matches word"
+\NewDocumentCommand{\robExtGenericAutoForwardStringMatch}{sO{latex}mO{}m}{%
+  \IfBooleanTF{#1}{}{#5}% We run the code right now
+  \robExt@set@hash@robust\zxTmpMacro{#5}%
+  \robExtConfigure{%
+    add to preset={#2}{%
+      if matches={#3}{
+        command if externalization/.append code={
+          \expanded{%
+            \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+              \expandonce{\zxTmpMacro}%
+              % #1%%
+            }%
+          }%
+        },#4%
+      }%
+    }%
+  }%
+}
+\let\genericAutoForwardStringMatch\robExtGenericAutoForwardStringMatch
 \ExplSyntaxOn
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2259,6 +2279,7 @@ if __name__ == '__main__':
   load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
   %% This will
   if matches regex/.code 2 args={\robExtIfMatchesRegex{#1}{#2}},
+  if matches word/.code 2 args={\robExtIfMatchesString{#1}{#2}},
   if matches/.code 2 args={\robExtIfMatchesString{#1}{#2}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Run code before/after inclusion %%%
@@ -2388,7 +2409,7 @@ if __name__ == '__main__':
 \NewDocumentCommand{\robExtCacheMe}{O{}m}{%
   {% Group
     %% We store the input in a non-string element for efficiently implementing "auto forward"
-    \def\robExtUserInputCacheMe{#2}
+    \edef\robExtUserInputCacheMe{\unexpanded{#2}}% \unexpanded is needed if the macro contains a #1
     \pgfkeys{%
       /robExt/.cd,%
       set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},%
