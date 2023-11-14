@@ -3066,6 +3066,24 @@ or use the optional parameter to configure the number of threads (xargs starts w
 \end{codeexample}
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/if unix=\marg{style to run if running linux or unix}\@nil
+  \extractkey/robExt/if windows=\marg{style to run if windows}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Since windows does not pack |xparse| by default, you might want to enable parallel compilation only in Linux/MacOs. This can be done using the above flags, like:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  if unix={
+    compile in parallel
+  },
+}
+\end{codeexample}
+(note that |unix| is understood as ``non windows'', i.e.\ would run in Unix/Linux/MacOs)
+\end{pgfmanualentry}
+
 NB: in version smaller than v2.1 (or if you prefer the manual method), you can instead run it in manual mode and use for instance GNU |parallel| (or any tool of you choice) to run all commands in the file |\jobname-robExt-compile-missing-figures.sh| in parallel. To do that:
 \begin{itemize}
 \item First add |\robExtConfigure{enable manual mode}| in your file
@@ -3968,7 +3986,7 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \item Deal with remember picture
 \item Since externalizing is all about speed, it would be nice to do more benchmarks. But overall, it seems fairly optimized, at least when using the compiled presets.
 \item Add a way to forward tikz styles and/or arbitrary code.
-\item Create a more efficient way to check if a word is present. For now for each color/... to export, we check if the string contains this word, which scales like $O(sn)$ where $s$ is the size of the string and $n$ is the number of colors etc to export. Instead, I'd like to run it in $O(s)$ by extracting all words a single time, and then checking if this word exists or not.
+\item Create a more efficient/precise way to check if a word is present than string ``is in''. Indeed, for now for each color/... to export, we check if the string contains this word, which scales like $O(sn)$ where $s$ is the size of the string and $n$ is the number of colors etc to export. Instead, I'd like to run it in $O(s)$ by extracting all words a single time, and then checking if this word exists or not. This is not an issue for |\newcommandAutoforward|, but could be an issue when exporting many colors or |\genericAutoForward|.
 \end{itemize}
 
 \section{Acknowledgments}
@@ -3983,6 +4001,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Fix issue with |compile in parallel| on MacOs (xargs there is not GNU xargs and is missing |-a| option)
   \item Added |*ExpandableDocumentCommandAutoForward|.
   \item Added |\genericAutoForward| to forward arbitrary code.
+  \item Added |if windows| and |if unix| tests.
   \end{itemize}
 \item v2.1:
   \begin{itemize}

@@ -20,6 +20,11 @@
 %%%%%%%%%%% Utils %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
+\ExplSyntaxOn
+\NewDocumentCommand{\robExtIfWindowsTF}{mm}{%
+  \sys_if_platform_windows:TF {#1}{#2}%
+}
+\ExplSyntaxOff
 
 % Debug function: by default, do nothing
 \def\robExtDebugMessage#1{}
@@ -2284,6 +2289,13 @@ if __name__ == '__main__':
     \gdef\robExt@compile@parallel@after{#1}%
   },
   compile in parallel after/.default=0,
+  disable compile in parallel/.code={\let\robExt@compile@parallel@after\undefined},
+  if windows/.code={%
+    \robExtIfWindowsTF{\pgfkeysalso{zx@tmp@key/.estyle={\unexpanded{#1}},zx@tmp@key}}{}%
+  },
+  if unix/.code={%
+    \robExtIfWindowsTF{}{\pgfkeysalso{zx@tmp@key/.estyle={\unexpanded{#1}},zx@tmp@key}}%
+  },
   compile in parallel command/.store in=\robExt@compile@parallel@command,
   % Different backends to compile in parallel
   compile in parallel with gnu parallel/.style={
