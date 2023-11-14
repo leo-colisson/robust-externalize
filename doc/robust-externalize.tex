@@ -2872,7 +2872,13 @@ but since this is a bit long to type, we provide a shortcut:
   \extractcommand\RenewDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
   \extractcommand\ProvideDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
   \extractcommand\DeclareDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\NewExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\RenewExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\ProvideExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
+  \extractcommand\DeclareExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
   \extractcommand\defAutoForward\marg{macro}\opt{\oarg{def-style arg spec}}\marg{macro}\opt{\oarg{additional style}}\@@
+  \extractcommand\genericAutoForward\opt{*}\opt{\oarg{preset}}\marg{string to match}\opt{\oarg{additional style}}\marg{code to execute}\@@
+  \extractcommand\genericAutoForwardStringMatch\opt{*}\opt{\oarg{preset}}\marg{string to match}\opt{\oarg{additional style in preset}}\opt{\oarg{additional style outside preset}}\marg{code to execute}\@@
   \pgfmanualbody
 \begin{verbatim}
 \newcommandAutoForward{\macro}[nb args][default value]{def}[STYLE]
@@ -2885,7 +2891,20 @@ but since this is a bit long to type, we provide a shortcut:
 \begin{verbatim}
 \configIfMacroPresent{\macro}{forward=\macro,STYLE}
 \end{verbatim}
-  to automatically forward the macro if it is used. This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|).
+  to automatically forward the macro if it is used. It is really practical to automatically define a macro and forward it:
+
+  This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|). |\genericAutoForward| and |\genericAutoForwardStringMatch| are a bit special (for now these two commands are alias, but only use the first one if the string is surrounded by non-letter characters as we plan to make that special case more efficient later), as it can be used to run any code assuming that |string to match| is present. For instance, you can use it to automatically forward the code that defines a new tikz style assuming |mystyle| is preset:
+\begin{codeexample}[width=0pt]
+\cacheTikz
+\genericAutoForward{mystyle}{
+  \tikzset{mystyle/.style={fill=#1!10!white,text=#1!50!black}}
+}
+
+\begin{tikzpicture}
+  \node[mystyle=green]{A};
+\end{tikzpicture}    
+\end{codeexample}
+This will also run the code to define it in the current document (practical for instance if some pictures are not externalized), use the stared version of |\genericAutoForward| if you do not want to run the code in the current document. By default, the code is added to the |latex| preset, but you can choose another preset if you want using the optional option. The additional style might be specified to run other style if the matches is true.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -3947,7 +3966,9 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \begin{itemize}
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
-\item Since externalizing is all about speed, it would be nice to do more benchmarks.
+\item Since externalizing is all about speed, it would be nice to do more benchmarks. But overall, it seems fairly optimized, at least when using the compiled presets.
+\item Add a way to forward tikz styles and/or arbitrary code.
+\item Create a more efficient way to check if a word is present. For now for each color/... to export, we check if the string contains this word, which scales like $O(sn)$ where $s$ is the size of the string and $n$ is the number of colors etc to export. Instead, I'd like to run it in $O(s)$ by extracting all words a single time, and then checking if this word exists or not.
 \end{itemize}
 
 \section{Acknowledgments}
@@ -3957,9 +3978,11 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \section{Changelog}
 
 \begin{itemize}
-\item Future v2.1.1 (master on github, not released yet on CTAN):
+\item Future v2.2 (master on github, not released yet on CTAN):
   \begin{itemize}
   \item Fix issue with |compile in parallel| on MacOs (xargs there is not GNU xargs and is missing |-a| option)
+  \item Added |*ExpandableDocumentCommandAutoForward|.
+  \item Added |\genericAutoForward| to forward arbitrary code.
   \end{itemize}
 \item v2.1:
   \begin{itemize}

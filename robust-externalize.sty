@@ -81,6 +81,8 @@
 \cs_generate_variant:Nn \robExt_set_hash_robust:Nn { cn }
 \cs_generate_variant:Nn \robExt_set_hash_robust:Nn { cx }
 
+\NewDocumentCommand{\robExt@set@hash@robust}{mm}{\robExt_set_hash_robust:Nn #1 {#2}}
+
 % Double the number of hashes... quite dirty but cannot find any solution or the user need to double it itself
 %% See also https://tex.stackexchange.com/questions/695432/latex3-latex-doubles-the-number-of-hashes-when-storing-them-in-string/695460#695460
 \NewDocumentCommand{\robExtStrSetDoubleHash}{mm}{
@@ -1746,10 +1748,57 @@ if __name__ == '__main__':
   \robExtAutoForwardMacro{#1}[#3]
 }
 
+\NewDocumentCommand{\NewExpandableDocumentCommandAutoForward}{mmO{}m}{
+  \NewExpandableDocumentCommand{#1}{#2}{#4}
+  \robExtAutoForwardMacro{#1}[#3]
+}
+
+\NewDocumentCommand{\RenewExpandableDocumentCommandAutoForward}{mmO{}m}{
+  \RenewExpandableDocumentCommand{#1}{#2}{#4}
+  \robExtAutoForwardMacro{#1}[#3]
+}
+
+\NewDocumentCommand{\ProvideExpandableDocumentCommandAutoForward}{mmO{}m}{
+  \ProvideExpandableDocumentCommand{#1}{#2}{#4}
+  \robExtAutoForwardMacro{#1}[#3]
+}
+
+\NewDocumentCommand{\DeclareExpandableDocumentCommandAutoForward}{mmO{}m}{
+  \DeclareExpandableDocumentCommand{#1}{#2}{#4}
+  \robExtAutoForwardMacro{#1}[#3]
+}
+
 \NewDocumentCommand{\defAutoForward}{mO{}mO{}}{
   \def#1#2{#3}
   \robExtAutoForwardMacro{#1}[#4]
 }
+
+% \robExtGenericAutoForward[tikz]{string to match}[additional style to run]{
+%    code to run in cached file if string matches, and to always run in current folder if not using
+%    the star version
+%  }
+\ExplSyntaxOff
+\NewDocumentCommand{\robExtGenericAutoForward}{sO{latex}mO{}m}{%
+  \IfBooleanTF{#1}{}{#5}% We run the code right now
+  \robExt@set@hash@robust\zxTmpMacro{#5}%
+  \robExtConfigure{%
+    add to preset={#2}{%
+      if matches={#3}{
+        command if externalization/.append code={
+          \expanded{%
+            \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+              \expandonce{\zxTmpMacro}%
+              % #1%%
+            }%
+          }%
+        },#4%
+      }%
+    }%
+  }%
+}
+\let\genericAutoForward\robExtGenericAutoForward
+\let\genericAutoForwardStringMatch\robExtGenericAutoForward
+\ExplSyntaxOn
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Automatically forward (regex-based)
@@ -2119,6 +2168,25 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   command if externalization/.code={},
   fw/.style={forward=#1},
+  run code before main content if externalization enabled/.code={\message{#1}},
+  % run code before main content if externalization enabled/.code={
+  %   \message{aaa #1}
+  %   \def\zx@tmp{#1}%
+  %   \message{xxx}
+  %   \show\zx@tmp%
+  %   \scantokens{%
+  %     \pgfkeysalso{
+  %       command if externalization/.append code={%
+  %         \expanded{%
+  %           \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+  %             % \expandonce{\zx@tmp}%
+  %             #1%%
+  %           }%
+  %         }%
+  %       }%
+  %     }%
+  %   },
+  % },
   forward/.style={%
     command if externalization/.append code={%
       \robExtGetCommandDefinitionInMacro{#1}%
