@@ -2800,7 +2800,7 @@ Note that using |if matches word|, you can also automatically forward colors:
 \colorlet{myviolet}{blue!50!myred}
 \colorlet{mypink}{pink!90!orange}
 \robExtConfigure{
-  add to preset={tikz}{
+  add to preset={latex}{
     if matches word={mypink}{forward color=mypink},
   },
 }
@@ -2820,6 +2820,7 @@ but since this is a bit long to type, we provide a shortcut:
   \node[fill=mypink,yshift=-1cm]{B};
 \end{tikzpictureC}
 \end{codeexample}
+Note that |auto forward color| should NOT be used directly in a preset, use |if matches word| for that.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}

@@ -11,7 +11,7 @@
 \RequirePackage{iftex} % computing md5 sum differs on lualatex/pdflatex/xelatex
 \RequirePackage{xparse} % solve https://github.com/leo-colisson/robust-externalize/issues/6
 \RequirePackage{atveryend} % to compile in parallel all images
-\usepackage{etl} % For auto forward https://tex.stackexchange.com/a/700844/116348
+%\usepackage{etl} % For auto forward https://tex.stackexchange.com/a/700844/116348
 
 %% TODO list:
 % - provide an easy way to use cross-ref, bibtex etc (we just need to add them when writing the file) without recompiling the whole document (we don't want to lose the cache everytime a new bib entry is added) but while preserving.
@@ -1660,12 +1660,17 @@ if __name__ == '__main__':
 
 %% "auto forward"
 \NewDocumentCommand{\robExtAutoForward}{}{
-  \ifdefined\robExtUserInputCacheMe\else
-    \msg_warning:nn{robExt}{auto forward not in cachemecode}
-    \tl_set_rescan:NnV \robExtUserInputCacheMe {} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
+  % some code will automatically add auto forward, but we don't want to run it twice.
+  \message{Running auto forward.}
+  \ifdefined\robExt@already@ran@autoforward\message{Auto forward already ran}\else
+    \ifdefined\robExtUserInputCacheMe\else
+      \msg_warning:nn{robExt}{auto forward not in cachemecode}
+      \tl_set_rescan:NnV \robExtUserInputCacheMe {} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
+    \fi
+    \robExt@normalBraces\robExtUserInputCacheMe
+    \expandafter\robExt@getfromstringA\robExtUserInputCacheMe\robExt@getfromstringA%\robExt@getfromstringA is added to know when to stop
+    \def\robExt@already@ran@autoforward{}%
   \fi
-  \robExt@normalBraces\robExtUserInputCacheMe
-  \expandafter\robExt@getfromstringA\robExtUserInputCacheMe\robExt@getfromstringA%\robExt@getfromstringA is added to know when to stop
 }
 
 % https://tex.stackexchange.com/questions/700834/efficiently-program-search-of-macro-in-string/700844
@@ -1778,29 +1783,52 @@ if __name__ == '__main__':
   \robExtAutoForwardMacro{#1}[#4]
 }
 
-% \robExtGenericAutoForward[tikz]{string to match}[additional style to run]{
+% \robExtGenericAutoForward[tikz][namespace]{string to match}[additional style to run]{
 %    code to run in cached file if string matches, and to always run in current folder if not using
 %    the star version
 %  }
 \ExplSyntaxOff
-\NewDocumentCommand{\robExtGenericAutoForward}{sO{latex}mO{}m}{%
-  \IfBooleanTF{#1}{}{#5}% We run the code right now
-  \robExt@set@hash@robust\zxTmpMacro{#5}%
-  \robExtConfigure{%
-    add to preset={#2}{%
-      if matches word={#3}{
-        command if externalization/.append code={
-          \expanded{%
-            \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
-              \expandonce{\zxTmpMacro}%
-              % #1%%
-            }%
+
+\NewDocumentCommand{\robExtGenericAutoForward}{sO{latex}O{}mO{}m}{%
+  \IfBooleanTF{#1}{}{#6}% We run the code right now
+  \robExt@set@hash@robust\zxTmpMacro{#6}%
+  \expanded{%
+    \noexpand\robExtConfigure{%
+      if matches word namespace={#3}{#4}{%
+        /utils/exec={
+          \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+            \expandonce{\zxTmpMacro}%
           }%
-        },#4%
+        },%
+        #5%
+      },
+      add to preset={#2}{%
+        auto forward words namespace={#3},%
       }%
     }%
-  }%
+  }%  
 }
+
+% \NewDocumentCommand{\robExtGenericAutoForward}{sO{latex}O{}mO{}m}{%
+%   \IfBooleanTF{#1}{}{#6}% We run the code right now
+%   \robExt@set@hash@robust\zxTmpMacro{#6}%
+%   \robExtConfigure{%
+%     if matches word namespace={#3}{#4}{%
+%       /utils/exec={
+%         \expanded{%
+%           \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
+%             \expandonce{\zxTmpMacro}%
+%           }%
+%         }%
+%       },%
+%       #5%
+%     },
+%     add to preset={#2}{%
+%       auto forward words namespace={#3},%
+%     }%
+%   }%
+% }
+
 \let\genericAutoForward\robExtGenericAutoForward
 
 % uses "if matches" instead of "if matches word"
@@ -1810,7 +1838,7 @@ if __name__ == '__main__':
   \robExtConfigure{%
     add to preset={#2}{%
       if matches={#3}{
-        command if externalization/.append code={
+        run command if externalization={
           \expanded{%
             \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
               \expandonce{\zxTmpMacro}%
@@ -1838,6 +1866,78 @@ if __name__ == '__main__':
 
 \NewDocumentCommand{\robExtIfMatchesString}{mm}{
   \str_if_in:NnTF \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {#1} {\pgfkeysalso{#2}} {}
+}
+
+% \robExtIfMatchesWord {namespace} {word} {style}
+\NewDocumentCommand{\robExtIfMatchesWord}{mmm}{
+  \robExt_register_match_word:nnn {#1} {#2} {\pgfkeysalso{#3}}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Automatically forward (word-based)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% For efficiency reasons, we first extract in a single pass all words in the text (a word is basically [A-Za-z]+)
+% and run a function on these words
+
+% \__robExt_auto_forward_words:N \commandToRunOnEachWord \stringToSearchOn
+\cs_set:Nn \__robExt_auto_forward_words:NN {
+  % \l_tmpa_str will contain the current word read so far
+  \str_set:Nn \l_tmpa_str {}%
+  \str_map_inline:Nn #2 {
+    % \token_case_charcode:NnTF ##1 {} {} {}
+    \__robExt_if_letter:nTF {##1} {
+      \str_put_right:Nn \l_tmpa_str {##1}
+    }{
+      \str_if_empty:NTF \l_tmpa_str { } {
+        % if the string is empty, we run the command on the string
+        #1 \l_tmpa_str%
+        \str_set:Nn \l_tmpa_str {}% we reset its value
+      }
+    }
+  }
+}
+
+%% \__robExt_if_letter:nTF {char} {true} {false} tests if an element is a letter
+%% https://tex.stackexchange.com/a/700864/116348
+\prg_new_conditional:Npnn \__robExt_if_letter:n #1 { TF }
+{
+  \bool_lazy_or:nnTF
+  {
+    \bool_lazy_and_p:nn
+    { \int_compare_p:nNn { `#1 } > { `a - 1 } }
+    { \int_compare_p:nNn { `#1 } < { `z + 1 } }
+  }
+  {
+    \bool_lazy_and_p:nn
+    { \int_compare_p:nNn { `#1 } > { `A - 1 } }
+    { \int_compare_p:nNn { `#1 } < { `Z + 1 } }
+  }
+  \prg_return_true:
+  \prg_return_false:
+}
+
+% \robExt_register_match_word {namespace that defaults to empty} {word} {code to run if word is present} 
+\cs_set:Nn \robExt_register_match_word:nnn {
+  \cs_set:cn {l__robExt_execute_if_word_present_#1_#2:} {#3}
+}
+
+% \robExt_try_to_execute_if_match_word:nn {namespace} {word}
+\cs_set:Nn \robExt_try_to_execute_if_match_word:nn {
+  \cs_if_exist:cTF {l__robExt_execute_if_word_present_#1_#2:} {%
+    \cs_if_exist:cTF {l__robExt_execute_if_word_present_#1_#2__already_forwarded:}{\message{Already forwarded}}{
+      \use:c {l__robExt_execute_if_word_present_#1_#2:}%
+      % define it so that we do not import twice next time
+      \cs_set:cx {l__robExt_execute_if_word_present_#1_#2__already_forwarded:} {}
+    }
+  } { }
+}
+\cs_generate_variant:Nn \robExt_try_to_execute_if_match_word:nn { nV }
+
+\NewDocumentCommand{\robExtAutoForwardWords}{O{}}{
+  \cs_set:Nn \__robExt_tmp_fct:N {
+    \robExt_try_to_execute_if_match_word:nV {#1} ##1
+  }
+  \__robExt_auto_forward_words:NN \__robExt_tmp_fct:N \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
 }
 
 \ExplSyntaxOff
@@ -2191,7 +2291,18 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Forward macros if externalization is enabled %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  command if externalization/.code={},
+  command if externalization/.code={\def\robExt@we@are@already@in@command@if@externalization{}},
+  % Doing "command if externalization/.append code={}" is not always good since we don't always know if the style
+  % will always be run before running "command if externalization". In particular this arrives when using
+  % something like "if matches word={mypink}{forward color=mypink}"
+  run command if externalization/.code={
+    \ifdefined\robExt@we@are@already@in@command@if@externalization%
+      % we are already running command if externalization
+      #1%
+    \else%
+      \pgfkeysalso{command if externalization/.append code={#1}}%
+    \fi%
+  },
   fw/.style={forward=#1},
   run code before main content if externalization enabled/.code={\message{#1}},
   % run code before main content if externalization enabled/.code={
@@ -2213,7 +2324,7 @@ if __name__ == '__main__':
   %   },
   % },
   forward/.style={%
-    command if externalization/.append code={%
+    run command if externalization={%
       \robExtGetCommandDefinitionInMacro{#1}%
       \expanded{%
         \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
@@ -2223,7 +2334,7 @@ if __name__ == '__main__':
     },
   },
   forward at letter/.style={%
-    command if externalization/.append code={%
+    run command if externalization={%
       \robExtGetCommandDefinitionInMacro{#1}%
       \expanded{%
         \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
@@ -2235,7 +2346,7 @@ if __name__ == '__main__':
     },
   },
   forward eval/.style={%
-    command if externalization/.append code={%
+    run command if externalization={%
       \expanded{%
         \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
           \noexpand\def\noexpand#1{#1}%
@@ -2244,7 +2355,7 @@ if __name__ == '__main__':
     },%
   },
   forward counter/.style={%
-    command if externalization/.append code={%
+    run command if externalization={%
       \expanded{%
         \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
           \noexpand\makeatletter%
@@ -2257,7 +2368,7 @@ if __name__ == '__main__':
     },%
   },%
   forward color/.style={
-    command if externalization/.append code={%
+    run command if externalization={%
       \extractcolorspecs{#1}{\zx@tmp@model}{\zx@tmp@cmd}%
       \expanded{%
         \noexpand\robExtAddBeforePlaceholder*{__ROBEXT_MAIN_CONTENT__}{%
@@ -2268,7 +2379,8 @@ if __name__ == '__main__':
   },%
   %% This will try to automatically forward some macros. For this, you must first define
   %% 
-  auto forward/.code={\robExtAutoForward},
+  auto forward only macros/.code={\robExtAutoForward},
+  auto forward/.code={\robExtAutoForward\pgfkeysalso{auto forward words}},
   auto forward color/.style 2 args={%
     add to preset={#1}{
       % if matches={\b #2\b}{forward color=#2},
@@ -2277,10 +2389,26 @@ if __name__ == '__main__':
     },
   },
   load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
+  %% Auto forward words
+  auto forward words namespace/.code={%
+    \ifdefined\robExt@autoforward@enabled\else%
+      \pgfkeysalso{command if externalization/.append code={%
+          \ifdefined\robExt@autoforward@enabled%
+            \expanded{\noexpand\robExtAutoForwardWords{\robExt@autoforward@enabled}}%
+          \fi%
+        }%
+      }%
+    \fi%
+    \def\robExt@autoforward@enabled{#1}%
+  },%%% todo: finish
+  auto forward words/.style={auto forward words namespace={}},
   %% This will
   if matches regex/.code 2 args={\robExtIfMatchesRegex{#1}{#2}},
-  if matches word/.code 2 args={\robExtIfMatchesString{#1}{#2}},
   if matches/.code 2 args={\robExtIfMatchesString{#1}{#2}},
+  if matches word/.code 2 args={\robExtIfMatchesWord{}{#1}{#2}\pgfkeysalso{auto forward words}},
+  % more efficient since we can register the words before the preset, but make sure to call `auto forward words namespace`.
+  % You can use an empty namespace.
+  if matches word namespace/.code n args={3}{\robExtIfMatchesWord{#1}{#2}{#3}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Run code before/after inclusion %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
