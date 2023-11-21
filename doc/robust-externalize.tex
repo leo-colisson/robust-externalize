@@ -94,7 +94,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.2}\\[3mm]
+  {Léo Colisson \quad Version 2.2+unstable}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -102,9 +102,9 @@
 
 \bigskip
 
-\textbf{WARNING: This library is young and might lack some testing (and is an important rewrite of a previous version), but v2.0 is definitely usable. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
+\textbf{WARNING: This library is young and might lack some testing (and is an important rewrite of a previous version), but v2.2 is definitely relatively robust. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
 
-\textbf{WARNING 2: the coming version 2.1 improves significantly the compilation time compared with 2.0 that was surprisingly slow. Now, it is fairly well optimized (but the code needs a bit of cleaning and documentation before doing an official release)}
+\textbf{WARNING 2: the recent versions 2.1 and 2.2 improves significantly the compilation time compared with 2.0 that was surprisingly slow. Now, it is fairly well optimized, and version 2.2 is even more optimized.}
 
 
 \section{A taste of this library}
@@ -378,10 +378,10 @@ I tested the library on Linux and Windows, but the library should work on all OS
 
 \paragraph{Do I need to compile using -shell-escape?}
 
-Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
+Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). Note that overleaf already defines this option by default, so you don't need to do anything special in overleaf. However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
-\item You can choose to display a dummy content explaining how to manually compile the pictures until they are compiled, see |enable fallback to manual mode|.
-\item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex}).
+\item You can choose to display a dummy content explaining how to manually compile the pictures instead of giving an error until they are compiled, see |enable fallback to manual mode|.
+\item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex} from the \texttt{robustExternalize} folder).
 \item If you allowed:
   \begin{itemize}
   \item |pdflatex| (needed to compile latex documents)
@@ -398,9 +398,27 @@ Since we need to compile the images via an external command, the simpler option 
 
 Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing special needs to be done there (of course, if you use this library to run some code, the programming language might not be available, but I heard that python is installed on overleaf servers for instance, even if this needs to be doubled checked). If the first compilation of the document to cache images times out, you can just repeat this operation multiple times until all images are cached.
 
+\paragraph{Overleaf still times-out, why?}
+
+During the first compilation, the pictures are not compiled, so you may obtain a time out. However, at each compilation, new pictures should be added to the cache, so you should eventually be able to compile (check the log file, you should read ``No need to recompile XX.pdf'' if the picture is already in the cache). If you want this to be faster, you can try to enable |\robExtConfigure{compile in parallel}| in order to compile the pictures in parallel (need 2 compilations). If you do not often change all pictures, you can also locally download the project (it might be more practical to use the git bridge if you have it enabled), compile them locally, and copy back the |robustExternalize| folder containing all cached pictures.
+
+If all pictures are still compiled, but you still experience timeouts, you can try to use compiled presets, with something like:
+\begin{verbatim}
+\robExtConfigure{
+  new compiled preset={compiled ZX}{templateZX, compile latex template}{}
+}
+\end{verbatim}
+to create a new, more efficient (we call it compiled) preset called |compiled ZX| from a preset |templateZX|.
+
+You can also try to reduce the compilation time by reducing the number of compilation passes. Indeed, overleaf will run |pdflatex| multiple times to make it converge to the final version, increasing mechanically the compilation time (for instance a file that takes 6s to compile locally was not able to compile online). You can force overleaf to compile a single time the document by creating a |latexmkrc| file at the root of the project, containing:
+\begin{verbatim}
+$max_repeat=1
+\end{verbatim}
+Of course, you might need to recompile more than once the document to reach the final version.
+
 \paragraph{Do you have some benchmarks?}
 
-We completely rewrote the \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{original library} to introduce the notion of placeholders (before, the template was fixed forever), allowing for greater flexibility. The original rewrite (1.0) had really poor performance compared to the original library (only x3 improvement compared to no externalization, while the old library could be 20x faster), but we made some changes (v2.0) that correct this issue. Here is a benchmark we made on an article with 159 small pictures (ZX diagrams from the zx-calculus library):
+We completely rewrote the \href{https://github.com/leo-colisson/robust-externalize/commit/09a05a86ec9c04eb6687b75831ebb84185786ac5}{original library} to introduce the notion of placeholders (before, the template was fixed forever), allowing for greater flexibility. The original rewrite (1.0) had really poor performance compared to the original library (only x3 improvement compared to no externalization, while the old library could be 20x faster), but we made some changes (v2.0) that correct this issue to recover the original speed (at least when using compiled templates). Here is a benchmark we made on an article with 159 small pictures (ZX diagrams from the zx-calculus library):
 \begin{itemize}
 \item without externalization: 1mn25
 \item with externalization, v2.0 (first run, not in parallel): 3mn05, so takes twice the time; but (first run in parallel) takes 60s (so faster by a factor of 1.5).
@@ -2580,6 +2598,7 @@ Some text %
   \def\extrakeytext{style, }
   \extractkey/robExt/command if no externalization\@nil
   \extractkey/robExt/command if externalization\@nil
+  \extractkey/robExt/run command if externalization=\marg{code}\@nil
   \makeatother%
   \pgfmanualbody
   You can easily change the command to run if externalization is disabled using by setting the \textbf{.code} of this key. By default, it is configured as:\\
@@ -2589,7 +2608,7 @@ command if no externalization/.code={%
 }
 \end{verbatim}
   Unless you know what you are doing, you should include |\robExtDisableTikzpictureOverwrite| as it is often necessary to avoid infinite recursion when externalization is disabled and the original command has been replaced with a cached version (for instance done by |\cacheTikz|). Note that if you write your own style, try to modify |__ROBEXT_MAIN_CONTENT__| so that it can be included as-it in a document: this way you do not need to change this command.
-  You can also use |command if externalization/.append code={...}| if you want to run a code only if externalization is enabled (this is used for instance by the |forward| functionality).
+  You can also use |command if externalization/.append code={...}| if you want to run a code only if externalization is enabled (this is used for instance by the |forward| functionality), but we advise you rather to use |run command if externalization={...}| as this will also work if the style is executed while |command if externalization| is already running (this might occur when calling the style inside |if matches word|, for instance when forwarding colors).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2794,13 +2813,25 @@ but also with colors defined with |\colorlet|:
   \node[fill=myviolet,yshift=-1cm]{B};
 \end{tikzpictureC}
 \end{codeexample}
-Note that using |if matches word|, you can also automatically forward colors:
+Note that using |if matches word|, you can also automatically forward colors. This command also scales better than |if matches|: if |if matches| is used to register $N$ words, the compilation time will increase for each new |if matches| (since we need to check each time if the string contains the expression). |if matches word|, on the other hand, is more clever, and extracts in a single loop all the words of the string: the running time is therefore independent of the number of times |if matches word| was called. You can call |if matches word| outside of any preset like in:
 \begin{codeexample}[width=0pt]
 \definecolor{myred}{HTML}{F01122}
 \colorlet{myviolet}{blue!50!myred}
 \colorlet{mypink}{pink!90!orange}
 \robExtConfigure{
-  add to preset={tikz}{
+  if matches word={mypink}{forward color=mypink},
+}
+\begin{tikzpictureC}
+  \node[fill=mypink,yshift=-1cm]{B};
+\end{tikzpictureC}
+\end{codeexample}
+And this will automatically allow all presets based on |latex| to forward this color (see also |\definecolorAutoForward| to do that even quicker). You can also simply call it on any preset of your choice like:
+\begin{codeexample}[width=0pt]
+\definecolor{myred}{HTML}{F01122}
+\colorlet{myviolet}{blue!50!myred}
+\colorlet{mypink}{pink!90!orange}
+\robExtConfigure{
+  add to preset={latex}{
     if matches word={mypink}{forward color=mypink},
   },
 }
@@ -2808,7 +2839,7 @@ Note that using |if matches word|, you can also automatically forward colors:
   \node[fill=mypink,yshift=-1cm]{B};
 \end{tikzpictureC}
 \end{codeexample}
-but since this is a bit long to type, we provide a shortcut:
+or, equivalently:
 \begin{codeexample}[width=0pt]
 \definecolor{myred}{HTML}{F01122}
 \colorlet{myviolet}{blue!50!myred}
@@ -2826,9 +2857,11 @@ but since this is a bit long to type, we provide a shortcut:
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/auto forward\@nil
+  \extractkey/robExt/auto forward only macros\@nil
+  \extractkey/robExt/auto forward words\@nil
   \makeatother%
   \pgfmanualbody
-  Enable automatic forwarding of macros marked with |*AutoForward| commands or |\configIfMacroPresent|. This command naively extracts all used macro via a simple regex match and forwards them/execute the style configured in |\configIfMacroPresent| if it exists.
+  |auto forward| enables automatic forwarding of macros marked with |*AutoForward| commands or |\configIfMacroPresent| or |if matches word|. This command naively extracts all used macros via a simple regex match and forwards them/execute the style configured in |\configIfMacroPresent| if it exists. It does a similar thing for words registered via |if matches word| or |register word with namespace|. If you want to only forward macros or words, you can use |auto forward only macros| or |auto forward words|.
 \begin{codeexample}[vbox]
 \cacheTikz  
 \robExtConfigure{add to preset={tikz}{auto forward}}
@@ -2878,8 +2911,8 @@ but since this is a bit long to type, we provide a shortcut:
   \extractcommand\ProvideExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
   \extractcommand\DeclareExpandableDocumentCommandAutoForward\marg{macro}\marg{arg spec}\opt{\oarg{additional style}}\marg{definition}\@@
   \extractcommand\defAutoForward\marg{macro}\opt{\oarg{def-style arg spec}}\marg{macro}\opt{\oarg{additional style}}\@@
-  \extractcommand\genericAutoForward\opt{*}\opt{\oarg{preset}}\marg{string to match}\opt{\oarg{additional style}}\marg{code to execute}\@@
-  \extractcommand\genericAutoForwardStringMatch\opt{*}\opt{\oarg{preset}}\marg{string to match}\opt{\oarg{additional style in preset}}\opt{\oarg{additional style outside preset}}\marg{code to execute}\@@
+  \extractcommand\genericAutoForward\opt{*}\opt{\oarg{preset}}\opt{\oarg{namespace}}\marg{word}\opt{\oarg{additional style}}\marg{code to run}\@@
+  \extractcommand\genericAutoForwardStringMatch\opt{*}\opt{\oarg{preset}}\marg{string}\opt{\oarg{additional style}}\marg{code to run}\@@
   \pgfmanualbody
 \begin{verbatim}
 \newcommandAutoForward{\macro}[nb args][default value]{def}[STYLE]
@@ -2908,7 +2941,7 @@ but since this is a bit long to type, we provide a shortcut:
 \end{tikzpicture}
 \end{codeexample}
 
-  This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|). |\genericAutoForward| and |\genericAutoForwardStringMatch| are a bit special (for now these two commands are alias, but only use the first one if the string is surrounded by non-letter characters as we plan to make that special case more efficient later as it uses internally |if matches word|), as it can be used to run any code assuming that |string to match| is present. For instance, you can use it to automatically forward the code that defines a new tikz style assuming |mystyle| is preset:
+  This works similarly for other commands (note that for |\defAutoForward|, you need to put the arguments in a bracket, like |\defAutoForward\myMacro[#1 and #2]{Hey #1, #2}| for |\def\myMacro#1 and #2{Hey #1, #2}|). |\genericAutoForward| and |\genericAutoForwardStringMatch| are a bit special, as it can be used to run any code assuming that |word|/|string to match| is present (|\genericAutoForward| is more efficient as it does not scale with the number of words, but do not allow spaces etc in the name). For instance, you can use it to automatically forward the code that defines a new tikz style assuming |mystyle| is preset:
 \begin{codeexample}[width=0pt]
 \cacheTikz
 \genericAutoForward{mystyle}{
@@ -2943,6 +2976,50 @@ This will also run the code to define it in the current document (practical for 
   };
 \end{tikzpicture}
 \end{codeexample}
+  \begin{codeexample}[vbox]
+    % space is not allowed in the name with this more efficient version:
+    \robExtGenericAutoForward{mystyle}{%
+      \tikzset{%
+        mystyle/.style={fill=#1!30!white,text=#1!40!black},
+      }%
+    }
+    \begin{tikzpictureC}
+      \node[mystyle=green]{My style automatically forwarded};
+    \end{tikzpictureC}
+  \end{codeexample}
+  \begin{codeexample}[vbox]
+    % space is allowed in the name with this slightly less efficient version:
+    \robExtGenericAutoForwardStringMatch{my style}{%
+      \tikzset{%
+        my style/.style={fill=#1!30!white,text=#1!40!black},
+      }%
+    }
+    \begin{tikzpictureC}
+      \node[my style=green]{My style with a space in the name automatically forwarded};
+    \end{tikzpictureC}
+  \end{codeexample}
+  Note that by default, this forwards elements in the |latex| preset, but you can change it via |preset|. You can also configure additional style to run, and choose another namespace for the word version (practical only if you want to forward different codes to different presets: note that a single namespace is allowed per preset).
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\definecolorAutoForward\marg{color}\marg{model}\marg{value}\opt{\oarg{additional style}}\@@
+  \extractcommand\colorletAutoForward\marg{color}\marg{value}\opt{\oarg{additional style}}\@@
+  \pgfmanualbody
+  Define colors like |\definecolor| and |\colorlet|, but also runs
+\begin{verbatim}
+if matches word={COLOR}{forward color=COLOR}
+\end{verbatim}
+  to automatically forward the color (this will forward it only in latex-based presets). You can provide additional style to run as well in option.
+  \begin{codeexample}[vbox]
+    \definecolorAutoForward{myred}{HTML}{F01122}
+    \colorletAutoForward{myviolet}{blue!50!myred}
+    \begin{tikzpictureC}
+      \node[fill=myred,yshift=-1cm]{Uses myred};
+    \end{tikzpictureC}
+    \begin{tikzpictureC}
+      \node[fill=myviolet,yshift=-1cm]{Myviolet};
+    \end{tikzpictureC}
+  \end{codeexample}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2974,9 +3051,12 @@ This will also run the code to define it in the current document (practical for 
   \extractkey/robExt/if matches=\marg{string}\marg{style to apply}\@nil
   \extractkey/robExt/if matches word=\marg{string}\marg{style to apply}\@nil
   \extractkey/robExt/if matches regex=\marg{latex3 regex}\marg{style to apply}\@nil
+  \extractkey/robExt/register word with namespace=\marg{namespace}\marg{word}\marg{style}\@nil
+  \extractkey/robExt/auto forward words\@nil
+  \extractkey/robExt/auto forward words namespace=\marg{namespace}\@nil
   \makeatother%
   \pgfmanualbody
-  Apply the corresponding style if the string (resp.\ regex in \LaTeX{}3 format) matches is matched in the content. As of today, |if matches word| and |if matches| are equivalent, but I plan to make |if watches word| more efficient\footnote{Scaling with $O(s)$ instead of $O(sn)$, where $s$ is the size of the string typed in |cacheMe| and $n$ is the number of times |if matches| is used, for instance when replacing multiple strings.}, and make it only match words that are made of consecutive letters |[A-Za-z]|. The regex version can be more expressive, but is significantly slower (it can easily multiply by 2 the compilation time).
+  |if matches *| applies the corresponding style if the string (resp.\ word or regex in \LaTeX{}3 format) matches is matched in the content. |if matches word| is more efficient that |if matches string| since the running time is independent of the number of times |if matches word| is called\footnote{Scaling with $O(s)$ instead of $O(sn)$, where $s$ is the size of the string typed in |cacheMe| and $n$ is the number of times |if matches| is used, for instance when replacing multiple strings.}. |if matches word| make it only match words that are mostly made of consecutive letters and numbers |[A-Za-z0-9]| (more precisely separated by elements in |\robExtWordSeparators|). The regex version can be more expressive, but is significantly slower (it can easily multiply by 2 the compilation time).
 \begin{codeexample}[vbox]
 \robExtConfigure{
   add to preset={my python}{
@@ -3021,7 +3101,9 @@ Some text %
   \draw[->] (0,0) to[bend left] (my original node);
 \end{tikzpicture}
 \end{codeexample}
+Note that to make |if matches word| even more efficient, you can call it before the preset. It will "register" the corresponding word with |register word| (itself a shortcut for |register word with namespace| with an empty namespace), and call |auto forward words| (shortcut for |auto forward words namespace={}|) in the |latex| preset (or in the current preset if we are already in a preset) to forward all words registered in the corresponding namespace (empty by default). Unless you want to forward different words to different presets, these more advanced functions involving namespaces should not be really useful for the end user.
 \end{pgfmanualentry}
+
 
 \subsubsection{Pass compiled file to another template}\label{sec:passOutputToOtherTemplate}
 
@@ -4036,6 +4118,11 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 
 \begin{itemize}
 \item Future v2.3 (master on github, not released yet on CTAN):
+  \begin{itemize}
+  \item fix bug in |more logs| and |less logs|
+  \item make |if matches word| more efficient, independent on the number of runs, allowing registration, namespaces, etc.
+  \item Added |\definecolorAutoForward| and |\colorletAutoForward|
+  \end{itemize}
 \item v2.2 
   \begin{itemize}
   \item v2.1 introduced two important bugs where hashes could not be used in a |\cacheMe| environment, and |auto forward| was not working if the string was containing an environment. This is fixed now.
