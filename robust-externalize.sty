@@ -1127,6 +1127,7 @@ if __name__ == '__main__':
 
 \seq_new:N \l__robExt_list_groups_seq % contains the list of all groups
 
+%%%% \robExtRegisterGroupPlaceholders{bash} adds "bash" to the list of existing groups
 \NewDocumentCommand{\robExtRegisterGroupPlaceholders}{m}{
   \seq_if_exist:cTF {l__robExt_placeholder_group_#1_seq}{}{
     \seq_clear_new:c {l__robExt_placeholder_group_#1_seq}
@@ -2286,6 +2287,17 @@ if __name__ == '__main__':
   % The default include command includes the pdf, making sure it is raised depending on its depth,
   % but you can override it:
   custom include command/.code={\def\robExtIncludeCommand{#1}},
+  include command is input/.style={
+    custom include command={#1\input{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}},
+  },
+  %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz picture
+  %% etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not want to reset
+  %% all compilation commands etc), so you can add here stuff that might need to be restored later.
+  reset/.code={%
+    \let\robExtIncludeCommandAdvanced\undefined%
+    \let\robExtIncludeCommand\undefined%
+  },
+  include command is input/.default={},
   %% Use this when we do not want to include anything (e.g. the video will be processed later in the chain):
   do not include pdf/.style={
     custom include command={}%
@@ -2314,6 +2326,12 @@ if __name__ == '__main__':
   % Change this before starting to cache any library, and if you change it mid-document, be aware
   % that you will not be able to refer to elements in the old folder.
   set subfolder and way back={robustExternalize/}{../},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Enable externalization for tikz %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  cache tikz/.code={\cacheTikz},
+  cache tikz 2 args/.code 2 args={\cacheTikz[#1][#2]},
+  cache tikz 3 args/.code n args={3}{\cacheTikz[#1][#2][3]},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Disable externalization %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -2593,6 +2611,11 @@ if __name__ == '__main__':
     \edef\robExtUserInputCacheMe{\unexpanded{#2}}% \unexpanded is needed if the macro contains a #1
     \pgfkeys{%
       /robExt/.cd,%
+      %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz
+      %% picture etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not
+      %% want to reset all compilation commands etc), so you can add here stuff that might need to be restored
+      %% later.
+      reset,
       set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},%
       default style,%
       #1,
@@ -2818,6 +2841,7 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     enable placeholders,
     % This way it appears before orig in the list: more efficient
     import placeholders from group={latex},
+    %/utils/exec={\message{I am in the latex style!!!!!!}},
     set placeholder={__ROBEXT_MAIN_CONTENT__}{__ROBEXT_MAIN_CONTENT_ORIG__},
     import placeholder={__ROBEXT_MAIN_CONTENT_ORIG__},
     first placeholders latex,
@@ -3108,6 +3132,44 @@ print_file.close()
 \robExtRegisterGroupPlaceholders{verbatim}
 
 
+% We clean the "main" group, that we will copy later to gnuplot.
+\robExtClearGroupPlaceholders{main}
+
+\begin{PlaceholderFromCode}{__GNUPLOT_TEMPLATE__}
+set terminal __ROBEXT_GNUPLOT_TERMINAL__
+set output "__ROBEXT_OUTPUT_PDF__"
+__ROBEXT_GNUPLOT_PRELUDE__
+__ROBEXT_MAIN_CONTENT__
+\end{PlaceholderFromCode}
+
+\begin{PlaceholderFromCode}{__ROBEXT_GNUPLOT_PRELUDE__}
+\end{PlaceholderFromCode}
+
+\robExtCopyGroupPlaceholders{gnuplot}{main}
+\robExtRegisterGroupPlaceholders{gnuplot}
+
+\robExtConfigure{
+  enable fallback to manual mode,
+  new preset={gnuplot}{
+    enable placeholders,
+    import placeholders from group={gnuplot},
+    set compilation command={gnuplot -c "__ROBEXT_SOURCE_FILE__"},
+    set terminal/.style={set placeholder={__ROBEXT_GNUPLOT_TERMINAL__}{#1}},
+    pdf terminal/.style={
+      set terminal={pdf #1},
+    },
+    pdf terminal/.default={},
+    pdf terminal,
+    tikz terminal/.style={
+      set terminal={tikz #1},
+      include command is input,
+    },
+    tikz terminal/.default={},
+    set template={__GNUPLOT_TEMPLATE__},
+    print verbatim if no externalization,
+  },
+}
+
 %%%%%% 
 %%%%%% Group "bash"
 %%%%%%
@@ -3139,6 +3201,11 @@ touch "${outputPdf}"
 
 \robExtCopyGroupPlaceholders{bash}{main}
 \robExtRegisterGroupPlaceholders{bash}
+
+%%%%%% 
+%%%%%% Group "gnuplot"
+%%%%%%
+
 
 %%%%%% 
 %%%%%% Group "default", available in all styles

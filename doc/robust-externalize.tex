@@ -26,6 +26,7 @@
 % Loads the great package that produces tikz-like manual (see also tikzcd for examples)
 \input{pgfmanual-en-macros.tex} % Is supposed to be included in recent TeX distributions, but I get errors...
 
+\usepackage{gnuplot-lua-tikz} %% Generate with gnuplot -e "set terminal tikz createstyle"
 
 %% For verbatim environments:
 
@@ -2440,10 +2441,13 @@ The inclusion command is the command that is run to include the cached file back
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/do not include pdf\@nil
+  \extractkey/robExt/include command is input=\opt{additional command}\@nil
   \makeatother%
   \pgfmanualbody
-  Do not include the pdf. Useful if you only want to compile the file but use it later (note that you should still generate a |.pdf| file, possibly empty, to indicate that the compilation runs smootly). Equivalent to:\\
+  |do not include pdf| do not include the pdf. Useful if you only want to compile the file but use it later (note that you should still generate a |.pdf| file, possibly empty, to indicate that the compilation runs smootly). Equivalent to:\\
   |custom include command={}|
+  Use |include command is input| (v2.3 and after) in order to specify that you should |\input| the |.pdf| file (note that despite the extension, it should still contain a LaTeX code). You can also specify an optional command to run before. Equivalent to:
+  |custom include command={#1\input{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}}|
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -3612,6 +3616,75 @@ This file contains:
 
 You might also like to use |name output=yourfile| that will create two macros |\yourfile| and |\yourfileInCache|, equal respectively to the prefix |robExt-somehash| and |pathOfCache/robExt-somehash|. 
 
+\subsubsection{Gnuplot}
+
+We also provide support for gnuplot since v2.3.
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/gnuplot\@nil
+  \extractkey/robExt/gnuplot/set terminal=\marg{terminal and options}\@nil
+  \extractkey/robExt/gnuplot/pdf terminal=\opt{pdf terminal options}\@nil
+  \extractkey/robExt/gnuplot/tikz terminal=\opt{tikz terminal options}\@nil
+  \makeatother%
+  \pgfmanualbody
+  Loads the |gnuplot| preset. By default, it uses the |pdf| terminal:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+You can also specify the gnuplot options to the pdf terminal, like the size, using:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot,pdf terminal={size 5cm,4cm}}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+You can also change the options of the |includegraphics| command used to include the image, using as usual:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot,set includegraphics options={width=5cm,height=4cm}}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+You can also use other terminals using the |set terminal| option. For instance, you can use the png terminal and configure its size using:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot,set terminal={png size 400,300}}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+The tikz terminal is a bit special since we do not want to use |\includegraphics| but |\input| to include the file. You can use it like this, just make sure:
+\begin{itemize}
+\item to have gnuplot installed with lua support. With nix you can get it with:\\
+  |nix-shell -p '(gnuplot.override { withLua = true; })'|
+\item Add |\usepackage{gnuplot-lua-tikz}| after making sure to run\\
+  |gnuplot -e "set terminal tikz createstyle"| once to create the |.sty| file.
+\end{itemize}
+\begin{codeAndResult}
+% \usepackage{gnuplot-lua-tikz} %% Generate with gnuplot -e "set terminal tikz createstyle"
+\begin{CacheMeCode}{gnuplot,tikz terminal={size 5cm,4cm}}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+By default, we only cache the gnuplot compilation, but the |\input| is not cached (so gnuplot will not be run again the next time, but tikz will run every time). But it can also be cached, just add |cache tikz| for that:
+\begin{codeAndResult}
+\robExtConfigure{
+  add to preset={tikz}{
+    % Run gnuplot -e "set terminal tikz createstyle" in the robustExternalize folder first
+    % to create this file:
+    add to preamble={\usepackage{gnuplot-lua-tikz}},
+  },
+  tikz terminal/.append style={
+    cache tikz,
+  }
+}
+\begin{CacheMeCode}{gnuplot, tikz terminal={size 8cm,5cm}}
+plot cos(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+\end{pgfmanualentry}
+
+
 \subsubsection{Custom languages}
 
 To add support to new languages, see \cref{sec:otherLanguages} for an example.
@@ -3716,8 +3789,14 @@ to cache all tikz pictures (unless externalization is disabled), but we also pro
 \begin{pgfmanualentry}
   \extractcommand\robExtExternalizeAllTikzpicture\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
   \extractcommand\cacheTikz\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/cache tikz\@nil
+  \extractkey/robExt/cache tikz 2 args=\marg{tikz preset}\marg{tikzpicture preset}\@nil
+  \extractkey/robExt/cache tikz 3 args=\marg{tikz preset}\marg{tikzpicture preset}\marg{delimiters cacheMe options}\@nil
+  \makeatother%
   \pgfmanualbody
-  This will automatically cache all tikz pictures (both are alias, |\cacheTizk| is available from v2.0). Since v2.0, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  (|cache tikz*| from 2.3, simply style alias) This will automatically cache all tikz pictures (both are alias, |\cacheTikz| is available from v2.0). Since v2.0, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
 \begin{codeexample}[width=0pt,vbox]
 \cacheTikz
 
@@ -3769,6 +3848,7 @@ You can also change the default style loaded for tikz and tikzpicture (note that
   \node(A){In tikzpicture \hello};
 \end{tikzpicture}
 \end{codeexample}
+Note that the |cache tikz| styles (the variation just provide default values) is useful for instance if you only want to locally enable |cache tikz| for the |\input| of a style (this way you can cache the output of a cached thing\dots{}). For instance, |gnuplot| with a tikz terminal will compile into a tex file that will be inputted. But unless |\cacheTikz| is enabled, the inputted picture will not be cached (i.e. tikz will need to run). If you still want to cache it without enabling |\cacheTikz| globally, you can load this style in the |gnuplot| style, or do something like:
 
 \end{pgfmanualentry}
 
@@ -4122,6 +4202,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item fix bug in |more logs| and |less logs|
   \item make |if matches word| more efficient, independent on the number of runs, allowing registration, namespaces, etc.
   \item Added |\definecolorAutoForward| and |\colorletAutoForward|
+  \item Add support for gnuplot
   \end{itemize}
 \item v2.2 
   \begin{itemize}
