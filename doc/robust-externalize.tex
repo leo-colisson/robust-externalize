@@ -839,6 +839,97 @@ We compute this data that is long to compute:
 We computed the cached value \myLongResult.
 \end{codeexample}
 
+\subsection{A note on font handling}
+
+Cached pictures are basically simple latex files that are compiled in a separate |standalone| document. Therefore, if the main document loads a different font, there is no reason for the cached document to also use that font. Fully-automatically forwarding the current font by default is not so easy because there are so many ways to load a font in LaTeX (by loading a package like |\usepackage{times}|, by using xelatex or lualatex, by calling locally |\rmfamily|, by loading a different class… and here I'm not even mentioning math font where each symbol \mylink{https://tex.stackexchange.com/questions/603475/is-there-any-command-to-find-out-the-current-math-font-used)}{can use a different font}, and this is even more complicated if the main file is compiled with a different engine (e.g.\ what should I do if the main document is compiled with lualatex but the inner cached images are compiled with pdflatex, that supports very few fonts by default?). For these reasons, it is simpler to simply let the user load fonts as they want, for instance using something like:
+\begin{codeexample}[width=0pt]
+\robExtConfigure{
+  add to preset={latex}{
+    add to preamble={\usepackage{times}},
+  },
+}
+
+\begin{tikzpictureC}
+\node[fill=green]{See I am using times font};    
+\end{tikzpictureC}
+\end{codeexample}
+or:
+\begin{codeexample}[width=0pt]
+\robExtConfigure{
+  add to preset={latex}{
+    add to latex options={12pt},
+  },
+}
+
+\begin{tikzpictureC}
+\node[fill=green]{See I am using a 12pt font};    
+\end{tikzpictureC}
+\end{codeexample}
+
+But if you want to use the same font as the current document, you might want to avoid code duplication (this might also be useful for any arbitrary code). Since v2.3, you can do:
+\begin{codeexample}[code only]
+\runHereAndInPreambleOfCachedFiles{
+  \usepackage{fontspec}
+  % need lualatex or xelatex to compile
+  \setmainfont{Times New Roman}
+}
+
+\robExtConfigure{
+  add to preset={latex}{
+    use lualatex, % Make sure to compile with lualatex the cached images.
+  },
+}
+\end{codeexample}
+and it will automatically compile the cached images with lualatex, and configure the font of the current document and of the cached documents to follow |Times New Roman|.
+
+If you like to often change the font in the document, you can also do something like that to always compile the document with the font currently in use if you use lualatex (this code fails with \mylink{https://tex.stackexchange.com/questions/705208/get-current-font}{xelatex}, currently trying to understand why):
+\begin{codeexample}[code only]
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+
+%% needed since \f@family contains a @ in its name:
+\makeatletter
+\def\myCurrentFont{\f@family}
+\makeatother
+
+\robExtConfigure{
+  add to preset={latex}{
+    use lualatex,
+    % create a new placeholder containing the name of the current font:
+    set placeholder eval={__MY_FONT__}{\myCurrentFont},
+    add to preamble={
+      \usepackage{fontspec}
+      \setmainfont{__MY_FONT__}
+    },
+  },
+}
+\end{codeexample}
+For now, on xelatex, you can do instead something like this:
+\begin{codeexample}[code only]
+% Create a new command \mysetmainfont which forwards the font to the picture.
+\NewDocumentCommand{\mysetmainfont}{m}{%
+  \def\myCurrentFont{#1}% Stores the name of the current font in \myCurrentFont
+  \setmainfont{#1}%
+}
+
+% Use mysetmainfont from now to change font:
+\mysetmainfont{Times New Roman}
+
+\usepackage{robust-externalize}
+\robExtConfigure{
+  add to preset={latex}{
+    use xelatex,
+    set placeholder eval={__MY_FONT__}{\myCurrentFont},
+    add to preamble={
+      \usepackage{fontspec}
+      \setmainfont{__MY_FONT__}
+    },
+  },
+}
+\end{codeexample}
+
+
+
 \subsection{Compile in parallel}
 Make sure to have xargs installed (installed by default on most linux, on Windows you need to install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), and type in your preamble:
 \begin{codeexample}[code only]
