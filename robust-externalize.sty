@@ -3149,9 +3149,10 @@ print_file.close()
 % We clean the "main" group, that we will copy later to gnuplot.
 \robExtClearGroupPlaceholders{main}
 
-\begin{PlaceholderFromCode}{__GNUPLOT_TEMPLATE__}
+\begin{PlaceholderFromCode}*{__GNUPLOT_TEMPLATE__}
 set terminal __ROBEXT_GNUPLOT_TERMINAL__
 set output "__ROBEXT_GNUPLOT_OUTPUTFILE__"
+set loadpath "__ROBEXT_WAY_BACK__"
 __ROBEXT_GNUPLOT_PRELUDE__
 __ROBEXT_MAIN_CONTENT__
 \end{PlaceholderFromCode}
