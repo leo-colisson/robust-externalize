@@ -3891,8 +3891,23 @@ As before, you can also specify the size, for instance it term of the current te
 plot cos(x)
 \end{CacheMeCode}
 \end{codeAndResult}
+\end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \extractcommand\robExtGpgetvar\marg{variable name}\@@
+  \pgfmanualbody
+  Like |\gpgetvar{}| from |gnuplot-lua-tikz| but does not produce an error if the variable does not exist yet (mostly useful if you compile in parallel as shown \mylink{https://github.com/leo-colisson/robust-externalize/issues/17}{here}). The first time, you will get a message like:
 
+  \robExtGpgetvar{test_variable}
+
+  and later this will compile fine:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot, tikz terminal={providevars test_variable}}
+test_variable = 5
+plot cos(test_variable * x) title "Test2"
+\end{CacheMeCode}
+Variable is \robExtGpgetvar{test_variable}.
+\end{codeAndResult}
 \end{pgfmanualentry}
 
 \subsubsection{Custom languages}
@@ -4389,6 +4404,15 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
 \end{pgfmanualentry}
 
 
+\section{Frequent errors}
+
+\subsection{Xelatex and tabs}
+
+It seems that xelatex (I never had issues with pdflatex and lualatex, but if you get this error on other engines you can try the same fix) \mylink{https://tex.stackexchange.com/a/14776/116348}{has a hard time dealing with tabs} if you do not compile with:
+\begin{verbatim}
+xelatex -8bit yourfile.tex
+\end{verbatim}
+If you see that tabs in your input file are turned into |^^I| in the source code, it might be worth adding the |-8bit| option.
 
 \section{TODO and known bugs:}
 

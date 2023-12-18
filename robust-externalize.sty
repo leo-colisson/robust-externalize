@@ -123,6 +123,7 @@
 \msg_new:nnn {robExt}{recommend two underscores in placeholders}{We~recommend~to~use~only~placeholders~containing~two~consecutive~underscores~in~their~name}
 \msg_new:nnn {robExt}{enabled parallel no shell escape}{Warning:~you~enabled~parallel~compilation~but~shell-escape~is~disabled.}
 \msg_new:nnn {robExt}{rerun because parallel}{Warning:~Compiling~all~missing~figures~in~parallel~with~"#1".~You~need~to~rerun~LaTeX~to~include~them.}
+\msg_new:nnn {robExt}{enabled parallel gpgetvar}{Warning:~you~need~to~recompile~as~the~gpgetvar~variable~"#1"~does~not~exist~yet.}
 
 % dummy placeholders added if image is not present
 \def\robExtImagePlaceholderIfManualMode{
@@ -3162,6 +3163,10 @@ print_file.close()
 \robExtRegisterGroupPlaceholders{verbatim}
 
 
+%%%%%% 
+%%%%%% Group "gnuplot"
+%%%%%%
+
 % We clean the "main" group, that we will copy later to gnuplot.
 \robExtClearGroupPlaceholders{main}
 
@@ -3218,6 +3223,21 @@ __ROBEXT_MAIN_CONTENT__
   },
 }
 
+
+% Like \gpgetvar but do not produce an error if the variable does not exist yet
+% Fix https://github.com/leo-colisson/robust-externalize/issues/17
+\ExplSyntaxOn
+\NewDocumentCommand{\robExtGpgetvar}{m}{%
+  \ifcsname gp@var@test_variable\endcsname%
+    \gpgetvar{#1}%
+  \else%
+    \msg_warning:nnx{robExt}{enabled parallel gpgetvar}{#1}%
+    \emph{Please~recompile~to~load~ variable:~}%
+    \texttt{\tl_to_str:n {#1}}%
+  \fi%
+}
+\ExplSyntaxOff
+
 %%%%%% 
 %%%%%% Group "bash"
 %%%%%%
@@ -3249,11 +3269,6 @@ touch "${outputPdf}"
 
 \robExtCopyGroupPlaceholders{bash}{main}
 \robExtRegisterGroupPlaceholders{bash}
-
-%%%%%% 
-%%%%%% Group "gnuplot"
-%%%%%%
-
 
 %%%%%% 
 %%%%%% Group "default", available in all styles
