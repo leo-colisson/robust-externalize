@@ -2555,9 +2555,13 @@ The inclusion command is the command that is run to include the cached file back
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/custom include command=\marg{include command}\@nil
+  \extractkey/robExt/include command is input=\opt{\oarg{additional code to run}}\@nil
   \makeatother%
   \pgfmanualbody
-  Sets the command to run to include the compiled file, after checking if the file has been correctly compiled and loading |*-out.tex| (useful to pass information back to the pdf).
+  Sets the command to run to include the compiled file, after checking if the file has been correctly compiled and loading |*-out.tex| (useful to pass information back to the pdf). |include command is input={SOME CODE}| is a shortcut for:
+\begin{verbatim}
+custom include command={SOME CODE\input{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}},
+\end{verbatim}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2609,6 +2613,16 @@ The inclusion command is the command that is run to include the cached file back
   \pgfmanualbody
   By default, the include commands runs |\includegraphics| on the pdf, and possibly raises it if needed. You can customize the arguments passed to |\includegraphics| here.
 \end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/add cache to graphicspath\@nil
+  \makeatother%
+  \pgfmanualbody
+  This will add the folder containing the cache in the |\graphicspath{}|. Mostly useful if you need to input a file from the cache that does |\includegraphics{foo}| where |foo| is an image from the cache itself (looking at you gnuplot).
+\end{pgfmanualentry}
+
 
 \subsubsection{Configuration of the cache}
 
@@ -3810,7 +3824,7 @@ The tikz terminal is a bit special since we do not want to use |\includegraphics
 plot sin(x)
 \end{CacheMeCode}
 \end{codeAndResult}
-By default, we only cache the gnuplot compilation, but the |\input| is not cached (so gnuplot will not be run again the next time, but tikz will run every time). But it can also be cached, just add |cache tikz| for that:
+(Note that if you do not provide any option to |tikz terminal|, it will just use the default value in gnuplot, you can also add any other option to the terminal here.) By default, we only cache the gnuplot compilation, but the |\input| is not cached (so gnuplot will not be run again the next time, but tikz will run every time). But it can also be cached, just add |cache tikz| for that:
 \begin{codeAndResult}
 \robExtConfigure{
   add to preset={tikz}{
@@ -3843,6 +3857,21 @@ Full example:
 plot cos(x)
 \end{CacheMeCode}
 \end{codeAndResult}
+
+Similar to the tikz terminal, you can also use the |cairolatex| terminal like this:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot,cairolatex terminal}
+plot sin(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+As before, you can also specify the size, for instance it term of the current textwidth:
+\begin{codeAndResult}
+\begin{CacheMeCode}{gnuplot, cairolatex terminal/.expanded={size \lenToCm{\textwidth},\lenToCm{.3\textwidth}}}
+plot cos(x)
+\end{CacheMeCode}
+\end{codeAndResult}
+
+
 \end{pgfmanualentry}
 
 \subsubsection{Custom languages}
@@ -4363,6 +4392,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item make |if matches word| more efficient, independent on the number of runs, allowing registration, namespaces, etc.
   \item Added |\definecolorAutoForward| and |\colorletAutoForward|
   \item Add support for gnuplot
+  \item Added |\runHereAndInPreambleOfCachedFiles|
   \end{itemize}
 \item v2.2 
   \begin{itemize}

@@ -1445,7 +1445,7 @@ if __name__ == '__main__':
           \cs_gset:cx {g__robExt_compilation_command_\robExtAddCachePathAndName{\robExtFinalHash}:} {\l__robExt_current_compilation_command_str}
         \fi
       }
-    \else
+    \else%
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation }
       {
         \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l__robExt_current_compilation_command_str.}
@@ -1528,7 +1528,7 @@ if __name__ == '__main__':
           \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}
         } { % We ran no compilation command: we print instead a placeholder depending on the context:
           \cs_if_exist:NTF \robExt@compile@parallel@must@compile {
-            % we are supposed to compile the current picture in parallel, let'us check if it will be possible:
+            % we are supposed to compile the current picture in parallel, let us check if it will be possible:
             \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation} {
               \robExtImagePlaceholderIfParallelCompilation
             }{
@@ -2301,14 +2301,20 @@ if __name__ == '__main__':
   include command is input/.style={
     custom include command={#1\input{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}},
   },
+  include command is input/.default={},
+  % Sometimes (gnuplot), we need to include an image located in the cache folder:
+  % https://tex.stackexchange.com/questions/171587/append-entries-to-an-existing-graphicspath
+  add cache to graphicspath/.code={%
+    \appto\Ginput@path{\robExtCacheFolder}%
+  },%
   %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz picture
   %% etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not want to reset
   %% all compilation commands etc), so you can add here stuff that might need to be restored later.
   reset/.code={%
     \let\robExtIncludeCommandAdvanced\undefined%
     \let\robExtIncludeCommand\undefined%
+    \setPlaceholder{__ROBEXT_INCLUDEGRAPHICS_FILE__}{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}%
   },
-  include command is input/.default={},
   %% Use this when we do not want to include anything (e.g. the video will be processed later in the chain):
   do not include pdf/.style={
     custom include command={}%
@@ -3174,23 +3180,17 @@ __ROBEXT_MAIN_CONTENT__
 \robExtRegisterGroupPlaceholders{gnuplot}
 
 \robExtConfigure{
-  enable fallback to manual mode,
   new preset={gnuplot}{
     enable placeholders,
     import placeholders from group={gnuplot},
-    % The move is needed as gnuplot might create a file even if the command produces an error.
-    if windows={
-      set compilation command={gnuplot -c "__ROBEXT_SOURCE_FILE__" && move "__ROBEXT_GNUPLOT_OUTPUTFILE__" "__ROBEXT_OUTPUT_PDF__"},
-    },
-    if unix={
-      set compilation command={gnuplot -c "__ROBEXT_SOURCE_FILE__" && mv "__ROBEXT_GNUPLOT_OUTPUTFILE__" "__ROBEXT_OUTPUT_PDF__"},
-    },
+    set compilation command={gnuplot -c "__ROBEXT_SOURCE_FILE__" && echo "ok" > "__ROBEXT_OUTPUT_PDF__"},
     set terminal/.style={
       set placeholder={__ROBEXT_GNUPLOT_TERMINAL__}{#1},
     },
     % The extension is important. Notably, the cairolatex expects a .tex.
     set filename/.style={
       set placeholder={__ROBEXT_GNUPLOT_OUTPUTFILE__}{__ROBEXT_OUTPUT_PREFIX__-gnuplot-#1},
+      set placeholder={__ROBEXT_INCLUDEGRAPHICS_FILE__}{\robExtAddCachePathAndName{\robExtFinalHash-gnuplot-#1}},
     },
     pdf terminal/.style={
       set terminal={pdf #1},
@@ -3198,11 +3198,21 @@ __ROBEXT_MAIN_CONTENT__
     },
     pdf terminal/.default={},
     pdf terminal,
+    is tex output/.style={
+      set filename={.tex},
+      add cache to graphicspath, % At least in cairolatex, we first need to input a file that includegraphics an image in the cache.
+      custom include command={\message{We will input the file \robExtAddCachePathAndName{\robExtFinalHash-gnuplot-.tex}}\input{\robExtAddCachePathAndName{\robExtFinalHash-gnuplot-.tex}}},
+    },
     tikz terminal/.style={
       set terminal={tikz #1},
-      include command is input,
+      is tex output,
     },
     tikz terminal/.default={},
+    cairolatex terminal/.style={
+      set terminal={cairolatex #1},
+      is tex output,
+    },
+    cairolatex terminal/.default={},
     set template={__GNUPLOT_TEMPLATE__},
     print verbatim if no externalization,
   },
