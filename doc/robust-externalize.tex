@@ -3833,8 +3833,17 @@ plot "gnuplot_data.dat"
 \end{CacheMeCode}
 \end{codeAndResult}
 
+You can also use the current text width when using the tikz terminal using something like:\\
+|tikz terminal/.expanded={size \lenToCm{\textwidth},\lenToCm{.3\textwidth}}|\\
+Full example:
+\begin{codeAndResult}
+% Just to check size:
+\noindent\rule{\textwidth}{1mm}\\%  
+\begin{CacheMeCode}{gnuplot, tikz terminal/.expanded={size \lenToCm{\textwidth},\lenToCm{.3\textwidth}}}
+plot cos(x)
+\end{CacheMeCode}
+\end{codeAndResult}
 \end{pgfmanualentry}
-
 
 \subsubsection{Custom languages}
 

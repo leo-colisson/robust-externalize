@@ -3125,6 +3125,16 @@ print_file.close()
 
 \robExtClearGroupPlaceholders{main}
 
+%% Inspired by
+%% https://tex.stackexchange.com/questions/259247/rescaling-gnuplottex-to-fit-in-subfigure/259271
+\ExplSyntaxOn
+\DeclareExpandableDocumentCommand{\robExtLenToCm}{ O{cm} m }
+{
+  \dim_to_decimal_in_unit:nn { #2 } { 1 #1 } #1
+}
+\ExplSyntaxOff
+\let\lenToCm\robExtLenToCm
+
 \robExtConfigure{
   verbatim text/.style={
     enable placeholders,
