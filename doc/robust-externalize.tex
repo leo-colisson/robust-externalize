@@ -904,7 +904,15 @@ If you like to often change the font in the document, you can also do something 
   },
 }
 \end{codeexample}
-For now, on xelatex, you can do instead something like this:
+If you want this to work on xelatex, you can either manually attribute a |NFSSFamily| name like:
+\begin{codeexample}[code only]
+\runHereAndInPreambleOfCachedFiles{
+  \usepackage{fontspec}
+  % need lualatex or xelatex to compile, make sure to use a different NFSSFamily for each new font you add here
+  \setmainfont[NFSSFamily=tmsnr]{Times New Roman}
+}
+\end{codeexample}
+and use the above solution for lualatex (you can change the font with |\fontfamily{tmsnr}\selectfont|), or do instead something like this:
 \begin{codeexample}[code only]
 % Create a new command \mysetmainfont which forwards the font to the picture.
 \NewDocumentCommand{\mysetmainfont}{m}{%
