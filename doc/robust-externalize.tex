@@ -492,7 +492,7 @@ If you want to display a message in the pdf on how to manually compile the file 
 
 \noindent (otherwise, it will give you an error if |-shell-escape| is disabled and if some pictures are not yet cached)
 
-If you forget/do not want to enable |-shell-escape|, this will give you this kind of message:
+If you forget/do not want to enable |-shell-escape|, this will give you this kind of message with instructions to follow to compile without shell escape:
 
 \noindent {
   \robExtConfigure{
@@ -504,6 +504,27 @@ If you forget/do not want to enable |-shell-escape|, this will give you this kin
   \end{tikzpictureC}
 }
 
+
+If you use an editor, you can usually configure |-shell-escape| directly inside the editor, even on a per-document basis. Shell-escape is enabled by default on overleaf. In emacs/auctex, just add at the end of your document:
+\begin{verbatim}
+% Local Variables:
+% TeX-command-extra-options: "--shell-escape"
+% End:
+\end{verbatim}
+(Note that it seems that |--shell-escape| can be used with one or two dashes on Linux, I am not sure about the number of dashes needed in Windows.)
+
+For TeXstudio, you can enable shell-escape on the current document by adding in your document:
+\begin{verbatim}
+% !TeX TXS-program:compile = txs:///pdflatex/[--shell-escape]
+\end{verbatim}
+
+If you use |latexmk| (with any editor), you can create a file called |.latexmkrc| containing:
+\begin{verbatim}
+$pdf_mode = 1;
+$pdflatex = 'pdflatex --shell-escape';
+\end{verbatim}
+
+For other editors, \mylink{https://tex.stackexchange.com/questions/598818/how-can-i-enable-shell-escape}{this answer} describe pretty accurately the solutions you have depending on your software.
 
 \subsection{Caching a tikz picture}
 
@@ -4436,6 +4457,9 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
 \printindex
 
 \end{document}
+% Luatex is needed, otherwise quotes ' are turned into another symbol in documentation
+% https://github.com/leo-colisson/robust-externalize/issues/11
 % Local Variables:
-% TeX-command-extra-options: "-shell-escape -halt-on-error"
+% TeX-command-extra-options: "--shell-escape -halt-on-error"
+% TeX-engine: luatex
 % End:
