@@ -3006,6 +3006,24 @@ This will also run the code to define it in the current document (practical for 
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
+  \extractcommand\runHereAndInPreambleOfCachedFiles\opt{\oarg{preset}}\marg{code}\@@
+  \pgfmanualbody
+  (from v2.3) This will run |code| right now and it will add it in the preamble of the files that use the preset |preset| (defaults to |latex|). This is practical to avoid duplicating the code into |add to preamble|. For instance, if want the configure the font of the current document and of all latex documents at the same time, use:
+\begin{codeexample}[code only]
+\runHereAndInPreambleOfCachedFiles{
+  \usepackage{fontspec}
+  \setmainfont{Times New Roman}
+}
+
+\robExtConfigure{
+  add to preset={latex}{
+    use lualatex, % Make sure to compile with lualatex the cached images.
+  },
+}
+\end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
   \extractcommand\definecolorAutoForward\marg{color}\marg{model}\marg{value}\opt{\oarg{additional style}}\@@
   \extractcommand\colorletAutoForward\marg{color}\marg{value}\opt{\oarg{additional style}}\@@
   \pgfmanualbody
