@@ -3853,9 +3853,11 @@ plot sin(x)
     % to create this file:
     add to preamble={\usepackage{gnuplot-lua-tikz}},
   },
-  tikz terminal/.append style={
-    cache tikz,
-  }
+  add to preset={gnuplot}{
+    tikz terminal/.append style={
+      cache tikz,
+    },
+  },
 }
 \begin{CacheMeCode}{gnuplot, tikz terminal={size 8cm,5cm}}
 plot cos(x)
