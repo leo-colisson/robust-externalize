@@ -3812,8 +3812,6 @@ plot sin(x)
 \end{CacheMeCode}
 \end{codeAndResult}
 
-\textbf{WARNING: gnuplot seems to be somehow sensible to indentation, notably to tabulation. So do NOT add any indentation in front of the code, or this will be copied to the source code, and therefore might disturb gnuplot.}
-
 You can also specify the gnuplot options to the pdf terminal, like the size, using:
 \begin{codeAndResult}
 \begin{CacheMeCode}{gnuplot,pdf terminal={size 5cm,4cm}}
@@ -4416,7 +4414,15 @@ It seems that xelatex (I never had issues with pdflatex and lualatex, but if you
 \begin{verbatim}
 xelatex -8bit yourfile.tex
 \end{verbatim}
-If you see that tabs in your input file are turned into |^^I| in the source code, it might be worth adding the |-8bit| option.
+If you see that tabs in your input file are turned into |^^I| in the source code, you should either add the |-8bit| option\dots{} or simply follow egreg's advice:
+\begin{center}
+  \emph{The strategy is very simple: never use TAB when dealing with TeX. Reserve the TAB key to trigger autocompletion and your life will be happier.}
+\end{center}
+If you use TeXstudio that uses Tabs by default, you can disable this feature by setting these two options:
+\begin{verbatim}
+Options > Configure TeXstudio > Editor > Replace indentation tabs with spaces
+Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
+\end{verbatim}
 
 \section{TODO and known bugs:}
 
@@ -4442,6 +4448,7 @@ I am deeply indebted to many users on \url{tex.stackexchange.com} that made the 
   \item Added |\definecolorAutoForward| and |\colorletAutoForward|
   \item Add support for gnuplot
   \item Added |\runHereAndInPreambleOfCachedFiles|
+  \item Clearer and more advanced error handling
   \end{itemize}
 \item v2.2 
   \begin{itemize}
