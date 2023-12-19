@@ -3308,7 +3308,7 @@ __ROBEXT_MAIN_CONTENT__
 % Fix https://github.com/leo-colisson/robust-externalize/issues/17
 \ExplSyntaxOn
 \NewDocumentCommand{\robExtGpgetvar}{m}{%
-  \ifcsname gp@var@test_variable\endcsname%
+  \ifcsname gp@var@#1\endcsname%
     \gpgetvar{#1}%
   \else%
     \msg_warning:nnx{robExt}{enabled parallel gpgetvar}{#1}%
