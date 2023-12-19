@@ -382,7 +382,7 @@ I tested the library on Linux and Windows, but the library should work on all OS
 Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). Note that overleaf already defines this option by default, so you don't need to do anything special in overleaf. However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
 \item You can choose to display a dummy content explaining how to manually compile the pictures instead of giving an error until they are compiled, see |enable fallback to manual mode|.
-\item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex} from the \texttt{robustExternalize} folder).
+\item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{JOBNAME-robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex} from the \texttt{robustExternalize} folder).
 \item If you allowed:
   \begin{itemize}
   \item |pdflatex| (needed to compile latex documents)
@@ -511,7 +511,7 @@ If you use an editor, you can usually configure |-shell-escape| directly inside 
 % TeX-command-extra-options: "--shell-escape"
 % End:
 \end{verbatim}
-(Note that it seems that |--shell-escape| can be used with one or two dashes on Linux, I am not sure about the number of dashes needed in Windows.)
+save, and run |M-x revert-buffer| (Note that it seems that |--shell-escape| can be used with one or two dashes on Linux, I am not sure about the number of dashes needed in Windows.)
 
 For TeXstudio, you can enable shell-escape on the current document by adding in your document:
 \begin{verbatim}
@@ -4287,6 +4287,8 @@ bash JOBNAME-robExt-compile-missing-figures.sh
 
 
 \subsection{How to debug}\label{sec:debug}
+
+Since v2.3, we provide a more advanced error handling system in order to provide more meaningful errors to the user, and to write the full compilation output in the log in case of an error. We do so by wrapping commands around something like |(my command) > somelog.tex 2>&1|; therefore nothing is printed on screen during the compilation of the cached picture, you only get a message if there is an error. If you want to come back to the old behavior, that just runs the command is it, use |\def\robExtDoNotRedirectOutput{}| and |\def\robExtDoNotRedirectOutputInManuallyCompileMissingFigures{}| (the last one will only concern commands written to the |robExt-compile-missing-figures.sh|, which is used in manual mode and in parallel mode).
 
 If for some reasons you are unable to understand why a build fails, first check if you compiled your document with |-shell-escape| (not that this must appear \textbf{before} the filename). Then, you can look at the log file to get more advices: when a cached document is compiled, we always write the full compilation command before compiling the file in the log file. This way, you can easily check the content of the file and see why it fails to compile. The compilation errors are also displayed directly in the output, and you can read the log file for details.
 

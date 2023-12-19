@@ -24,6 +24,38 @@
 \NewDocumentCommand{\robExtIfWindowsTF}{mm}{%
   \sys_if_platform_windows:TF {#1}{#2}%
 }
+
+\cs_new:Nn \robExt_get_errors_from_file:n {
+  \ior_open:Nn \g__robExt_read_ior {#1}%
+  \cs_undefine:N \l__robExt_I_saw_an_error:
+  \str_clear_new:N \l__robExt_tmp_str%
+  \ior_str_map_inline:Nn \g__robExt_read_ior {%
+    \str_if_in:xnTF {\str_lowercase:n{##1}} {error} {
+      \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+      \cs_set:Nn \l__robExt_I_saw_an_error: {}
+    } {
+      \str_if_in:xnTF {\str_lowercase:n{##1}} {invalid} {
+        \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+        \cs_set:Nn \l__robExt_I_saw_an_error: {}
+      } {
+        \str_set:Nn \l_tmp_str {##1}
+      }
+    }
+  }%
+  \cs_if_exist:NTF \l__robExt_I_saw_an_error: {} {
+    % We print the last line if we found no error. Might be useful for errors like:
+    % sh: ligne 1: gnuplot : commande introuvable.
+    \str_set_eq:NN \l__robExt_tmp_str \l_tmp_str
+  }
+}
+
+\cs_new:Nn \robExt_write_file_in_log:n {
+  \ior_open:Nn \g__robExt_read_ior {#1}%
+  \ior_str_map_inline:Nn \g__robExt_read_ior {%
+    \message{\tl_to_str:n{##1}^^J}%
+  }%
+}
+
 \ExplSyntaxOff
 
 % Debug function: by default, do nothing
@@ -54,6 +86,7 @@
 \cs_generate_variant:Nn \str_replace_all:Nnn { Nnx, Nnv, cnx, cxx, NnV, Nnx, Nnv }
 
 \cs_generate_variant:Nn \str_set:Nn { NV }
+\cs_generate_variant:Nn \str_if_in:nnTF { xnTF }
 
 \cs_generate_variant:Nn \tl_rescan:nn { nv }
 \cs_generate_variant:Nn \tl_set_rescan:Nnn { Nnv, NnV }
@@ -116,7 +149,12 @@
 \msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
 \msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
 \msg_new:nnn {robExt}{missing compiled pdf}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
-\msg_new:nnn {robExt}{missing compiled pdf parallel}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
+\msg_new:nnn {robExt}{missing compiled pdf with logs}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1-compilation.log.}
+\msg_new:nnn {robExt}{missing compiled pdf parallel}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
+
+\msg_new:nnn {robExt}{missing compiled pdf parallel with log}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
+
+
 \msg_new:nnn {robExt}{auto forward not in cachemecode}{Auto~forward~is~less~efficient~in~cacheMeCode.}
 
 % warnings
@@ -287,7 +325,7 @@ if __name__ == '__main__':
         \fi
       \fi
     }{
-      \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
+      \message{Warning: If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
     }
   \fi
 }
@@ -1436,7 +1474,11 @@ if __name__ == '__main__':
       % Avoid writing the same command multiple times (might occur in environments that execute the
       % same command multiple times like align etc)
       \cs_if_exist:cTF {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :}{}{
-        \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\l__robExt_current_compilation_command_str}% a new line is automatically added
+        \ifdefined\robExtDoNotRedirectOutputInManuallyCompileMissingFigures%
+          \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\l__robExt_current_compilation_command_str}% a new line is automatically added
+        \else
+          \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {(~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}% a new line is automatically added
+        \fi
         \cs_gset:cn {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :} {}
         \ifdefined\robExt@compile@parallel@after
           \gdef\robExt@compile@parallel@must@compile{}
@@ -1449,8 +1491,13 @@ if __name__ == '__main__':
     \else%
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation }
       {
-        \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l__robExt_current_compilation_command_str.}
-        \sys_shell_now:x {\l__robExt_current_compilation_command_str} % The ~ are used in ExplSyntaxOn to add space
+        \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l__robExt_current_compilation_command_str.}%
+        % For a better debugging, we create a new file:
+        \ifdefined\robExtDoNotRedirectOutput%
+          \sys_shell_now:x {\l__robExt_current_compilation_command_str}%
+        \else
+          \sys_shell_now:x {(~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}%
+        \fi
         %% We notify that we are running the compilation command, this way it is possible to check later
         %% if the file is not present because of some compilation error or because we are in manual mode
         %% or fallback
@@ -1461,7 +1508,11 @@ if __name__ == '__main__':
           % same command multiple times like align etc)
           \cs_if_exist:cTF {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :}{}{
             \message{[robExt] Fallback to manual mode: please, manually compile the images using \l__robExt_current_compilation_command_str or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
-            \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\l__robExt_current_compilation_command_str}% a new line is automatically added
+            \ifdefined\robExtDoNotRedirectOutputInManuallyCompileMissingFigures%
+              \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\l__robExt_current_compilation_command_str}% a new line is automatically added
+            \else
+              \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {(~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}% a new line is automatically added
+            \fi
             \cs_gset:cn {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :} {}
             \ifdefined\robExt@compile@parallel@after
               \gdef\robExt@compile@parallel@must@compile{}
@@ -1526,7 +1577,22 @@ if __name__ == '__main__':
         % Check if we tried to run a compilation command at the previous step:
         \cs_if_exist:NTF \l__robExt_I_just_ran_a_compilation_command: {
           % We ran a compilation command but it failed: we print an error message
-          \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}
+          % We first check if an error file has been produced:
+          \file_if_exist:nTF {\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}} {
+            % We print the error twice as some editor might display only the first error while in others
+            % it might be easier to see the last error. For instance, in emacs if we do not do that
+            % then it first prints the error message in a file in the cache (but it forgets the
+            % robustExternalize prefix)
+            % But first we get the lines containing the word error:
+            \robExt_get_errors_from_file:n {\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}}%
+            \msg_error:nnxxxx{robExt}{missing compiled pdf parallel with log}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}{below}
+            \message{--------~We~print~now~the~full~log~--------^^J}
+            \robExt_write_file_in_log:n {\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}}%
+            \message{--------~End~of~the~full~log~--------^^J}
+            \msg_error:nnxxxx{robExt}{missing compiled pdf parallel with log}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}{above}
+          }{
+            \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{\robExtAddCachePathAndName{\robExtFinalHash}}{\msg_line_number:}{\l__robExt_current_compilation_command_str}
+          }%
         } { % We ran no compilation command: we print instead a placeholder depending on the context:
           \cs_if_exist:NTF \robExt@compile@parallel@must@compile {
             % we are supposed to compile the current picture in parallel, let us check if it will be possible:
@@ -2583,7 +2649,21 @@ if __name__ == '__main__':
         % We check if some files failed to compile
         \seq_map_inline:Nn \g__robExt_files_compiled_in_parallel {
           \file_if_exist:xTF{#1.pdf}{}{
-            \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}
+            \file_if_exist:nTF {#1-compilation.log} {
+              % We print the error twice as some editor might display only the first error while in others
+              % it might be easier to see the last error. For instance, in emacs if we do not do that
+              % then it first prints the error message in a file in the cache (but it forgets the
+              % robustExternalize prefix)
+              % But first we get the lines containing the word error:
+              \robExt_get_errors_from_file:n {#1-compilation.log}%
+              \msg_error:nnxxxx{robExt}{missing compiled pdf parallel with log}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}{below}
+              \message{--------~We~print~now~the~full~log~--------^^J}
+              \robExt_write_file_in_log:n {#1-compilation.log}%
+              \message{--------~End~of~the~full~log~--------^^J}
+              \msg_error:nnxxxx{robExt}{missing compiled pdf parallel with log}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}{above}
+            }{
+              \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}
+            }
           }
         }
       } {
