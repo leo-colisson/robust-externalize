@@ -3317,11 +3317,11 @@ __ROBEXT_MAIN_CONTENT__
   \fi%
 }
 % Is useful if you want a number even if there is an error https://github.com/leo-colisson/robust-externalize/issues/17#issuecomment-1862556771
-\NewDocumentCommand{\robExtGpgetvarNb}{O{404}m}{%
+% It must be expandable.
+\NewExpandableDocumentCommand{\robExtGpgetvarNb}{O{404}m}{%
   \ifcsname gp@var@#2\endcsname%
     \gpgetvar{#2}%
-  \else%
-    \msg_warning:nnx{robExt}{enabled parallel gpgetvar}{#2}%
+  \else% We cannot print a waring or siunit will complain.
     #1%
   \fi%
 }
