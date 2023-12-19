@@ -10,6 +10,7 @@
 \usepackage{amsmath}
 \usepackage[margin=3cm]{geometry}
 \usepackage{calc}
+\usepackage{siunitx}
 \usepackage{tikz}
 \usetikzlibrary{shadows,fit}
 % \usetikzlibrary fails because file is not in current directory, lazy to setup TEXINPUTS
@@ -1567,6 +1568,18 @@ Compare with:
   \placeholderFromContent{__LIKES__}{Hello __NAME__ I am a really basic template $\delta_n$.}
   \placeholderFromContent{__NAME__}{Alice}
   The (unexpanded) template contains \texttt{\getPlaceholderNoReplacement{__LIKES__}}
+\end{codeexample}
+Note that this macro is expandable, which can be helpful for instance if you use |siunitx| that expects an expandable content:
+\begin{codeexample}[width=0pt,vbox]
+\setPlaceholder{__TEST__}{4.42345}
+\num[round-mode=figures,round-precision=3]{\getPlaceholderNoReplacement{__TEST__}}
+\end{codeexample}
+This is contrary to |\getPlaceholder| that is not expandable, so if you do want expandable |\getPlaceholder| with replacements, you should rather first evaluate the placeholder with |\getPlaceholderInResult{__TEST_VARIABLE__}|:
+\begin{codeexample}[width=0pt,vbox]
+\setPlaceholder{__TEST_A__}{4.42345}
+\setPlaceholder{__TEST__}{__TEST_A__}
+\getPlaceholderInResult{__TEST_A__}
+\num[round-mode=figures,round-precision=3]{\robExtResult}
 \end{codeexample}
 \end{pgfmanualentry}
 

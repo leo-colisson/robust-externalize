@@ -490,7 +490,7 @@ if __name__ == '__main__':
 }
 \let\evalPlaceholderNoReplacement\robExtEvalPlaceholderNoReplacement
 
-\NewDocumentCommand{\robExtGetPlaceholderNoReplacement}{m}{
+\NewExpandableDocumentCommand{\robExtGetPlaceholderNoReplacement}{m}{
   \str_use:c { l__robExt_placeholder_#1_str }
 }
 \let\getPlaceholderNoReplacement\robExtGetPlaceholderNoReplacement
