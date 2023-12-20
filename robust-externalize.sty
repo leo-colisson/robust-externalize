@@ -20,6 +20,18 @@
 %%%%%%%%%%% Utils %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
+% If the file contains a space, the jobname gets quotes around...
+% https://tex.stackexchange.com/questions/418670/avoid-quotation-marks-when-using-jobname-or-currfilename
+\newcommand*{\jobnameNoQuotes}{}
+\newcommand*{\setjobnameNoQuotes}{%
+  \edef\jobnameNoQuotes{\jobname}%
+  \expandafter\expandafter\expandafter\setjobnameNoQuotesaux
+  \expandafter\jobnameNoQuotes\expandafter"\jobnameNoQuotes"\relax
+}
+\newcommand*{\setjobnameNoQuotesaux}{}
+\def\setjobnameNoQuotesaux#1"#2"#3\relax{\def\jobnameNoQuotes{#2}}
+\setjobnameNoQuotes
+
 \ExplSyntaxOn
 \NewDocumentCommand{\robExtIfWindowsTF}{mm}{%
   \sys_if_platform_windows:TF {#1}{#2}%
@@ -168,7 +180,7 @@
   \framebox[\linewidth]
   {
     \begin{minipage}{\linewidth}
-      \textbf{Manual ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l__robExt_current_compilation_command_str}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+      \textbf{Manual ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l__robExt_current_compilation_command_str}\newline or ~ call ~ \newline\texttt{bash ~ \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
     \end{minipage}
   }
 }
@@ -177,7 +189,7 @@
   \framebox[\linewidth]
   {
     \begin{minipage}{\linewidth}
-      \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l__robExt_current_compilation_command_str}\newline or ~ call ~ \newline\texttt{bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
+      \textbf{Falling ~ back ~ to ~ draft ~ mode: ~ either ~ compile ~ with ~ \texttt{-shell-escape} ~ or ~ compile:\newline \texttt{\robExtAddCachePathAndName{\robExtFinalHash.tex}}\newline via ~ \newline \texttt{\l__robExt_current_compilation_command_str}\newline or ~ call ~ \newline\texttt{bash ~ \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}}\newline to ~ compile ~ all ~ missing ~ figures.}
     \end{minipage}
   }
 }
@@ -357,9 +369,9 @@ if __name__ == '__main__':
 %% TODO: create a makefile.
 \iow_new:N \g__robExt_write_list_all_figures_iow
 %% Create a file robExt-all-figures.txt with the list of .tex files
-\iow_open:Nx \g__robExt_write_list_all_figures_iow {\jobname-\robExtAddPrefixName{all-figures.txt}}
+\iow_open:Nx \g__robExt_write_list_all_figures_iow {\jobnameNoQuotes-\robExtAddPrefixName{all-figures.txt}}
 \iow_new:N \g__robExt_write_manually_compile_all_missing_figures_iow
-\iow_open:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+\iow_open:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}}
 
 % Contains the list of dependency files (useful to compute the final md5sum)
 \seq_new:N \l__robExt_dependencies_str
@@ -702,10 +714,10 @@ if __name__ == '__main__':
   %% https://tex.stackexchange.com/a/680259/116348 might work and be more efficient, but it might be less reliable
   %% and definitely more complicated and error prone. Instead, we write to a file and read the result.
   %% TODO: try to do it using verbatim, might be trivial or complicated, not sure, maybe see https://tex.stackexchange.com/questions/555359/reading-lines-verbatim-into-a-sequence-variable
-  \XSIMfilewritestart{\jobname-robExt-tmp-file-you-can-remove.tmp}%
+  \XSIMfilewritestart{\jobnameNoQuotes-robExt-tmp-file-you-can-remove.tmp}%
 }{%
   \XSIMfilewritestop%
-  \ior_open:Nn \g__robExt_read_ior {\jobname-robExt-tmp-file-you-can-remove.tmp}%
+  \ior_open:Nn \g__robExt_read_ior {\jobnameNoQuotes-robExt-tmp-file-you-can-remove.tmp}%
   %% Put the file in l__robExt_tmp_contain_file_str
   \str_clear_new:N \l__robExt_tmp_str%
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
@@ -802,10 +814,10 @@ if __name__ == '__main__':
 %% This will copy "some code" in the cache, and set MYLIBPATH to the name of the file in the cache like
 %% MYLIBPATH = robExt-abc.py
 \NewDocumentEnvironment{RobExtPlaceholderPathFromCode}{sO{}m}{
-  \XSIMfilewritestart*{\jobname-robExt-tmp-file-you-can-remove.tmp}
+  \XSIMfilewritestart*{\jobnameNoQuotes-robExt-tmp-file-you-can-remove.tmp}
 }{
   \XSIMfilewritestop
-  \ior_open:Nn \g__robExt_read_ior {\jobname-robExt-tmp-file-you-can-remove.tmp}
+  \ior_open:Nn \g__robExt_read_ior {\jobnameNoQuotes-robExt-tmp-file-you-can-remove.tmp}
   %% Put the file in \l__robExt_tmp_contain_file_str
   \str_clear_new:N \l__robExt_tmp_contain_file_str
   \ior_str_map_inline:Nn \g__robExt_read_ior {
@@ -1470,7 +1482,7 @@ if __name__ == '__main__':
       } {}
     \fi
     \ifdefined\robExtManualMode
-      \message{[robExt] Manual mode enabled: please, manually compile the images using \l__robExt_current_compilation_command_str or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
+      \message{[robExt] Manual mode enabled: please, manually compile the images using \l__robExt_current_compilation_command_str or run 'bash \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}'.}
       % Avoid writing the same command multiple times (might occur in environments that execute the
       % same command multiple times like align etc)
       \cs_if_exist:cTF {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :}{}{
@@ -1491,13 +1503,13 @@ if __name__ == '__main__':
     \else%
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation }
       {
-        \message{[robExt] We ~ will ~ start ~ the ~ compilation using: ~ \l__robExt_current_compilation_command_str.}%
         % For a better debugging, we create a new file:
         \ifdefined\robExtDoNotRedirectOutput%
           \sys_shell_now:x {\l__robExt_current_compilation_command_str}%
         \else
           \sys_shell_now:x {(~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}%
         \fi
+        \message{[robExt] We ~ will ~ start ~ the ~ compilation ~ using: ~ \l__robExt_current_compilation_command_str.}%
         %% We notify that we are running the compilation command, this way it is possible to check later
         %% if the file is not present because of some compilation error or because we are in manual mode
         %% or fallback
@@ -1507,7 +1519,7 @@ if __name__ == '__main__':
           % Avoid writing the same command multiple times (might occur in environments that execute the
           % same command multiple times like align etc)
           \cs_if_exist:cTF {l__robExt_missing_figure_\l__robExt_current_compilation_command_str :}{}{
-            \message{[robExt] Fallback to manual mode: please, manually compile the images using \l__robExt_current_compilation_command_str or run 'bash \jobname-\robExtAddPrefixName{compile-missing-figures.sh}'.}
+            \message{[robExt] Fallback to manual mode: please, manually compile the images using \l__robExt_current_compilation_command_str or run 'bash \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}'.}
             \ifdefined\robExtDoNotRedirectOutputInManuallyCompileMissingFigures%
               \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {\l__robExt_current_compilation_command_str}% a new line is automatically added
             \else
@@ -1604,10 +1616,10 @@ if __name__ == '__main__':
           }{
             \cs_if_exist:NTF \robExtManualMode {
               \robExtImagePlaceholderIfManualMode
-              \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+              \message{[robExt] ~ You ~ are ~ in ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}}
             }{
               \robExtImagePlaceholderIfFallbackMode
-              \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobname-\robExtAddPrefixName{compile-missing-figures.sh}}
+              \message{[robExt] ~ You ~ are ~ falling ~ back ~ to ~ manual ~ mode: ~ please ~ compile ~ yourself ~ \robExtAddCachePathAndName{\robExtFinalHash.tex} ~ or ~ use ~ the ~ bash ~ \jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}}
             }
           }
         }
@@ -2604,12 +2616,13 @@ if __name__ == '__main__':
   compile in parallel command/.store in=\robExt@compile@parallel@command,
   % Different backends to compile in parallel
   compile in parallel with gnu parallel/.style={
-    compile in parallel command={parallel --jobs #1 :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}'},
+    compile in parallel command={parallel --jobs #1 :::: '\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}'},
   },
   compile in parallel with gnu parallel/.default={200\%},
   compile in parallel with xargs/.style={
+    /utils/exec={\message{\jobnameNoQuotes}\show\jobname},
     % Use " instead of ' as Windows does not consider ' as a valid surrounding for strings
-    compile in parallel command={xargs -t -I "{}" -P #1 \robExtParallelShell\space "{}" < "\jobname-\robExtAddPrefixName{compile-missing-figures.sh}"},
+    compile in parallel command={xargs -t -I "{}" -P #1 \robExtParallelShell\space "{}" < "\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}"},
   },
   % With 0 it spawns as many shells at possible, i.e. it compiles all 200 pictures at the same time, making the
   % system a laggy, and it is actually *slower* (2:05mn vs 1:15mn) than when using 16 threads.
@@ -2907,7 +2920,7 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
 \begin{RobExtPlaceholderFromCode}{__ROBEXT_LATEX_CREATE_OUT_FILE__}
 %% We save the height/depth of the content by using a savebox:
 \newwrite\writeRobExt%
-\immediate\openout\writeRobExt=\jobname-out.tex%
+\immediate\openout\writeRobExt=\jobnameNoQuotes-out.tex%
 \end{RobExtPlaceholderFromCode}
 
 \begin{RobExtPlaceholderFromCode}{__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__}
