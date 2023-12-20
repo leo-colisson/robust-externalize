@@ -3908,7 +3908,7 @@ plot cos(x)
 
 \begin{pgfmanualentry}
   \extractcommand\robExtGpgetvar\marg{variable name}\@@
-  \extractcommand\robExtGpgetvarNb\opt{\oarg{text, default 404}}\marg{variable name}\@@
+  \extractcommand\robExtGpgetvarNb\opt{*}\opt{\oarg{text, default 404}}\marg{variable name}\@@
   \pgfmanualbody
   Like |\gpgetvar{}| from |gnuplot-lua-tikz| but does not produce an error if the variable does not exist yet (mostly useful if you compile in parallel as shown \mylink{https://github.com/leo-colisson/robust-externalize/issues/17}{here}). The first time, you will get a message like:
 
@@ -3922,7 +3922,11 @@ plot cos(test_variable * x) title "Test2"
 \end{CacheMeCode}
 Variable is \robExtGpgetvar{test_variable}.
 \end{codeAndResult}
-|\robExtGpgetvarNb| is similar, except that it prints a number 404 by default (useful if you use it in siunit). You can choose another text using the optional argument.
+|\robExtGpgetvarNb| is similar, except that it prints a number 404 by default (useful if you use it in siunit) and is expandable (also \mylink{https://github.com/leo-colisson/robust-externalize/issues/17}{needed for siunit}). You can choose another text using the optional argument. The star version prints a warning in the log if the variable does not exist, but can only be used in LuaLaTeX:
+\begin{codeAndResult}
+Variable is \num[round-mode=figures,round-precision=3]{\robExtGpgetvarNb{non_existing_variable}}.
+\end{codeAndResult}
+Note that you will get a warning if the variable does not exist (yet?) only in LuaLaTeX as in other engines there is no \mylink{https://tex.stackexchange.com/questions/705299/print-message-in-expandable-macro/705304}{way to write in the log with an expandable function}.
 \end{pgfmanualentry}
 
 \subsubsection{Custom languages}

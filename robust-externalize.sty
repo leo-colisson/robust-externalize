@@ -161,7 +161,7 @@
 \msg_new:nnn {robExt}{recommend two underscores in placeholders}{We~recommend~to~use~only~placeholders~containing~two~consecutive~underscores~in~their~name}
 \msg_new:nnn {robExt}{enabled parallel no shell escape}{Warning:~you~enabled~parallel~compilation~but~shell-escape~is~disabled.}
 \msg_new:nnn {robExt}{rerun because parallel}{Warning:~Compiling~all~missing~figures~in~parallel~with~"#1".~You~need~to~rerun~LaTeX~to~include~them.}
-\msg_new:nnn {robExt}{enabled parallel gpgetvar}{Warning:~you~need~to~recompile~as~the~gpgetvar~variable~"#1"~does~not~exist~yet.}
+\msg_new:nnn {robExt}{gpgetvar recompilation needed}{Warning:~you~need~to~recompile~as~the~gpgetvar~variable~"#1"~does~not~exist~yet.}
 
 % dummy placeholders added if image is not present
 \def\robExtImagePlaceholderIfManualMode{
@@ -3311,18 +3311,18 @@ __ROBEXT_MAIN_CONTENT__
   \ifcsname gp@var@#1\endcsname%
     \gpgetvar{#1}%
   \else%
-    \msg_warning:nnx{robExt}{enabled parallel gpgetvar}{#1}%
+    \msg_warning:nnx{robExt}{gpgetvar recompilation needed}{#1}%
     \emph{Please~recompile~to~load~ variable:~}%
     \texttt{\tl_to_str:n {#1}}%
   \fi%
 }
 % Is useful if you want a number even if there is an error https://github.com/leo-colisson/robust-externalize/issues/17#issuecomment-1862556771
 % It must be expandable.
-\NewExpandableDocumentCommand{\robExtGpgetvarNb}{O{404}m}{%
-  \ifcsname gp@var@#2\endcsname%
-    \gpgetvar{#2}%
+\NewExpandableDocumentCommand{\robExtGpgetvarNb}{sO{404}m}{%
+  \ifcsname gp@var@#3\endcsname%
+    \gpgetvar{#3}%
   \else% We cannot print a waring or siunit will complain.
-    #1%
+    \sys_if_engine_luatex:TF{\directlua{texio.write_nl('Warning:~the~variable~#3~used~in~robExtGpgetvarNb~does~not~exist~yet.~Please~recompile.')}}{}#2%
   \fi%
 }
 \ExplSyntaxOff
