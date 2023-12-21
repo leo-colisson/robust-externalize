@@ -175,9 +175,9 @@
 \msg_new:nnn {robExt}{forgot template}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}
 \msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
 \msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
-\msg_new:nnn {robExt}{missing compiled pdf parallel}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
+\msg_new:nnn {robExt}{missing compiled pdf parallel}{The~compilation~of~block~at~line~#2~failed~as~the~following ~ file~is~missing: ~ #1.pdf. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
 
-\msg_new:nnn {robExt}{missing compiled pdf parallel with log}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
+\msg_new:nnn {robExt}{missing compiled pdf parallel with log}{The~compilation~of~the~code~block~at~line~#2~failed:~the~following ~ file~is~indeed~missing: ~ #1.pdf. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
 
 
 \msg_new:nnn {robExt}{auto forward not in cachemecode}{Auto~forward~is~less~efficient~in~cacheMeCode.}
