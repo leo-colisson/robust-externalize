@@ -41,29 +41,57 @@
 % containing errors
 \def\robExtPrefixLogMessage{}
 
+% Prints the next 4 lines after an error:
+\def\robExtLinesAfterError{3}
+\def\robExtRemoveLineNumber{}
+% We might want to remove l.XX in front of lines as emacs interpret this as a line of error and goes to a wrong place.
+\cs_new:Nn \robExt__clean_line_if_needed:n {
+  \ifdefined\robExtRemoveLineNumber%
+    \str_compare:eNeTF {\str_range:nnn {#1} {1} {2}} = {l.} {
+      \str_range:nnn {#1} {3} {-1}%
+    } {
+      #1
+    }
+  \else
+    #1
+  \fi
+}
+\cs_generate_variant:Nn \robExt__clean_line_if_needed:n { V }
+
 \cs_new:Nn \robExt_get_errors_from_file:n {
   \ior_open:Nn \g__robExt_read_ior {#1}%
   \cs_undefine:N \l__robExt_I_saw_an_error:
   \str_clear_new:N \l__robExt_tmp_str%
+  \int_set:Nn \l_tmpa_int {0}
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
     \ifdefined\robExtPrintWholeFile
       \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
       \cs_set:Nn \l__robExt_I_saw_an_error: {}
+      \int_set:Nn \l_tmpa_int {\robExtLinesAfterError}
     \else
-      \str_if_in:xnTF {\str_lowercase:n{##1}} {erroor} {
-        \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+      \str_if_in:xnTF {\str_lowercase:n{##1}} {error} {
+        \str_gput_right:Nx \l__robExt_tmp_str {\robExt__clean_line_if_needed:V{\tl_to_str:n{##1}^^J}}%
         \cs_set:Nn \l__robExt_I_saw_an_error: {}
+        \int_set:Nn \l_tmpa_int {\robExtLinesAfterError}
       } {
         \str_if_in:xnTF {\str_lowercase:n{##1}} {invalid} {
-          \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+          \str_gput_right:Nx \l__robExt_tmp_str {\robExt__clean_line_if_needed:V{\tl_to_str:n{##1}^^J}}%
           \cs_set:Nn \l__robExt_I_saw_an_error: {}
+          \int_set:Nn \l_tmpa_int {\robExtLinesAfterError}
         } {
           % Check if it starts with a ! (usually latex errors start with this symbol)
           \str_compare:eNeTF {\str_range:nnn {##1} {1} {1}} = {!} {
-            \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+            \str_gput_right:Nx \l__robExt_tmp_str {\robExt__clean_line_if_needed:V{\tl_to_str:n{##1}^^J}}%
             \cs_set:Nn \l__robExt_I_saw_an_error: {}
+            \int_set:Nn \l_tmpa_int {\robExtLinesAfterError}
           }{
-            \str_set:Nn \l_tmp_str {##1}
+            % Check if we saw an error not too long ago:
+            \int_compare:nNnTF {\l_tmpa_int} > {0} {
+              \str_gput_right:Nx \l__robExt_tmp_str {\robExt__clean_line_if_needed:V{\tl_to_str:n{##1}^^J}}%
+            } {
+              \str_set:Nn \l_tmp_str {##1}
+            }
+            \int_set:Nn \l_tmpa_int {\l_tmpa_int - 1}
           }
         }
       }
@@ -2377,6 +2405,10 @@ if __name__ == '__main__':
   % This adds a ! in front of the code if \robExtPrintWholeFile is defined
   logs should show as errors/.style={prefix log message with={!\space}},
   texstudio/.style={logs should show as errors},
+  remove line number/.code={\def\robExtRemoveLineNumber{}}, % Removes the l. if the log error line starts with l.42 or it will disturb emacs.
+  do not remove line number/.code={\let\robExtRemoveLineNumber\undefined},
+  remove line number,
+  nb lines after error to show/.code={\def\robExtLinesAfterError{#1}},
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={
     add argument to compilation command/.list={#1}

@@ -4457,6 +4457,15 @@ You can also use |debug| (or its alias |print command and source|) in order to d
   Show all imported placeholders and their content. Use the start not to pause.
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/nb lines after error to show=\marg{nb lines to keep}\@nil
+  \extractkey/robExt/remove line number\@nil
+  \extractkey/robExt/do not remove line number\@nil
+  \makeatother
+  In order to make the small error message more meaningful (to avoid getting to the full log), we try to extract some errors automatically, reading lines staring with |!|, or containing |error| or |invalid|. But this line alone is often not enough, so you can use |nb lines after error to show| to determine the number of lines to show after (defaults to 3). |remove line number| will remove in the short error message any |l.| at the beginning of the line, otherwise some editors (at least emacs), will interpret it as a line number in the current file and will jump to a bad position (this is enabled by default). These options would work best if set globally when you use |compile in parallel|.
+\end{pgfmanualentry}
 
 \subsection{Advanced optimizations}\label{sec:advancedOperations}
 
