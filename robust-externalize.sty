@@ -2620,7 +2620,6 @@ if __name__ == '__main__':
   },
   compile in parallel with gnu parallel/.default={200\%},
   compile in parallel with xargs/.style={
-    /utils/exec={\message{\jobnameNoQuotes}\show\jobname},
     % Use " instead of ' as Windows does not consider ' as a valid surrounding for strings
     compile in parallel command={xargs -t -I "{}" -P #1 \robExtParallelShell\space "{}" < "\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}"},
   },
@@ -2658,6 +2657,10 @@ if __name__ == '__main__':
         \iow_close:N \g__robExt_write_manually_compile_all_missing_figures_iow
         \msg_warning:nnx{robExt}{rerun because parallel}{\robExt@compile@parallel@command}
         \message{\robExt@compile@parallel@command}
+        % Note that we do not save this into a file because it might help to see in real time where we are in
+        % the compilation process. This also means that we get poorer error message if this specific
+        % command fails in texstudio since it only prints the log file and not the whole terminal...
+        % Since this should anyway be quite rare (user has not xargs installed basically), this should be fine.
         \sys_shell_now:x {\robExt@compile@parallel@command}
         % We check if some files failed to compile
         \seq_map_inline:Nn \g__robExt_files_compiled_in_parallel {
