@@ -2453,9 +2453,10 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Enable externalization for tikz %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  cache tikz/.code={\cacheTikz},
-  cache tikz 2 args/.code 2 args={\cacheTikz[#1][#2]},
-  cache tikz 3 args/.code n args={3}{\cacheTikz[#1][#2][3]},
+  cache tikz/.code={\robExtExternalizeAllTikzpictures},
+  do not cache tikz/.code={\robExtDoNotExternalizeAllTikzpictures},
+  cache tikz 2 args/.code 2 args={\robExtExternalizeAllTikzpictures[#1][#2]},
+  cache tikz 3 args/.code n args={3}{\robExtExternalizeAllTikzpictures[#1][#2][3]},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Disable externalization %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -3530,6 +3531,19 @@ touch "${outputPdf}"
   }%
 }
 \let\cacheTikz\robExtExternalizeAllTikzpictures
+
+\NewDocumentCommand{\robExtDoNotExternalizeAllTikzpictures}{}{%
+  \ifdefined\robExtCommandOrigtikz%
+    \DeclareCommandCopy{\tikz}{\robExtCommandOrigtikz}%
+    \let\robExtCommandOrigtikz\undefined
+  \fi%
+  \ifdefined\robExtEnvironmentOrigtikzpicture%
+    \DeclareEnvironmentCopy{tikzpicture}{robExtEnvironmentOrigtikzpicture}%
+    \let\robExtEnvironmentOrigtikzpicture\undefined
+  \fi%
+}
+\let\doNotCacheTikz\robExtDoNotExternalizeAllTikzpictures
+
 
 %% The cached version
 \DeclareDocumentEnvironment{tikzpictureC}{D<>{}O{}O{}}{%

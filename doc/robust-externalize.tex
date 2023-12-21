@@ -680,6 +680,19 @@ If you find yourself duplicating code between the main document and the preamble
 }
 \end{codeexample}
 
+You can also define your common macros (even if we recommend |\newcommandAutoForward| to avoid frequent recompilations when the definitions changes):
+\begin{codeexample}[width=0pt,vbox]
+\runHereAndInPreambleOfCachedFiles{
+	\def\name#1{The great lady #1 and her friends.}
+}
+
+\cacheTikz
+This is the picture of \name{Alice}:
+\begin{tikzpicture}
+	\node[fill=orange]{\name{Alice}};
+\end{tikzpicture}
+\end{codeexample}
+
 \subsection{Dependencies}\label{sec:dependencies}
 
 \textbf{Note: dependencies can sometimes be advantageously replaced with auto-forwarding of arguments, cf.\ \cref{sec:forwardIntro}, or |\runHereAndInPreambleOfCachedFiles|.}
@@ -4036,16 +4049,19 @@ It might be handy to cache automatically a given environment: we already provide
 to cache all tikz pictures (unless externalization is disabled), but we also provide tools to handle arbitrary environments.
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtExternalizeAllTikzpicture\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
+  \extractcommand\robExtExternalizeAllTikzpictures\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
   \extractcommand\cacheTikz\opt{\oarg{preset for tikz}}\opt{\oarg{preset for tikzpicture}}\opt{\oarg{delimiters}}\@@
+  \extractcommand\robExtDoNotExternalizeAllTikzpictures\@@
+  \extractcommand\doNotCacheTikz\@@
   \makeatletter%
   \def\extrakeytext{style, }
+  \extractkey/robExt/cache tikz\@nil
   \extractkey/robExt/cache tikz\@nil
   \extractkey/robExt/cache tikz 2 args=\marg{tikz preset}\marg{tikzpicture preset}\@nil
   \extractkey/robExt/cache tikz 3 args=\marg{tikz preset}\marg{tikzpicture preset}\marg{delimiters cacheMe options}\@nil
   \makeatother%
   \pgfmanualbody
-  (|cache tikz*| from 2.3, simply style alias) This will automatically cache all tikz pictures (both are alias, |\cacheTikz| is available from v2.0). Since v2.0, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
+  (|cache tikz*| from 2.3, simply style alias) This will automatically cache all tikz pictures (the |*ExternalizeAllTikzpicturers| are alias of the  |*cacheTikz| which is available from v2.0). Since v2.0, we added the delimiters options and we allow to specify custom presets for |tikz| and |tikzpicture|, and we parse |\tikz| as well (the |tikz| preset is now used by |\tikz| by default while the |tikzpicture| preset is used by |tikzpicture|). Note that we add an additional optional argument to the tikz picture via its first argument delimited by |delimiters| (defaults to |<>|) to specify preset options, which can for instance be practical to disable externalization on individual pictures. Cf.\ \cref{sec:disableExternalization} to see an example of use.
 \begin{codeexample}[width=0pt,vbox]
 \cacheTikz
 
@@ -4099,6 +4115,25 @@ You can also change the default style loaded for tikz and tikzpicture (note that
 \end{codeexample}
 Note that the |cache tikz| styles (the variation just provide default values) is useful for instance if you only want to locally enable |cache tikz| for the |\input| of a style (this way you can cache the output of a cached thing\dots{}). For instance, |gnuplot| with a tikz terminal will compile into a tex file that will be inputted. But unless |\cacheTikz| is enabled, the inputted picture will not be cached (i.e. tikz will need to run). If you still want to cache it without enabling |\cacheTikz| globally, you can load this style in the |gnuplot| style, or do something like:
 
+|\doNotCacheTikz| just undo |\cacheTikz|:
+\begin{codeexample}[width=0pt,vbox]
+\def\whereIAm{(not cached)}
+\robExtConfigure{
+  add to preset={tikz}{
+    add to preamble={
+      \def\whereIAm{(cached)}
+    },
+  },
+}
+
+\cacheTikz
+\doNotCacheTikz
+
+\tikz \node[fill=pink, rounded corners]{\whereIAm};
+\begin{tikzpicture}
+  \node[fill=pink, rounded corners]{\whereIAm};
+\end{tikzpicture}
+\end{codeexample}
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
