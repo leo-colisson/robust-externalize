@@ -2372,9 +2372,11 @@ if __name__ == '__main__':
   set compilation command/.code={\robExtSetCompilationCommand{#1}},
   do not redirect compilation output/.code={\def\robExtDoNotRedirectOutput{}\def\robExtDoNotRedirectOutputInManuallyCompileMissingFigures{}},
   print whole file in error message/.code={\def\robExtPrintWholeFile{}},
+  do not print whole file in error message/.code={\let\robExtPrintWholeFile\undefined},
   prefix log message with/.code={\def\robExtPrefixLogMessage{#1}},
   % This adds a ! in front of the code if \robExtPrintWholeFile is defined
   logs should show as errors/.style={prefix log message with={!\space}},
+  texstudio/.style={logs should show as errors},
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={
     add argument to compilation command/.list={#1}
@@ -3165,6 +3167,7 @@ finished_with_no_error()
 \robExtConfigure{
   python/.style={
     enable placeholders,
+    print whole file in error message,
     import placeholders={__ROBEXT_PYTHON__,__ROBEXT_PYTHON_IMPORT__,__ROBEXT_PYTHON_MAIN_CONTENT_WRAPPED__,__ROBEXT_PYTHON_FINISHED_WITH_NO_ERROR__,__ROBEXT_PYTHON_EXEC__},
     set compilation command={__ROBEXT_PYTHON_EXEC__ "__ROBEXT_SOURCE_FILE__"},
     set template={__ROBEXT_PYTHON__},
@@ -3399,6 +3402,7 @@ touch "${outputPdf}"
 \robExtConfigure{
   bash/.style={
     enable placeholders,
+    print whole file in error message,
     import placeholders={__ROBEXT_BASH_TEMPLATE__,__ROBEXT_BASH_SHELL__},
     set compilation command={__ROBEXT_BASH_SHELL__ "__ROBEXT_SOURCE_FILE__"},
     set template={__ROBEXT_BASH_TEMPLATE__},

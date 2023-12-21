@@ -518,6 +518,11 @@ For TeXstudio, you can enable shell-escape on the current document by adding in 
 \begin{verbatim}
 % !TeX TXS-program:compile = txs:///pdflatex/[--shell-escape]
 \end{verbatim}
+and you might also want to enable:
+\begin{verbatim}
+\robExtConfigure{textstudio}
+\end{verbatim}
+to get clearer error messages as TeXstudio is \mylink{https://github.com/texstudio-org/texstudio/issues/1410}{fairly bad at parsing error messages} (see also |print whole file in error message|).
 
 If you use |latexmk| (with any editor), you can create a file called |.latexmkrc| containing:
 \begin{verbatim}
@@ -4339,28 +4344,29 @@ robustExternalize/robExt-F27CD43D192AA2668A16DEAA616591FF-compilation.log.
 You can see inside the location in the main tex file of the block containing the error, we provide also the compilation command that lead to this error, and the lines of the log containing the word ``error'' (case insensitive), as well as the path to the full log of the compilation of the inner command, that you can also see if you continue the compilation by pressing Enter or by looking at the full log file, for instance in TeXstudio. This smaller message is often good enough in LaTeX, but usually not very good for languages that do not print the word ``error''. In that case, add to your preset:
 
 \begin{pgfmanualentry}
-  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/print whole file in error message\@nil
+  \extractkey/robExt/do not print whole file in error message\@nil
   \makeatother
-  If you want to print the whole file in the small error message because you do not want to inspect the full log file, you can use the style |print whole file in error message|. This is enabled by default on the gnuplot preset for instance, but disabled in \LaTeX{} has it makes little sense to print thousands of log lines.
+  (Add this only in preset, do NOT set it globally)
+  If you want to print the whole file in the small error message because you do not want to inspect the full log file, you can use the style |print whole file in error message|. This is enabled by default on the gnuplot, python and bash presets for instance, but disabled in \LaTeX{} has it makes little sense to print thousands of log lines in the error.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
-  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
   \makeatletter%
   \def\extrakeytext{style, }
-  \extractkey/robExt/prefix log message with=\marg{string to prepend to log message}\@nil
+  \extractkey/robExt/texstudio\@nil
   \extractkey/robExt/logs should show as errors\@nil
+  \extractkey/robExt/prefix log message with=\marg{string to prepend to log message}\@nil
   \makeatother
-  Some IDE like TeXstudio will only print lines starting with an exclamation mark, so to make the compilation errors more visible in the log, we can start every line in the log with a |!| (you can set it globally via |logs should show as errors|). This way, all presets that enable |print whole file in error message| will print after the error their log files like:
+  Some IDE like TeXstudio will only print lines starting with an exclamation mark, so to make the compilation errors more visible in the log, we can start every line in the log with a |!| (you can set it globally via |logs should show as errors|). This way, all presets that enable |texstudio|, or |print whole file in error message| will print after the error their log files like:
 \begin{verbatim}
 -------- We print now the full log --------
 ! sh: ligne 1: gnuplot : commande introuvable
 -------- End of the full log --------
 \end{verbatim}
-end the like |sh: ligne 1: gnuplot : commande introuvable| will appear in your IDE without going in the log file.
+this way the line |sh: ligne 1: gnuplot : commande introuvable| will appear in your IDE without going in the log file.
 \end{pgfmanualentry}
 
 Then, you can look at the log files\footnote{Either the latex one or the |-compilation.log| file, and sometimes try in a terminal if you really can't see any useful error as it might be the case that the error is not printed in the log file, which occurs for instance if xparse is not installed on Windows and you use the compilation command in parallel.} to get more advices, and run yourself the compilation command printed in the above error message. This way, you can easily check the content of the file and see why it fails to compile. In version before 2.3, or if you use |do not redirect compilation output|, the compilation errors are also displayed directly in the output, and you can read the log file for details.
