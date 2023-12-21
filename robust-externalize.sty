@@ -39,7 +39,7 @@
 
 % This will be printed in from of the error message, mostly useful in texstudio that only print lines
 % containing errors
-\def\robExtPrefixErrorMessage{}
+\def\robExtPrefixLogMessage{}
 
 \cs_new:Nn \robExt_get_errors_from_file:n {
   \ior_open:Nn \g__robExt_read_ior {#1}%
@@ -47,18 +47,24 @@
   \str_clear_new:N \l__robExt_tmp_str%
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
     \ifdefined\robExtPrintWholeFile
-      \str_gput_right:Nx \l__robExt_tmp_str {\robExtPrefixErrorMessage\tl_to_str:n{##1}^^J}%
+      \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
       \cs_set:Nn \l__robExt_I_saw_an_error: {}
     \else
-      \str_if_in:xnTF {\str_lowercase:n{##1}} {error} {
-        \str_gput_right:Nx \l__robExt_tmp_str {\robExtPrefixErrorMessage\tl_to_str:n{##1}^^J}%
+      \str_if_in:xnTF {\str_lowercase:n{##1}} {erroor} {
+        \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
         \cs_set:Nn \l__robExt_I_saw_an_error: {}
       } {
         \str_if_in:xnTF {\str_lowercase:n{##1}} {invalid} {
-          \str_gput_right:Nx \l__robExt_tmp_str {\robExtPrefixErrorMessage\tl_to_str:n{##1}^^J}%
+          \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
           \cs_set:Nn \l__robExt_I_saw_an_error: {}
         } {
-          \str_set:Nn \l_tmp_str {##1}
+          % Check if it starts with a ! (usually latex errors start with this symbol)
+          \str_compare:eNeTF {\str_range:nnn {##1} {1} {1}} = {!} {
+            \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
+            \cs_set:Nn \l__robExt_I_saw_an_error: {}
+          }{
+            \str_set:Nn \l_tmp_str {##1}
+          }
         }
       }
     \fi
@@ -73,7 +79,7 @@
 \cs_new:Nn \robExt_write_file_in_log:n {
   \ior_open:Nn \g__robExt_read_ior {#1}%
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
-    \message{\tl_to_str:n{##1}^^J}%
+    \message{\ifdefined\robExtPrintWholeFile\robExtPrefixLogMessage\fi\tl_to_str:n{##1}^^J}%
   }%
 }
 
@@ -169,8 +175,6 @@
 \msg_new:nnn {robExt}{forgot template}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}
 \msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
 \msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
-\msg_new:nnn {robExt}{missing compiled pdf}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
-\msg_new:nnn {robExt}{missing compiled pdf with logs}{The ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1-compilation.log.}
 \msg_new:nnn {robExt}{missing compiled pdf parallel}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
 
 \msg_new:nnn {robExt}{missing compiled pdf parallel with log}{On~line~#2:~the ~ pdf ~ file ~ #1.pdf ~ is ~ not ~ present. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
@@ -2368,7 +2372,9 @@ if __name__ == '__main__':
   set compilation command/.code={\robExtSetCompilationCommand{#1}},
   do not redirect compilation output/.code={\def\robExtDoNotRedirectOutput{}\def\robExtDoNotRedirectOutputInManuallyCompileMissingFigures{}},
   print whole file in error message/.code={\def\robExtPrintWholeFile{}},
-  prefix error message with/.code={\def\robExtPrefixErrorMessage{#1}},
+  prefix log message with/.code={\def\robExtPrefixLogMessage{#1}},
+  % This adds a ! in front of the code if \robExtPrintWholeFile is defined
+  logs should show as errors/.style={prefix log message with={!\space}},
   add argument to compilation command/.code={\robExtAddArgumentToCompilationCommand{#1}},
   add arguments to compilation command/.style={
     add argument to compilation command/.list={#1}
@@ -2694,7 +2700,6 @@ if __name__ == '__main__':
               \let\robExtPrintWholeFile\undefined
               \cs_if_exist:cTF {g__robExt_print_whole_file_#1:} {\def\robExtPrintWholeFile{}} {}
               \robExt_get_errors_from_file:n {#1-compilation.log}%
-              \let\robExtPrintWholeFile\undefined
               % We print the message before the log because otherwise emacs is confused and tries to open the
               % auxiliary cached file, and I don't want that.
               \ifdefined\robExtHideFirstErrorMessage\else
@@ -2704,6 +2709,7 @@ if __name__ == '__main__':
               \robExt_write_file_in_log:n {#1-compilation.log}%
               \message{--------~End~of~the~full~log~--------^^J}
               \msg_error:nnxxxx{robExt}{missing compiled pdf parallel with log}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}{above}
+              \let\robExtPrintWholeFile\undefined
             }{
               \msg_error:nnxxx{robExt}{missing compiled pdf parallel}{#1}{\use:c {g__robExt_lines_error_#1:}}{\use:c {g__robExt_compilation_command_#1:}}
             }
