@@ -4305,11 +4305,75 @@ bash JOBNAME-robExt-compile-missing-figures.sh
 
 \subsection{How to debug}\label{sec:debug}
 
-Since v2.3, we provide a more advanced error handling system in order to provide more meaningful errors to the user, and to write the full compilation output in the log in case of an error. We do so by wrapping commands around something like |(my command) > somelog.tex 2>&1|; therefore nothing is printed on screen during the compilation of the cached picture, you only get a message if there is an error. If you want to come back to the old behavior, that just runs the command is it, use |\def\robExtDoNotRedirectOutput{}| and |\def\robExtDoNotRedirectOutputInManuallyCompileMissingFigures{}| (the last one will only concern commands written to the |robExt-compile-missing-figures.sh|, which is used in manual mode and in parallel mode).
+If for some reasons you are unable to understand why a build fails, first check if you compiled your document with |-shell-escape| (not that this must appear \textbf{before} the filename).
 
-If for some reasons you are unable to understand why a build fails, first check if you compiled your document with |-shell-escape| (not that this must appear \textbf{before} the filename). Then, you can look at the log file to get more advices: when a cached document is compiled, we always write the full compilation command before compiling the file in the log file. This way, you can easily check the content of the file and see why it fails to compile. The compilation errors are also displayed directly in the output, and you can read the log file for details.
+Since v2.3, we provide a more advanced error handling system in order to provide more meaningful errors to the user, and to write the full compilation output in the log in case of an error. We do so by wrapping commands around something like |(my command) > somelog.tex 2>&1|; therefore nothing is printed on screen during the compilation of the cached picture, you only get a message if there is an error.
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/do not redirect compilation output\@nil
+  \makeatother
+   If you want to come back to the old behavior, that just runs the command is it either set this option, or set |\def\robExtDoNotRedirectOutput{}| and |\def\robExtDoNotRedirectOutputInManuallyCompileMissingFigures{}| (the last one will only concern commands written to the |robExt-compile-missing-figures.sh|, which is used in manual mode and in parallel mode).
+\end{pgfmanualentry}
 
-You might often get an error |! Missing $ inserted.|: this is typically when a placeholder was left unreplaced (e.g.\ you forgot to define it, import it, or you forgot to wrap a command in |\evalPlaceholder{}|): since \LaTeX{} is asked to typeset |__something__|, it thinks that you are trying to write a subscript, and asks you to start first the math mode.
+Starting from 2.3, we also automatically print an actual error message like:
+\begin{verbatim}
+! Package robExt Error: On line 20: the pdf file
+(robExt)               
+robustExternalize/robExt-F27CD43D192AA2668A16DEAA616591FF.pdf
+(robExt)                is not present. The compilation command "cd
+(robExt)                robustExternalize/ && xelatex -halt-on-error
+(robExt)                "robExt-F27CD43D192AA2668A16DEAA616591FF.tex"" used
+(robExt)                to compile the environment on line 20 certainly
+(robExt)                failed with errors:
+(robExt)                vvvvvv
+(robExt)                ! Package tikz Error: Giving up on this path. Did
+(robExt)                you forget a semicolon?.
+(robExt)                
+(robExt)                ^^^^^^
+(robExt)                See full logs below (you might need to press ENTER
+(robExt)                to go to the next error) or in
+(robExt)               
+robustExternalize/robExt-F27CD43D192AA2668A16DEAA616591FF-compilation.log.
+\end{verbatim}
+You can see inside the location in the main tex file of the block containing the error, we provide also the compilation command that lead to this error, and the lines of the log containing the word ``error'' (case insensitive), as well as the path to the full log of the compilation of the inner command, that you can also see if you continue the compilation by pressing Enter or by looking at the full log file, for instance in TeXstudio. This smaller message is often good enough in LaTeX, but usually not very good for languages that do not print the word ``error''. In that case use:
+
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/print whole file in error message\@nil
+  \makeatother
+  If you want to print the whole file at that position because you do not want to inspect the full log, you might want to use the style |print whole file in error message|. This is enabled by default on the gnuplot preset for instance.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\evalPlaceholderInplace\marg{name placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/prefix error message with=\marg{string to prepend to error message}\@nil
+  \makeatother
+  Some IDE like TeXstudio will only print lines containing ``error'', so to make the compilation errors more visible in the log, you can use |prefix error message with=Sub-Error| to generate a message like:
+\begin{verbatim}
+...
+(robExt)                vvvvvv
+(robExt)                Sub-Error! Package tikz Error: Giving up on this
+(robExt)                path. Did you forget a semicolon?.
+(robExt)                
+(robExt)                ^^^^^^
+...
+\end{verbatim}
+(note that the indentation might make that the line will be cut in two parts)
+\end{pgfmanualentry}
+
+Then, you can look at the log file to get more advices, and run yourself the compilation command printed in the above error message. This way, you can easily check the content of the file and see why it fails to compile. In version before 2.3, or if you use |do not redirect compilation output|, the compilation errors are also displayed directly in the output, and you can read the log file for details.
+
+You might often get an error:
+\begin{verbatim}
+! Missing $ inserted.
+\end{verbatim}
+This is typically when a placeholder was left unreplaced (e.g.\ you forgot to define it, import it, or you forgot to wrap a command in |\evalPlaceholder{}|): since \LaTeX{} is asked to typeset |__something__|, it thinks that you are trying to write a subscript, and asks you to start first the math mode.
 
 To get more advanced info during the compilation command, set the style |more logs| (that does |\def\robExtDebugMessage#1{\message{^^J[robExt] #1}}|) in order to print some messages on the replacement process (there is also |\robExtDebugWarning| for more important messages, but it prints the logs by default.
 
