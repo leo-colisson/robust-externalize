@@ -4394,14 +4394,19 @@ You can see inside the location in the main tex file of the block containing the
   \extractkey/robExt/texstudio\@nil
   \extractkey/robExt/logs should show as errors\@nil
   \extractkey/robExt/prefix log message with=\marg{string to prepend to log message}\@nil
+  \extractkey/robExt/spacing between lines in log=\marg{content to separate lines in log}\@nil
   \makeatother
-  Some IDE like TeXstudio will only print lines starting with an exclamation mark, so to make the compilation errors more visible in the log, we can start every line in the log with a |!| (you can set it globally via |logs should show as errors|). This way, all presets that enable |texstudio|, or |print whole file in error message| will print after the error their log files like:
+  Some IDE like TeXstudio will only print lines starting with an exclamation mark, assuming that they are spaced enough, so to make the compilation errors more visible in the log, we can start every line in the log with a |!| (you can set it globally via |logs should show as errors| that internally calls |prefix log message with|) and separate all lines with enough empty lines using |spacing between lines in log|. For simplicity, we create |texstudio| to automatically configure these values so that errors print nicely in texstudio via:
+\begin{verbatim}
+\robExtConfigure{texstudio}
+\end{verbatim}
+This way you will get errors like:
 \begin{verbatim}
 -------- We print now the full log --------
 ! sh: ligne 1: gnuplot : commande introuvable
 -------- End of the full log --------
 \end{verbatim}
-this way the line |sh: ligne 1: gnuplot : commande introuvable| will appear in your IDE without going in the log file.
+and the line |sh: ligne 1: gnuplot : commande introuvable| will appear in your IDE without going in the log file. Note that this will only be printed for items that enable |print whole file in error message| not to pollute the errors space when the log contains many lines (e.g. \LaTeX{}), but this is automatically enabled on most default presets.
 \end{pgfmanualentry}
 
 Then, you can look at the log files\footnote{Either the latex one or the |-compilation.log| file, and sometimes try in a terminal if you really can't see any useful error as it might be the case that the error is not printed in the log file, which occurs for instance if xparse is not installed on Windows and you use the compilation command in parallel.} to get more advices, and run yourself the compilation command printed in the above error message. This way, you can easily check the content of the file and see why it fails to compile. In version before 2.3, or if you use |do not redirect compilation output|, the compilation errors are also displayed directly in the output, and you can read the log file for details.
@@ -4522,16 +4527,6 @@ In order to know when to stop replacing placeholders earlier (i.e.\ without runn
   \makeatother%
   \pgfmanualbody
   If you disable the import mechanism (enabled by default), it will do an |\importAllPlaceholders| while evaluating the template. This is not recommended as it is quite inefficient, it is better to selectively import the group you need.
-\end{pgfmanualentry}
-
-\begin{pgfmanualentry}
-  \makeatletter%
-  \def\extrakeytext{style, }
-  \extractkey/robExt/disable optimizations\@nil
-  \extractkey/robExt/enable optimizations\@nil
-  \makeatother%
-  \pgfmanualbody
-  
 \end{pgfmanualentry}
 
 

@@ -44,6 +44,21 @@
 % Prints the next 4 lines after an error:
 \def\robExtLinesAfterError{3}
 \def\robExtRemoveLineNumber{}
+
+%% Needed for studio to prepend ! in front of all lines, including big ones.
+%% https://tex.stackexchange.com/questions/705502/message-add-symbol-in-front-of-new-lines-even-if-there-is-a-line-break
+\def\robExtMessageWithPrefixNumberLines{^^J}%
+\cs_new:Nn \robExt__message_with_prefix:n {
+  \str_set:Nn \l_tmpa_str {#1}  
+  \int_compare:nNnTF {\str_count:N \l_tmpa_str + \str_count:N \robExtPrefixLogMessage} > {78} {
+    \typeout{\robExtPrefixLogMessage \str_range:Nnn \l_tmpa_str {1} {78 - \str_count:N \robExtPrefixLogMessage}\robExtMessageWithPrefixNumberLines}
+    \robExt__message_with_prefix:x {\str_range:Nnn \l_tmpa_str {78 - \str_count:N \robExtPrefixLogMessage + 1} {-1}}
+  }{
+    \typeout{\robExtPrefixLogMessage \l_tmpa_str \robExtMessageWithPrefixNumberLines}
+  }
+}
+\cs_generate_variant:Nn \robExt__message_with_prefix:n { x }
+
 % We might want to remove l.XX in front of lines as emacs interpret this as a line of error and goes to a wrong place.
 \cs_new:Nn \robExt__clean_line_if_needed:n {
   \ifdefined\robExtRemoveLineNumber%
@@ -107,7 +122,15 @@
 \cs_new:Nn \robExt_write_file_in_log:n {
   \ior_open:Nn \g__robExt_read_ior {#1}%
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
-    \message{\ifdefined\robExtPrintWholeFile\robExtPrefixLogMessage\fi\tl_to_str:n{##1}^^J}%
+    \ifdefined\robExtPrintWholeFile
+      \ifdefempty{\robExtPrefixLogMessage}{
+        \typeout{\tl_to_str:n{##1}}%
+      }{
+        \robExt__message_with_prefix:x {\tl_to_str:n{##1}}
+      }
+    \else
+      \typeout{\tl_to_str:n{##1}}%
+    \fi
   }%
 }
 
@@ -2402,9 +2425,13 @@ if __name__ == '__main__':
   print whole file in error message/.code={\def\robExtPrintWholeFile{}},
   do not print whole file in error message/.code={\let\robExtPrintWholeFile\undefined},
   prefix log message with/.code={\def\robExtPrefixLogMessage{#1}},
+  spacing between lines in log/.code={\def\robExtMessageWithPrefixNumberLines{#1}},
   % This adds a ! in front of the code if \robExtPrintWholeFile is defined
   logs should show as errors/.style={prefix log message with={!\space}},
-  texstudio/.style={logs should show as errors},
+  texstudio/.style={
+    logs should show as errors,
+    spacing between lines in log={^^J^^J(sorry, these 4 empty lines are ugly but needed for texstudio to consider them as separate errors, customize me "with spacing between lines in log")^^J},
+  },
   remove line number/.code={\def\robExtRemoveLineNumber{}}, % Removes the l. if the log error line starts with l.42 or it will disturb emacs.
   do not remove line number/.code={\let\robExtRemoveLineNumber\undefined},
   remove line number,
@@ -2485,10 +2512,10 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Enable externalization for tikz %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  cache tikz/.code={\robExtExternalizeAllTikzpictures},
-  do not cache tikz/.code={\robExtDoNotExternalizeAllTikzpictures},
-  cache tikz 2 args/.code 2 args={\robExtExternalizeAllTikzpictures[#1][#2]},
-  cache tikz 3 args/.code n args={3}{\robExtExternalizeAllTikzpictures[#1][#2][3]},
+  cache tikz/.code={\robExtExternalizeAllTikzpictures{}},
+  do not cache tikz/.code={\robExtDoNotExternalizeAllTikzpictures{}},
+  cache tikz 2 args/.code 2 args={\robExtExternalizeAllTikzpictures[#1][#2]{}},
+  cache tikz 3 args/.code n args={3}{\robExtExternalizeAllTikzpictures[#1][#2][3]{}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Disable externalization %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -3379,9 +3406,9 @@ __ROBEXT_MAIN_CONTENT__
       is tex output,
     },
     tikz terminal/.default={},
-    tikz/.style={
-      tikz terminal
-    },
+    % Warning: you cannot define this option with the name "tikz" if you try to nest elements, for instance
+    % if the include command calls an \input that calls a tikz picture, that is cached by \cacheTikz and therefore
+    % call the "tikz" preset that is now changed.
     cairolatex terminal/.style={
       set terminal={cairolatex #1},
       is tex output,
@@ -3553,6 +3580,7 @@ touch "${outputPdf}"
 }
 
 \NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{tikz}O{tikzpicture}O{<>}}{%
+  \robExtDoNotExternalizeAllTikzpictures%
   \robExtCacheEnvironment[#3]{tikzpicture}{#2}%
   % Tikz has a more complicated parsing system
   \DeclareCommandCopy{\robExtCommandOrigtikz}{\tikz}% we save the function for later reset
@@ -3593,7 +3621,8 @@ touch "${outputPdf}"
 \NewDocumentCommand{\robExtCacheEnvironment}{O{<>}mm}{%
   %% We need to save the original environment to avoid infinite recursion if we disable externalization
   %% https://tex.stackexchange.com/questions/695391/why-isnt-my-environment-restored/695398
-  \NewEnvironmentCopy{robExtEnvironmentOrig#2}{#2}%
+  \ifcsname robExtEnvironmentOrig#2\endcsname\PackageWarning{Your are trying to cache an environment #2 that seems to be already cached... Expect weird things to happen.}{}\fi
+  \DeclareEnvironmentCopy{robExtEnvironmentOrig#2}{#2}%
   \robExtAddToEnvironmentResetList{#2}%
   \DeclareDocumentEnvironment{#2}{D#1{}}{%
     \def\robExtEnvironmentOrigName{#2}%
