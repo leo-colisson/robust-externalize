@@ -222,7 +222,7 @@
 %% In LaTeX3 error messages are defined here, this allows people to translate them, filter them, change them,
 %% make them more verbose etc.
 \msg_new:nnn {robExt}{underscore in name}{Error:~all~the~placeholders~should~contain~two~consecutive~underscores~in~their~name.}
-\msg_new:nnn {robExt}{placeholder not existing}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #3 ~ does ~ not ~ exists.}
+\msg_new:nnn {robExt}{placeholder not existing}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #1 ~ does ~ not ~ exists.}
 \msg_new:nnn {robExt}{forgot template}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}
 \msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
 \msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
@@ -972,7 +972,7 @@ if __name__ == '__main__':
   \cs_if_exist:cTF { l__robExt_placeholder_#3_str }{
     \str_set_eq:Nc { \l_robExt_result_str }{ l__robExt_placeholder_#3_str }
   }{
-    \msg_error:nn{robExt}{placeholder not existing}
+    \msg_error:nnx{robExt}{placeholder not existing}{#3}
   }
   \robExtDebugMessage{Starting~to~replace~placeholder~#3~to~get~\l_robExt_result_str}
   \__robExt_replace_until_impossible:
@@ -3475,6 +3475,51 @@ touch "${outputPdf}"
 
 \robExtCopyGroupPlaceholders{bash}{main}
 \robExtRegisterGroupPlaceholders{bash}
+
+%%%%%% 
+%%%%%% Group "web image", to download images automatically
+%%%%%%
+
+\robExtClearGroupPlaceholders{main}
+
+% \begin{RobExtPlaceholderFromCode}{__ROBEXT_BASH_TEMPLATE__}
+% # Quit if there is an error
+% set -e
+% outputTxt="__ROBEXT_OUTPUT_PREFIX__-out.txt"
+% outputTex="__ROBEXT_OUTPUT_PREFIX__-out.tex"
+% outputPdf="__ROBEXT_OUTPUT_PDF__"
+% __ROBEXT_MAIN_CONTENT__
+% # Create the pdf file to certify that no compilation error occured
+% touch "${outputPdf}"
+% \end{RobExtPlaceholderFromCode}
+
+\robExtConfigure{
+  web image/.style={
+    enable placeholders,
+    print whole file in error message,
+    import placeholders={__ROBEXT_BASH_TEMPLATE__,__ROBEXT_BASH_SHELL__},
+    wget/.style={
+      set compilation command={wget "__ROBEXT_MAIN_CONTENT__" -O "__ROBEXT_OUTPUT_PDF__"},
+    },
+    curl/.style={
+      set compilation command={curl "__ROBEXT_MAIN_CONTENT__" -L -o "__ROBEXT_OUTPUT_PDF__"},
+    },
+    if unix={
+      wget
+    },
+    if windows={
+      curl
+    },
+    set template={},
+  }
+}
+
+\NewDocumentCommand{\robExtIncludegraphicsWeb}{D<>{}O{}m}{\robExtCacheMe[web image,set includegraphics options={#2},#1]{#3}}
+\let\includegraphicsWeb\robExtIncludegraphicsWeb
+
+\robExtCopyGroupPlaceholders{web image}{main}
+\robExtRegisterGroupPlaceholders{web image}
+
 
 %%%%%% 
 %%%%%% Group "default", available in all styles

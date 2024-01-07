@@ -120,7 +120,7 @@ This library allows you to cache any language: not only \LaTeX{} documents and \
   enable fallback to manual mode,
 }
 \end{verbatim}
-Then type something like this (note the |C| for |cached| at the end of |tikzpictureC|, see below to override the original command), and compile with |pdflatex -shell-escape yourfile.tex| (or \textcolor{red}{\textbf{read below if you do not want to use }}|-shell-escape|\textcolor{red}{\textbf{ (note that overleaf enables shell-escape by default, and it not needed once all pictures are cached)}}):
+Then type something like this (note the |C| for |cached| at the end of |tikzpictureC|, see below to override the original tikz commands), and compile with |pdflatex -shell-escape yourfile.tex| (or \textcolor{red}{\textbf{read below if you do not want to use }}|-shell-escape|\textcolor{red}{\textbf{ (note that overleaf enables shell-escape by default, and it is not needed once all pictures are cached)}}):
 \begin{codeexample}[width=0pt,vbox]
   \robExtConfigure{
     add to preset={tikz}{
@@ -133,6 +133,11 @@ Then type something like this (note the |C| for |cached| at the end of |tikzpict
     \node[fill=red, rounded corners](A){My node that respects baseline \ding{164}.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC} and you can see that overlay and depth works.
+\end{codeexample}
+
+Since v2.3 we also provide a way to include online pictures with |\includegraphicsWeb|:
+\begin{codeexample}[width=0pt,vbox]
+Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
 \end{codeexample}
 
 You can also cache arbitrary code (e.g.\ python). You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
@@ -3822,6 +3827,43 @@ This file contains:
 \end{codeAndResult}
 
 You might also like to use |name output=yourfile| that will create two macros |\yourfile| and |\yourfileInCache|, equal respectively to the prefix |robExt-somehash| and |pathOfCache/robExt-somehash|. 
+
+\subsubsection{Online images}
+
+We also provide support for online images since v2.3.
+\begin{pgfmanualentry}
+  \extractcommand\includegraphicsWeb\opt{<robExt options>}\opt{\oarg{includegraphics options}}\marg{url image}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/web image\@nil
+  \extractkey/robExt/web image/wget\@nil
+  \extractkey/robExt/web image/curl\@nil
+  \makeatother%
+  \pgfmanualbody
+  |\includegraphicsWeb| is used in place of |\includegraphics| to download online images:
+\begin{codeexample}[width=0pt,vbox]
+Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.     
+\end{codeexample}
+By default, the engine uses |wget| in linux (since it is installed by default) and |curl| on windows (should also be installed by default on recent windows). But you can change it by modifying the |web image| preset (or using the optional robExt options that are loaded after |web image|):
+\begin{codeexample}[width=0pt,vbox]
+\robExtConfigure{
+  add to preset={web image}{
+    curl
+  },
+}
+
+Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/303}. 
+\end{codeexample}
+By default, the |wget| and |curl| presets are defined as:
+\begin{verbatim}
+wget/.style={
+  set compilation command={wget "__ROBEXT_MAIN_CONTENT__" -O "__ROBEXT_OUTPUT_PDF__"},
+},
+curl/.style={
+  set compilation command={curl "__ROBEXT_MAIN_CONTENT__" -L -o "__ROBEXT_OUTPUT_PDF__"},
+},
+\end{verbatim}
+\end{pgfmanualentry}
 
 \subsubsection{Gnuplot}
 
