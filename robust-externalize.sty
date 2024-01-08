@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2.2+unstable Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2.3 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -3497,7 +3497,6 @@ touch "${outputPdf}"
   web image/.style={
     enable placeholders,
     print whole file in error message,
-    import placeholders={__ROBEXT_BASH_TEMPLATE__,__ROBEXT_BASH_SHELL__},
     wget/.style={
       set compilation command={wget "__ROBEXT_MAIN_CONTENT__" -O "__ROBEXT_OUTPUT_PDF__"},
     },

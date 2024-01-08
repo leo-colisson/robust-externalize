@@ -96,7 +96,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.2+unstable}\\[3mm]
+  {Léo Colisson \quad Version 2.3}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -348,6 +348,13 @@ We also provide a number of other functionalities, among others:
 \item And more\dots
 \end{itemize}
 
+\section{Acknowledgments}
+
+I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much! A big thanks also to the project \url{https://github.com/sasozivanovic/memoize/} from which I borrowed most of the code to automatically wrap commands. Thanks to kiryph and dflvunoooooo for providing very useful feedbacks.
+
+\section{Support}
+
+If you find this library useful, please consider citing the arXiv version of this documentation, possibly using |\nocite|. If you want to support me financially and offer me a virtual coffee, you can use my \mylink{https://github.com/sponsors/tobiasBora}{GitHub sponsor page}.
 
 \section{Introduction}
 
@@ -1435,7 +1442,7 @@ Note also that we usually define two names for each function, one normal and one
 
 \subsection{Placeholders}\label{sec:placeholders}
 
-Placeholders are the main concept allowing this library to generate the content of a source file based on a template (a template will itself be a placeholder containing other placeholders). A placeholder is a special strings like |__COLOR_IMAGE__| that should start and end with two underscores, ideally containing no space or double underscores inside the name directly. Placeholders are inserted for instance in a string and will be given a value later. This value will be used to replace (recursively) the placeholder in the template. For instance, if a placeholder |__LIKES__| contains |I like __FRUIT__ and __VEGETABLE__|, if the placeholder |__FRUIT__| contains |oranges| and if the placeholder |__VEGETABLE__| contains |salad|, then evaluating |__LIKES__| will output |I like oranges and salad.|
+Placeholders are the main concept allowing this library to generate the content of a source file based on a template (a template will itself be a placeholder containing other placeholders). A placeholder is a special strings like |__COLOR_IMAGE__| that should start and end with two underscores, ideally containing no space or double underscores inside the name directly (we might use this property even more in a future release to improve further the efficiency). Placeholders are inserted for instance in a string and will be given a value later. This value will be used to replace (recursively) the placeholder in the template. For instance, if a placeholder |__LIKES__| contains |I like __FRUIT__ and __VEGETABLE__|, if the placeholder |__FRUIT__| contains |oranges| and if the placeholder |__VEGETABLE__| contains |salad|, then evaluating |__LIKES__| will output |I like oranges and salad.|
 
 Note that you are not strictly forced to follow the above convention (it allows us to optimize the code to find and replace placeholders), but in that case you should enable |not all placeholders have underscores|.
 
@@ -4595,26 +4602,23 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \begin{itemize}
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
-\item Since externalizing is all about speed, it would be nice to do more benchmarks. But overall, it seems fairly optimized, at least when using the compiled presets.
+\item Since externalizing is all about speed, it would be nice to do more benchmarks. But overall, it seems fairly optimized, at least when using the compiled presets. One option to gain in term of efficiency and simplicity might be to directly use the fact that the placeholders start and end with two dashes: a more efficient implementation might be doable using something like |\def\findPlaceholders#1__#2__{}| instead of string replacement. I will try to investigate in future releases.
 \item Add a way to forward tikz styles and/or arbitrary code.
 \item Create a more efficient/precise way to check if a word is present than string ``is in''. Indeed, for now for each color/... to export, we check if the string contains this word, which scales like $O(sn)$ where $s$ is the size of the string and $n$ is the number of colors etc to export. Instead, I'd like to run it in $O(s)$ by extracting all words a single time, and then checking if this word exists or not. This is not an issue for |\newcommandAutoforward|, but could be an issue when exporting many colors or |\genericAutoForward|.
 \end{itemize}
 
-\section{Acknowledgments}
-
-I am deeply indebted to many users on \url{tex.stackexchange.com} that made the writing of this library possible. I can't list you all, but thank you so much! A big thanks also to the project \url{https://github.com/sasozivanovic/memoize/} from which I borrowed most of the code to automatically wrap commands. Thanks to kiryph for providing useful feedbacks.
-
 \section{Changelog}
 
 \begin{itemize}
-\item Future v2.3 (master on github, not released yet on CTAN):
+\item v2.3:
   \begin{itemize}
-  \item fix bug in |more logs| and |less logs|
-  \item make |if matches word| more efficient, independent on the number of runs, allowing registration, namespaces, etc.
+  \item Fix bug in |more logs| and |less logs|
+  \item Make |if matches word| more efficient, independent on the number of runs, allowing registration, namespaces, etc.
   \item Added |\definecolorAutoForward| and |\colorletAutoForward|
   \item Add support for gnuplot
   \item Added |\runHereAndInPreambleOfCachedFiles|
   \item Clearer and more advanced error handling
+  \item Add support for online images with |\includegraphicsWeb|
   \end{itemize}
 \item v2.2 
   \begin{itemize}
