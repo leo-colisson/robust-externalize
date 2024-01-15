@@ -13,6 +13,8 @@
 \usepackage{calc}
 \usepackage{siunitx}
 \usepackage{tikz}
+\usepackage{tikzit}
+\input{new_zxstyle.tikzstyles}
 \usetikzlibrary{shadows,fit}
 % \usetikzlibrary fails because file is not in current directory, lazy to setup TEXINPUTS
 \makeatletter
@@ -4158,11 +4160,17 @@ Note that you will get a warning if the variable does not exist (yet?) only in L
     %%%%%%% In your document:
     \tikzfig{demo} % figures/ is optional
   \end{codeexample}
-  
+  Note that |\tikzfig| accepts an additional optional argument for further options, for instance to forward locally a macro or to disable externalization:
+  \begin{codeexample}[vbox]
+    %%%%%%% In your preamble, make sure to load:
+    %% \usepackage{tikzit}
+    %% \input{new_zxstyle.tikzstyles}
+    %% if you want "disable externalization" to work.
+    \cacheTikzitWithStyle{new_zxstyle.tikzstyles}
+    %%%%%%% In your document:
+    \tikzfig<disable externalization>{demo} % figures/ is optional
+  \end{codeexample}  
 \end{pgfmanualentry}
-
-You need to provide your own style file, say |new_zxstyle.tikzstyles| We provide out 
-
 
 \subsubsection{Custom languages}
 
