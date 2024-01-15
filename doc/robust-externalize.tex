@@ -1,3 +1,4 @@
+%\pdfoutput=1% Do not remove, needed for arxiv
 \documentclass[a4paper,doc2]{ltxdoc} % doc2 is needed to force the old version, or links get colored in a weird red way even with hidelinks. https://github.com/latex3/latex2e/issues/822
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18,8 +19,14 @@
   \input{../robust-externalize.sty}
 \makeatother
 \robExtConfigure{
-  enable optimizations
-}  
+  enable optimizations,
+  copy file to cache={zx-calculus.sty},
+  copy file to cache={tikzlibraryzx-calculus.code.tex},
+  % You need to uncomment that line to rename the .tex files into .tex-backup
+  % backup source for arxiv,
+  rename backup files for arxiv,
+  print source when saving, % debug
+}
 \usepackage{zx-calculus}
 \usepackage{forest}
 \setlength{\marginparwidth}{2cm}
@@ -96,7 +103,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.3}\\[3mm]
+  {Léo Colisson \quad Version 2.4+unstable}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -104,10 +111,11 @@
 
 \bigskip
 
-\textbf{WARNING: This library is young and might lack some testing (and is an important rewrite of a previous version), but v2.2 is definitely relatively robust. Even if we try to stay backward compatible, the only guaranteed way to be immune to changes is to copy/paste the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
+\textbf{WARNING: Even if we try to stay backward compatible, the only guaranteed way to be 100\% immune to changes is to copy/paste the\ .sty file of the library in your main project folder. Please report any bug to \url{https://github.com/leo-colisson/robust-externalize}!}
 
-\textbf{WARNING 2: the recent versions 2.1 and 2.2 improves significantly the compilation time compared with 2.0 that was surprisingly slow. Now, it is fairly well optimized, and version 2.2 is even more optimized.}
+\textbf{WARNING 2: the recent versions 2.1 and 2.2 improves significantly the compilation time compared with 2.0 that was surprisingly slow. Now, it is fairly well optimized, and version 2.3 is even more optimized.}
 
+\textbf{WARNING 3: If you read this documentation from the arXiv or CTAN, you might prefer to read it from \mylink{https://github.com/leo-colisson/robust-externalize}{Github} to get the latest version.}
 
 \section{A taste of this library}
 
@@ -130,7 +138,7 @@ Then type something like this (note the |C| for |cached| at the end of |tikzpict
   }
   The next picture is cached %
   \begin{tikzpictureC}[baseline=(A.base)]
-    \node[fill=red, rounded corners](A){My node that respects baseline \ding{164}.};
+    \node[fill=red, rounded corners](A){My node respecting baseline \ding{164}.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC} and you can see that overlay and depth works.
 \end{codeexample}
@@ -152,7 +160,7 @@ for name in ["Alice", "Bob"]:
 Actually, we also provide this style by default (and explain how to write it yourself), just make sure to load:
 \begin{verbatim}
 \usepackage{pythonhighlight}
-\usepackage{tcolorbox}
+\usepackage[most]{tcolorbox}
 \end{verbatim}
 
 You can also cache any environment and command using something like:
@@ -215,6 +223,17 @@ A ZX figure %
 }
 \end{codeAndResult}
 \end{itemize}
+
+We also provide methods to cache automatically \mylink{https://tikzit.github.io/}{TikZit} pictures (|\cacheCommand| alone would not be sufficient as the source relies on an external file):
+
+\begin{codeexample}[vbox]
+  %%%%%%% In your preamble:
+  \cacheTikzitWithStyle{new_zxstyle.tikzstyles}
+  
+  %%%%%%% In your document:
+  \tikzfig{demo} %figures/ can be omitted
+\end{codeexample}
+
 You can also cache all tikz pictures by default, except those that are run from some commands (as remember picture does not work yet, this is important). For instance, this code will allow you to freely use the |todonotes| package (that uses internally tikz but is not cachable with this library since it uses remember picture) while caching all other elements:
 \begin{codeexample}[code only]
   %% this will cache \tikz and tikzpictures by default (using the tikz preset)
@@ -392,7 +411,7 @@ I tested the library on Linux and Windows, but the library should work on all OS
 
 \paragraph{Do I need to compile using -shell-escape?}
 
-Since we need to compile the images via an external command, the simpler option is to add the argument |-shell-escape| to let the library run the  compilation command automatically (this is also the case of \tikzname's externalize library). Note that overleaf already defines this option by default, so you don't need to do anything special in overleaf. However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
+Since we need to compile the images via an external command the first time, the simpler option is to add the argument |-shell-escape| to let the library run the compilation command automatically (this is also the case of \tikzname's externalize library). Note that overleaf already defines this option by default, so you don't need to do anything special in overleaf. Moreover, this is only needed \textbf{during the first compilation} since once the image is cached, |-shell-escape| is not needed anymore (therefore, on the arXiv website, you can upload the |robustExternalize| folder containing the cached images without any issue, see \cref{sec:arxiv} for details). However, people worried by security issues of |-shell-escape| (that allows arbitrary code execution if you don't trust the \LaTeX{} code) might be interested by these facts:
 \begin{itemize}
 \item You can choose to display a dummy content explaining how to manually compile the pictures instead of giving an error until they are compiled, see |enable fallback to manual mode|.
 \item You can compile manually the images: all the commands that are left to be executed are also listed in \texttt{JOBNAME-robExt-compile-missing-figures.sh} and you can just inspect and run them, either with \texttt{bash robExt-compile-missing-figures.sh} or by typing them manually (most of the time it's only a matter of running \texttt{pdflatex somefile.tex} from the \texttt{robustExternalize} folder).
@@ -410,7 +429,7 @@ Since we need to compile the images via an external command, the simpler option 
 
 \paragraph{Is it working on overleaf?}
 
-Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing special needs to be done there (of course, if you use this library to run some code, the programming language might not be available, but I heard that python is installed on overleaf servers for instance, even if this needs to be doubled checked). If the first compilation of the document to cache images times out, you can just repeat this operation multiple times until all images are cached.
+Yes: overleaf automatically compiles documents with |-shell-escape|, so nothing special needs to be done there (of course, if you use this library to run some code, the programming language might not be available, but I heard that python is installed on overleaf servers for instance, even if this needs to be doubled checked). If the first compilation of the document to cache images times out, you can just repeat this operation multiple times until all images are cached. In case of doubt, you can look at the log file to see which file is getting cached. If overleaf still times out, read the next paragraph.
 
 \paragraph{Overleaf still times-out, why?}
 
@@ -484,6 +503,45 @@ Cons of \url{https://github.com/sasozivanovic/memoize}:
 \end{itemize}
 
 Note that |remember picture| is not supported in both libraries, but we can provide multiple methods to disable externalizations when |remember picture| is used.
+
+\subsection{How to use with arXiv}\label{sec:arxiv}
+
+You can completely use this library with the arXiv's website (this documentation is also compiled in arXiv), but you need to follow a few steps due to arXiv's particularities:
+\begin{itemize}
+\item First, arXiv does NOT allow |-shell-escape|. So you either need to disable externalization (not recommended since this will of course increase the compilation time and will not work when working with non-latex code like python or external images), or you need to compile locally the document to cache all images locally\footnote{Make sure to recompile from scratch, by removing the .aux file, if your cached pictures can depend on counters (like the current page) that can change across compilations.}, and upload the |robustExternalize/| folder containing all cached images online in a zip file.
+\item Moreover, if you choose to upload the |robustExternalize/| folder, the arXiv website will automatically remove all |.pdf| files if a |.tex| file is present (which will break this library, since it puts all sources in the |.tex| file and the output in a |.pdf| file). The trick is to rename all the source |.tex| files into |.tex-backup| (this library will automatically recreate the |.tex| from the |.tex-backup| starting from v2.4). We provide two approaches for that:
+  \begin{itemize}
+  \item \textbf{Solution 1}: if you have python installed the most robust solution is to run
+\begin{verbatim}
+$ python robExt-prepare-for-arxiv.py
+\end{verbatim}
+    before sending the document to the arXiv. This will rename all the |.tex| files in the |robust-externalize| folder that have a matching |*.pdf| file into |.tex-backup|, and list these files in |robExt-arxiv-files-to-rename.txt|. Then, add in the preamble of your document:
+    \begin{codeexample}[code only]
+      \robExtConfigure{
+        rename backup files for arxiv,
+      }
+    \end{codeexample}
+    This will automatically rename back the |.tex-backup| files into |.tex| (without needing shell-escape), based on the |robExt-arxiv-files-to-rename.txt| file (if this file exists and if the files have not already been renamed: it is therefore safe to keep this option on even without running the python code), allowing the rest of the document to compile normally.
+  \item \textbf{Solution 2}: if you do \textbf{not} have python installed, you can simply run:
+    \begin{codeexample}[code only]
+      \robExtConfigure{
+        backup source for arxiv,
+      }
+    \end{codeexample}
+    This will automatically rename the source files |.tex| into |.tex-backup| (make sure to comment this line on the final pdf sent to the arXiv). Note however that this is less robust than solution 1 since the |.tex-backup| will be renamed into |.tex| only if it is in the source, but sometimes other |.tex| files might need to be renamed as well: for instance, |gnuplot| with |cairolatex| terminal creates two files |-gnuplot-.tex| and |-gnuplot-.pdf|, and this file will not be renamed with this method, so the |-gnuplot-.pdf| file will be lost.
+  \end{itemize}
+\item This should be enough to compile most documents. But note that since the arXiv uses a different Texlive version and might try to compile other document formats, it might be the case that the number of page varies from your original document: if you uses things like |forward counter=page|, it might cause you some troubles since your local cache might contain the cache for |page=42| while the arXiv would ask for the cached value for |page=45|, producing an error like |enable -shell-escape|. There are a few steps you can follow to fix these issues:
+  \begin{itemize}
+  \item First, make sure to have the same margins/paper on your local file and online (by default arXiv will create a document in |letterpaper|). To that end, you can force the paper format with |\documentclass[a4paper]{article}|.
+  \item ArXiv might try to compile with various output formats like eps, so it might help to force a pdf output by starting your document with |\pdfoutput=1| (not sure how helpful this is, it might already be forced when we insert a pdf?).
+  \item ArXiv will automatically remove all empty files. While for some files it is not an issue (aux files and compilation logs), if this file is the |.pdf| it will be an issue. So make sure to always generate non-empty output files.
+  \item If despite these options, arXiv still tries to fetch a cached value that is not present in your local cache, you can enable
+\begin{verbatim}
+\robExtConfigure{print source when saving}
+\end{verbatim}
+    This will print in the log file the content of the |.deps| file, of the |.tex| file, and the compilation command that would have been run without the error. You can then recreate these files in the cache and compile it locally. If you do not want to copy/paste the content of the file, it might be simpler to simply see the value that differs from your own local cache and just temporarily change this value in your local document to automatically generate the correct cache entry. If the value is obtained via |forward counter=page|, you can use |forward counter force value={page}{45}| to force the value of the counter.
+  \end{itemize}
+\end{itemize}
 
 \section{Tutorial}
 
@@ -723,6 +781,13 @@ Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache
 
 You can note that we used |add dependencies={common_inputs.tex}|: this allows us to recompile the files if |common_inputs.tex| changes. If you do not want this behavior (e.g. |common_inputs.tex| changes too often and you do not want to recompile everything at every change), you can remove this line, but beware: if you do a breaking changes in |common_inputs.tex| (e.g.\ redefine |42| to |43|), then the previously cached picture will not be recompiled! (So you will still read 42 instead of 43.)
 
+Sometimes, it can also be useful to copy a file in the cache folder. This can be done via:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  copy file to cache={zx-calculus.sty},
+}
+\end{codeexample}
+
 \subsection{Wrap arbitrary environments}
 
 You can wrap arbitrary environments using the already presented |cacheEnvironment| and |cacheCommand|, where the first mandatory argument is the name of the environment/macro, and the second mandatory argument contains the default preset. |cacheEnvironment| works for any environment while |cacheCommand| might need a bit of help to determine the signature of the macro if the function is defined via xparse. Long story short, |O{foo}| is an optional argument with default value foo, |m| is a mandatory argument. By default, you can pass an optional arguments via the first argument enclosed in |<>|:
@@ -820,6 +885,7 @@ Some text %
 
 You can feed data from the main document to the cached file using placeholders, since |set placeholder eval={__foo__}{\bar}| will evaluate |\bar| and put the result in |__foo__|. For instance, if the picture depends on the current page, you can do:
 
+\message{We will export the page: \thepage}
 \begin{codeexample}[width=0pt,vbox]
 \begin{tikzpictureC}<set placeholder eval={__thepage__}{\thepage}>
   \node[rounded corners, fill=red]{The current page is __thepage__.};
@@ -1356,7 +1422,8 @@ We also provide support for other languages, notably |bash|, but it is relativel
 set -e  
 __ROBEXT_MAIN_CONTENT__
 # Create the pdf file to certify that no compilation error occured
-touch "__ROBEXT_OUTPUT_PDF__"
+# (non empty file to avoid arXiv error)
+echo "ok" > "__ROBEXT_OUTPUT_PDF__"
 \end{PlaceholderFromCode}
 
 \robExtConfigure{
@@ -1410,7 +1477,9 @@ plt.savefig("__ROBEXT_OUTPUT_PDF__")
 
 If you want to recompile a file (e.g. an untracked dependency was changed\dots{} and you do not want to track it to avoid recompilation when you change a single line in this file), you can use the |recompile| style since v2.1:
 
-\begin{codeexample}[vbox]
+\begin{codeexample}[vbox,
+  %TURN_INTO_CODE_ONLY_ARXIV
+  ]
 \cacheEnvironment{tikzcd}{tikz, add to preamble={\usepackage{tikz-cd}}}
 \begin{tikzcd}<recompile>
   A \rar & B
@@ -2503,9 +2572,16 @@ plt.ylabel('Number of futurestud.io Tutorials')
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/set compilation command=\marg{compilation command}\@nil
+  \extractkey/robExt/set compilation command create if no error=\marg{compilation command}\@nil
+  \extractkey/robExt/set compilation command move if no error=\marg{compilation command}\@nil
   \makeatother%
   \pgfmanualbody
-  Style that alias to |set placeholder={__ROBEXT_COMPILATION_COMMAND__}{#1}|, in order to define the placeholder that will hold the compilation command.
+  |set compilation command| is equivalent to |set placeholder={__ROBEXT_COMPILATION_COMMAND__}{#1}|, in order to define the placeholder that will hold the compilation command.
+
+  Then, |set compilation command move if no error| (new in v2.4)
+  is like |set compilation command| except that it will copy the file located in |__ROBEXT_OUTPUT_PDF__-tmp| into |__ROBEXT_OUTPUT_PDF__| if the command succeeds (returns a status code of 0), and otherwise it will not create the |__ROBEXT_OUTPUT_PDF__| at all, creating an error message. This is needed by some programs that will create an output file even if an error occurs, for instance wget will still create an empty file if there is no internet connection, producing no error during the compilation, which can be confusing.
+
+  |set compilation command create if no error| (new in v2.4) will, on the other hand, create an empty |__ROBEXT_OUTPUT_PDF__| file if the command succeeds (only useful if you use a custom include command).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -2559,7 +2635,9 @@ plt.ylabel('Number of futurestud.io Tutorials')
   \pgfmanualbody
   (new to v2.1) |recompile| will force a compilation even if the image is already cached (mostly useful if you made a change to a non-tracked dependency). Note that since this library does not want to remove any file on the hard drive (we do not want to risk to remove important files in case of a bug), this command will NOT clear the auxiliary files already present, so for maximum purity, ensure that your compiling command is idempotent (so that compiling twice gives the same outcome as compiling once).
 
-\begin{codeexample}[vbox]
+\begin{codeexample}[vbox,
+  %TURN_INTO_CODE_ONLY_ARXIV
+  ]
 \cacheEnvironment{tikzcd}{tikz, add to preamble={\usepackage{tikz-cd}}}
 \begin{tikzcd}<recompile>
   A \rar & B
@@ -2599,6 +2677,15 @@ You want to delete the file \texttt{\filetodeleteInCache.pdf}. %
 
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \extractcommand\robExtMv\@@
+  \extractcommand\robExtCp\@@
+  \pgfmanualbody
+  (new in v2.4) Respectively expands to |mv| and |cp| in linux/unix and to |move| and |copy| in Windows (needed to create a compilation command that works in both linux and windows). Note that |set compilation command| does NOT expand its argument by default and spaces after macros are removed by latex, so you need to use |/.expanded| and |\space| like in:
+  \begin{codeexample}[code only]
+    set compilation command/.expanded={\robExtCp\space"__ROBEXT_SOURCE_FILE__" "__ROBEXT_OUTPUT_PDF__"}
+  \end{codeexample}
+\end{pgfmanualentry}
 
 \subsubsection{Options to configure the inclusion command}
 
@@ -2889,6 +2976,23 @@ In order to enforce reproducibility, you should tell what are the files that you
 Note that the placeholder |__ROBEXT_WAY_BACK__| contains the path from the cache folder (containing the |.tex| that will be cached) to the root folder.\\ This way, you can easily input files contained in the root folder.
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \extractcommand\copyFileToCache\@@
+  \extractcommand\forceCopyFileToCache\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/copy file to cache=\marg{file}\@nil
+  \makeatother%
+  \pgfmanualbody
+  It can sometimes be handy to copy a file to the cache folder to avoid using |__ROBEXT_WAY_BACK__| for instance to refer to another file. This can be done with |copy file to cache|, either in a preset or in |\robExtConfigure| like:
+\begin{codeexample}[code only]
+\robExtConfigure{
+  copy file to cache={zx-calculus.sty},
+}
+\end{codeexample}
+Note that |copy file to cache| will always compare the md5 sum to check if a copy must be done or not.
+\end{pgfmanualentry}
+
 \subsubsection{Forward macros}\label{sec:forward}
 
 (since v2.1)
@@ -2986,11 +3090,18 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/forward counter=counter to forward\@nil
+  \extractkey/robExt/forward counter force value=\marg{counter to forward}\marg{value of counter}\@nil
   \makeatother%
   \pgfmanualbody
   Forward a counter:
 \begin{codeexample}[width=0pt]
 \begin{tikzpictureC}<forward counter=page>
+  \node[rounded corners, fill=red]{The current page is \thepage.};
+\end{tikzpictureC}    
+\end{codeexample}
+The force value also assigns a value to the counter irrespective of the current value (might be useful for instance to generate a cached value for the arXiv).
+\begin{codeexample}[width=0pt]
+\begin{tikzpictureC}<forward counter force value={page}{65}>
   \node[rounded corners, fill=red]{The current page is \thepage.};
 \end{tikzpictureC}    
 \end{codeexample}
@@ -3795,7 +3906,7 @@ outputTxt="__ROBEXT_OUTPUT_PREFIX__-out.txt"
 outputTex="__ROBEXT_OUTPUT_PREFIX__-out.tex"
 outputPdf="__ROBEXT_OUTPUT_PDF__"
 \end{verbatim}
-in order to quit when an error occurs, and to define two variables containing the path to the |pdf| file and to the file that is read by the |verbatim output| setting (that just apply a |\verbatiminput| on that file). Finally, it also creates the file |outputPdf| with |touch| in order to notify that the compilation succeeded.
+in order to quit when an error occurs, and to define two variables containing the path to the |pdf| file and to the file that is read by the |verbatim output| setting (that just apply a |\verbatiminput| on that file). Finally, it also creates the file |outputPdf| with |echo "ok"| in order to notify that the compilation succeeded.
 
 In practice:
 \begin{codeAndResult}
@@ -3849,7 +3960,7 @@ We also provide support for online images since v2.3.
   \pgfmanualbody
   |\includegraphicsWeb| is used in place of |\includegraphics| to download online images:
 \begin{codeexample}[width=0pt,vbox]
-Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.     
+Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
 \end{codeexample}
 By default, the engine uses |wget| in linux (since it is installed by default) and |curl| on windows (should also be installed by default on recent windows). But you can change it by modifying the |web image| preset (or using the optional robExt options that are loaded after |web image|):
 \begin{codeexample}[width=0pt,vbox]
@@ -3928,7 +4039,8 @@ plot sin(x)
 \robExtConfigure{
   add to preset={tikz}{
     % Run gnuplot -e "set terminal tikz createstyle" in the robustExternalize folder first
-    % to create this file:
+    % to create this file, or, better, run this command in your local folder and use
+    % "copy file to cache" to copy the 3 generated files.:
     add to preamble={\usepackage{gnuplot-lua-tikz}},
   },
   add to preset={gnuplot}{
@@ -3995,6 +4107,62 @@ Variable is \num[round-mode=figures,round-precision=3]{\robExtGpgetvarNb{non_exi
 \end{codeAndResult}
 Note that you will get a warning if the variable does not exist (yet?) only in LuaLaTeX as in other engines there is no \mylink{https://tex.stackexchange.com/questions/705299/print-message-in-expandable-macro/705304}{way to write in the log with an expandable function}.
 \end{pgfmanualentry}
+
+\subsubsection{TikZit}
+
+\mylink{https://tikzit.github.io/}{TikZit} is a software to produce \tikzname{} images via a graphical interface.
+
+\begin{pgfmanualentry}
+  \extractcommand\cacheTikzit\opt{\oarg{preset}}\@@
+  \extractcommand\cacheTikzitWithStyle\opt{\oarg{preset}}\marg{name of style file}\@@
+  \pgfmanualbody
+  (since v2.5) These command will automatically cache the |\tikzfig| command (and therefore also |\ctikzfig|). While |\cacheTikzit| will let you create the preset (named |tikzit| preset by default), |\cacheTikzitWithStyle| will automatically create the preset style for you, loading your style given as parameter:
+    \begin{codeexample}[vbox]
+    %%%%%%% In your preamble:
+    \cacheTikzitWithStyle{new_zxstyle.tikzstyles}
+    
+    %%%%%%% In your document:
+    \tikzfig{demo} % figures/ is optional
+  \end{codeexample}
+  If you prefer to do it manually, you can do instead:
+  \begin{codeexample}[vbox]
+    %%%%%%% In your preamble:
+    \robExtConfigure{
+      % First, we copy the tikzit-related files to the cache:
+      copy file to cache={tikzit.sty},
+      copy file to cache={new_zxstyle.tikzstyles},
+      % We create the tikzit preset loaded by default:
+      new preset={tikzit}{
+        latex,
+        add to preamble={
+          \usepackage{tikzit}
+          \input{new_zxstyle.tikzstyles}
+        },
+      },
+    }
+    % Cache all tikzit figures:
+    \cacheTikzit
+    
+    %%%%%%% In your document:
+    \tikzfig{figures/demo}
+  \end{codeexample}
+  \textbf{WARNING:} since the tikz picture uses |baseline| that relies on the current font size to vertically align the figure, and since we do not yet propagate the current font size to the cached picture (there are so many ways to configure the font in \LaTeX\dots{}), you should make sure that the |tikzit| preset sets the font size like in your main document, for instance via:
+    \begin{codeexample}[vbox]
+    %%%%%%% In your preamble:
+    \cacheTikzitWithStyle{new_zxstyle.tikzstyles}
+    \robExtConfigure{
+      add to preset={tikzit}{
+        add to latex options={12pt},
+      },
+    }
+    %%%%%%% In your document:
+    \tikzfig{demo} % figures/ is optional
+  \end{codeexample}
+  
+\end{pgfmanualentry}
+
+You need to provide your own style file, say |new_zxstyle.tikzstyles| We provide out 
+
 
 \subsubsection{Custom languages}
 
@@ -4304,7 +4472,7 @@ Let us say that you want to cache all elements of a given environment, like |min
 \end{pgfmanualentry}
 
 \paragraph{Defining its own macro without repeating its definition.}
-Note that when you define yourself a macro function, the above structure might not be optimal as you need to define the macro in the main document (in case you disable the externalization) and in the template. One option to avoid repeated code is to write the definition in a common input file (see \cref{sec:dependencies}), but you might prefer to keep everything in a single file. In that case, you can simply wrap your function into |cacheMe| yourself. Say you want your function to draw a circle like, |\tikz \draw[fill=#2] (0,0) circle [radius=#1];|, then wrap in inside |CacheMe|:
+Note that when you define yourself a macro function, the above structure might not be optimal as you need to define the macro in the main document (in case you disable the externalization) and in the template. One option to avoid repeated code is to write the definition in a common input file (see \cref{sec:dependencies}), use |\runHereAndInPreambleOfCachedFiles| or |forward=\macroToExport|. But sometimes, you might need to do more involved operations, for instance to add a file as a dependency etc. So another solution it to wrap yourself your function into |cacheMe| yourself. Say you want your function to draw a circle like, |\tikz \draw[fill=#2] (0,0) circle [radius=#1];|, then wrap in inside |CacheMe|:
 
 \begin{codeexample}[width=0mm,vbox]
 % D<>{} is an optional argument enclosed in <>, we use this to pass arguments to CacheMe
@@ -4603,13 +4771,22 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \item See how to deal with label, links and cite inside pictures (without disabling externalization). For label and links, I have a proof of concept, I ``just'' need to write it down. \url{https://tex.stackexchange.com/questions/695277/clickable-includegraphics-for-cross-reference-data}
 \item Deal with remember picture
 \item Since externalizing is all about speed, it would be nice to do more benchmarks. But overall, it seems fairly optimized, at least when using the compiled presets. One option to gain in term of efficiency and simplicity might be to directly use the fact that the placeholders start and end with two dashes: a more efficient implementation might be doable using something like |\def\findPlaceholders#1__#2__{}| instead of string replacement. I will try to investigate in future releases.
-\item Add a way to forward tikz styles and/or arbitrary code.
-\item Create a more efficient/precise way to check if a word is present than string ``is in''. Indeed, for now for each color/... to export, we check if the string contains this word, which scales like $O(sn)$ where $s$ is the size of the string and $n$ is the number of colors etc to export. Instead, I'd like to run it in $O(s)$ by extracting all words a single time, and then checking if this word exists or not. This is not an issue for |\newcommandAutoforward|, but could be an issue when exporting many colors or |\genericAutoForward|.
 \end{itemize}
 
 \section{Changelog}
 
 \begin{itemize}
+\item v2.5 (current master, not yet published):
+  \begin{itemize}
+  \item Add tikzit support
+  \end{itemize}
+\item v2.4:
+  \begin{itemize}
+  \item Better error message in wget if file not found
+  \item Add support for arXiv with |rename backup files for arxiv|, |print source when saving|, |backup source for arxiv|, |forward counter force value|
+  \item Add |\robExtMv|, |\robExtCp|, |set compilation command create if no error| and |set compilation command move if no error|.
+  \item Add |copy file to cache|
+  \end{itemize}
 \item v2.3:
   \begin{itemize}
   \item Fix bug in |more logs| and |less logs|
