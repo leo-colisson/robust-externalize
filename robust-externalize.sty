@@ -439,6 +439,9 @@ if __name__ == '__main__':
 %%%%%%%%%%% Paths %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% For support of --output-directory
+\def\robExtPrefixAllCompilationCommands{\ifdefined\robExtOutputDirectory cd~"\robExtOutputDirectory"~&&~\fi}
+
 \def\robExtPrefixFilename{robExt-}
 
 \NewExpandableDocumentCommand{\robExtAddCachePathAndName}{m}{%
@@ -482,8 +485,8 @@ if __name__ == '__main__':
       \message{Warning:~running~in~manual~mode~so~we~cannot~run~the~command~``#1''.}
       \iow_now:Nx \g__robExt_write_manually_compile_all_missing_figures_iow {#1}
     \else
-      \message{Running:~#1}%
-      \sys_shell_now:x {#1}
+      \message{Running:~\robExtPrefixAllCompilationCommands #1}%
+      \sys_shell_now:x {\robExtPrefixAllCompilationCommands #1}
     \fi
   }{
     \ifdefined\robExtFallbackManualMode
@@ -504,7 +507,7 @@ if __name__ == '__main__':
         \ifdefined\robExtManualMode
           \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ MANUALLY ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
         \else
-          \sys_shell_now:x {mkdir ~ -p ~ \robExtCacheFolder}
+          \sys_shell_now:x {\robExtPrefixAllCompilationCommands mkdir ~ -p ~ \robExtCacheFolder}
         \fi
       \fi
     }{
@@ -1769,9 +1772,9 @@ if __name__ == '__main__':
       {
         % For a better debugging, we create a new file:
         \ifdefined\robExtDoNotRedirectOutput%
-          \sys_shell_now:x {\l__robExt_current_compilation_command_str}%
+          \sys_shell_now:x {\robExtPrefixAllCompilationCommands \l__robExt_current_compilation_command_str}%
         \else
-          \sys_shell_now:x {(~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}%
+          \sys_shell_now:x {\robExtPrefixAllCompilationCommands (~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}%
         \fi
         \message{[robExt] We ~ will ~ start ~ the ~ compilation ~ using: ~ \l__robExt_current_compilation_command_str.}%
         %% We notify that we are running the compilation command, this way it is possible to check later
@@ -2710,7 +2713,9 @@ if __name__ == '__main__':
   %% The role of this command is to set \l_robExt_result_str, that will contain the final string.
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Configuration of the cache %%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % For support of --output-directory
+  set output directory/.code={\def\robExtOutputDirectory{#1}},
   %% Configure the prefix (default to "robExt-")
   set filename prefix/.code={\def\robExtPrefixFilename{#1}},
   % first argument is subfolder, second is how to get from subfolder to the folder containing the source:
@@ -2978,7 +2983,7 @@ if __name__ == '__main__':
         % the compilation process. This also means that we get poorer error message if this specific
         % command fails in texstudio since it only prints the log file and not the whole terminal...
         % Since this should anyway be quite rare (user has not xargs installed basically), this should be fine.
-        \sys_shell_now:x {\robExt@compile@parallel@command}
+        \sys_shell_now:x {\robExtPrefixAllCompilationCommands\robExt@compile@parallel@command}
         % We check if some files failed to compile
         \seq_map_inline:Nn \g__robExt_files_compiled_in_parallel {
           \file_if_exist:xTF{#1.pdf}{}{

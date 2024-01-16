@@ -2809,6 +2809,24 @@ If needed, you can configure the cache:
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
+  \extractkey/robExt/set output directory=\marg{output directory}\@nil
+  \makeatother%
+  \pgfmanualbody
+  If you compile with |--output-directory build|, you also need to tell this library that you are compiling with |--output-directory build|. As I can't find a reliable way to get this value, even using |TEXMF_OUTPUT_DIRECTORY|, you need to specify manually the compilation directory. To do that, you can either compile with:
+  \begin{codeexample}[code only]
+    pdflatex -shell-escape -output-directory=build "\def\robExtOutputDirectory{build}\input{test.tex}"
+  \end{codeexample}
+  or add in your file:
+  \begin{codeexample}[code only]
+    \robExtConfigure{
+      set output directory=build,
+    }
+  \end{codeexample}
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
   \extractkey/robExt/no cache folder\@nil
   \makeatother%
   \pgfmanualbody
@@ -4787,6 +4805,7 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \item v2.5 (current master, not yet published):
   \begin{itemize}
   \item Add tikzit support
+  \item Add support for |--output-directory|
   \end{itemize}
 \item v2.4:
   \begin{itemize}
