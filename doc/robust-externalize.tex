@@ -105,7 +105,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.5}\\[3mm]
+  {Léo Colisson \quad Version 2.5+unstable}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -2072,6 +2072,30 @@ Compare \evalPlaceholder{__MACRO_EVALUATED__} and \evalPlaceholder{__MACRO_NOT_E
 \end{CacheMe}
 \end{codeexample}
 Note that this works well for commands that expand completely, but some more complex commands might not expand properly (like |cref|). I need to investigate how to solve this issue, meanwhile you can still disable externalization for these pictures.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \extractcommand\lenToCm\opt{\oarg{unit}}\marg{expression}\@@
+  \extractcommand\lenToCmNoUnit\opt{\oarg{unit}}\marg{expression}\@@
+  \pgfmanualbody
+  |\lenToCm{.75\linewidth}| will output the length of |.75\linewidth| in cm by default, like |10cm|. If you want to change the unit, you can use the optional argument to specify a different unit (like |in| for inches, see |\dim_to_decimal_in_unit| for details). You can remove the unit at the end using |\lenToCmNoUnit{.75\linewidth}| (needs v2.6) to obtain something like |10| instead of |10cm|. These commands are helpful with |set placeholder eval| to send length from \LaTeX{} to your environment:
+\begin{codeAndResult}
+\begin{CacheMeCode}{python, set placeholder eval={__LINEWIDTH__}{\lenToCmNoUnit[in]{.75\linewidth}}}
+import matplotlib.pyplot as plt
+import matplotlib
+from matplotlib.pyplot import figure
+figure(figsize=(__LINEWIDTH__, __LINEWIDTH__))
+year = [2014, 2015, 2016, 2017, 2018, 2019]
+tutorial_count = [39, 117, 111, 110, 67, 29]
+plt.plot(year, tutorial_count, color="#6c3376", linewidth=2)
+plt.title("Simple plot")
+plt.xlabel('Year')
+plt.ylabel('Number of futurestud.io Tutorials')
+print(get_filename_from_extension(".pgf"))
+# https://stackoverflow.com/a/52587591/4987648
+plt.savefig("__ROBEXT_OUTPUT_PDF__", bbox_inches="tight")   
+\end{CacheMeCode}
+\end{codeAndResult}
 \end{pgfmanualentry}
 
 \subsubsection{Groups: the import system}\label{sec:importSystem}
@@ -4802,6 +4826,10 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
+\item v2.6 (current master branch, not yet released):
+  \begin{itemize}
+  \item Added |\lenToCmNoUnit|
+  \end{itemize}
 \item v2.5:
   \begin{itemize}
   \item Add tikzit support

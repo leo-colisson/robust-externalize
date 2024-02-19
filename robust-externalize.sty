@@ -3577,8 +3577,13 @@ print_file.close()
 {
   \dim_to_decimal_in_unit:nn { #2 } { 1 #1 } #1
 }
+\DeclareExpandableDocumentCommand{\robExtLenToCmNoUnit}{ O{cm} m }
+{
+  \dim_to_decimal_in_unit:nn { #2 } { 1 #1 }
+}
 \ExplSyntaxOff
 \let\lenToCm\robExtLenToCm
+\let\lenToCmNoUnit\robExtLenToCmNoUnit
 
 \robExtConfigure{
   verbatim text/.style={
