@@ -2000,7 +2000,7 @@ We provide a list of placeholders that are useful to escape parts of the strings
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtPlaceholderRemoveSpacesUntil\marg{placeholder}\opt{\oarg{nb of additional letters to remove}}\marg{separator}\@@
+  \extractcommand\placeholderRemoveSpacesUntil\marg{placeholder}\opt{\oarg{nb of additional letters to remove}}\marg{separator}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/placeholder remove spaces until=\marg{placeholder}\marg{separator}\@nil
@@ -2023,7 +2023,7 @@ We provide a list of placeholders that are useful to escape parts of the strings
 
 
 \begin{pgfmanualentry}
-  \extractcommand\robExtPlaceholderPrependAllLines\marg{placeholder}\marg{text}\@@
+  \extractcommand\placeholderPrependAllLines\marg{placeholder}\marg{text}\@@
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/placeholder prepend all lines=\marg{placeholder}\marg{text}\@nil
@@ -2040,13 +2040,45 @@ We provide a list of placeholders that are useful to escape parts of the strings
   >>> def g(z):
   >>>     return 48
 \end{PlaceholderFromCode}
-\robExtPlaceholderRemoveSpacesUntil{__TMP__}{>>>}
-\robExtPlaceholderPrependAllLines{__TMP__}{My text\space\space\space\space}
+\placeholderRemoveSpacesUntil{__TMP__}{>>>}
+\placeholderPrependAllLines{__TMP__}{My text\space\space\space\space}
 \printPlaceholderNoReplacement{__TMP__}
 \end{codeAndResult}
 Note that |prepend all lines| automatically adds the text to the |__ROBEXT_MAIN_CONTENT_ORIG__| placeholder, i.e. the text typed by the user.
 \end{pgfmanualentry}
 
+\begin{pgfmanualentry}
+  \extractcommand\placeholderRemoveLeadingSpaces\marg{placeholder}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/placeholder remove leading spaces=\marg{placeholder}\@nil
+  \extractkey/robExt/remove leading spaces\@nil
+  \extractkey/robExt/remove leading spaces if not disabled\@nil
+  \extractkey/robExt/do not remove leading spaces\@nil
+  \makeatother%
+  \pgfmanualbody
+  (new in v2.6) Remove the indentation of a placeholder (the |__ROBEXT_MAIN_CONTENT_ORIG__| placeholder, containing the content typed by the user, is used when not specified), by removing on each line the highest possible number of leading spaces (the same number of spaces is removed on all lines).
+\begin{codeAndResult}
+\begin{PlaceholderFromCode}{__TMP__}
+    def f(x): % hye # 42
+        return 42
+    
+    def g(z):
+        return 48
+\end{PlaceholderFromCode}
+\placeholderRemoveLeadingSpaces{__TMP__}
+\printPlaceholderNoReplacement{__TMP__}
+\end{codeAndResult}
+Note that |remove leading spaces if not disabled| is like |remove leading spaces|, except that it is not run if the |do not remove leading spaces| style is applied before. This is used inside some styles like |python| that cares about indentation to remove the leading spaces (before v2.6, it was forbidden to add any indentation to the python code), while allowing the user to disable it temporarily (who knows why?) by using the style:
+\begin{verbatim}
+do not remove leading spaces, python
+\end{verbatim}
+Since |remove leading spaces if not disabled| is enabled by default on python, it is therefore fine to indent your python code like in:
+\begin{CacheMeCode}{python print code and result}
+  for i in range(3):
+      print(f"Hello {i}")
+\end{CacheMeCode}
+\end{pgfmanualentry}
 
 \begin{pgfmanualentry}
   \extractcommand\placeholderHalveNumberHashesInplace\marg{placeholder}\@@
@@ -4882,6 +4914,7 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
   \item Added |\lenToCmNoUnit|
   \item Added |\placeholderPrependAllLines| and alike
   \item Added |remove spaces until| and alike
+  \item Added |placeholderRemoveLeadingSpaces| and alike
   \end{itemize}
 \item v2.5:
   \begin{itemize}
