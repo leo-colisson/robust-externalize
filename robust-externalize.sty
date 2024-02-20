@@ -190,6 +190,8 @@
 
 \cs_generate_variant:Nn \regex_match:nnTF { nVTF }
 
+\cs_generate_variant:Nn \seq_set_split_keep_spaces:Nnn {Nnv}
+
 %%%
 %%% String manipulation
 %%%
@@ -234,6 +236,7 @@
 \msg_new:nnn {robExt}{dependency does not exist}{The~dependency~#1~does~not~exist.}
 
 \msg_new:nnn {robExt}{missing compiled pdf parallel with log}{The~compilation~of~the~code~block~at~line~#2~failed:~the~following ~ file~is~indeed~missing: ~ #1.pdf. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
+\msg_new:nnn {robExt}{remove spaces until non spaces characters}{The~placeholder~#1~contains~characters~other~than~spaces~(#2)~before~the~separator~#3.}
 
 
 \msg_new:nnn {robExt}{auto forward not in cachemecode}{Auto~forward~is~less~efficient~in~cacheMeCode.}
@@ -674,7 +677,7 @@ if __name__ == '__main__':
   % For some reasons, newlines are displayed as \Omega. We need to replace them with \\
   % https://tex.stackexchange.com/questions/694716/print-latex3-string-verbatim/694717
   \tl_set_eq:Nc \l__robExt_tmp_str { l__robExt_placeholder_#2_str }
-  \tl_replace_all:Nnn \l__robExt_tmp_str {^^J} { \par }
+  \tl_replace_all:Nnn \l__robExt_tmp_str {^^J} { \mbox{}\par } % mbox is helpful to print empty lines
   \tl_replace_all:Nnn \l__robExt_tmp_str { ~ } { \  }
   \IfBooleanTF{#1}{\texttt{\use:c{l__robExt_placeholder_#2_str}}}{\begin{flushleft}\ttfamily%
       \l__robExt_tmp_str
@@ -688,7 +691,7 @@ if __name__ == '__main__':
   % For some reasons, newlines are displayed as \Omega. We need to replace them with \\
   % https://tex.stackexchange.com/questions/694716/print-latex3-string-verbatim/694717
   \tl_set_eq:NN \l__robExt_tmp_str \l_robExt_result_str
-  \tl_replace_all:Nnn \l__robExt_tmp_str {^^J} { \par }
+  \tl_replace_all:Nnn \l__robExt_tmp_str {^^J} { \mbox{}\par }
   \tl_replace_all:Nnn \l__robExt_tmp_str { ~ } { \  }
   \IfBooleanTF{#1}{\texttt{\l__robExt_tmp_str}}{\begin{flushleft}\ttfamily%
       \l__robExt_tmp_str
@@ -1299,6 +1302,69 @@ if __name__ == '__main__':
   \str_replace_all:cxx { l__robExt_placeholder_#1_str } { #2 } { #3 }
 }
 \let\placeholderReplaceInplaceEval\robExtPlaceholderReplaceInplaceEval
+
+
+% \group_begin:
+% \char_set_catcode_other:N \^^I
+% Usage:
+% \robExtPlaceholderRemoveSpacesUntil{__MY_PLACEHOLDER__}{>>>}
+\NewDocumentCommand{\robExtPlaceholderRemoveSpacesUntil}{mO{1}m}{
+  %% Cut the string in lines
+  \seq_set_split_keep_spaces:Nnv \l_tmpa_seq {^^J} { l__robExt_placeholder_#1_str }
+  \str_clear:c { l__robExt_placeholder_#1_str }
+  %% We iterate over the lines
+  \seq_map_variable:NNn \l_tmpa_seq \l_tmpa_tl {
+    % \l_tmpa_tl contains the current line
+    \message{AAAAAAAAAAAAAa #3}
+    \seq_set_split_keep_spaces:NnV \l_tmpb_seq {#3} \l_tmpa_tl
+    \message{b}
+    %% In any case, the first item must only contain spaces.
+    % The separator was present. Check that the line only contains spaces before the separator
+    \seq_get_left:NN \l_tmpb_seq \l_tmpb_tl
+    \message{c}
+    %\str_replace_all:Nnn \l__robExt_tmp_str { ^^I } { ~ }
+    %\tl_replace_all:Nnn \l_tmpb_tl {^^I} {~} % we replace tabs with spaces, check if it works
+    \message{w}
+    % Save the size of the string
+    \int_set:Nn \l_tmpa_int {\str_count:N \l_tmpb_tl}
+    % we remove spaces
+    \tl_trim_spaces:N \l_tmpb_tl
+    \message{w}
+    \tl_if_empty:VTF \l_tmpb_tl {
+      % If 
+      \int_compare:nNnTF {\seq_count:N \l_tmpb_seq} > {1} {
+        % Empty line: we add it to the current placeholder
+        \str_put_right:cx { l__robExt_placeholder_#1_str } {
+          % the placeholder is a string, so I expect l_tmpa_tl to also be a string. No problem?
+          \str_range:Nnn \l_tmpa_tl {\l_tmpa_int + \str_count:n {#3} + 1 + #2} {-1} ^^J
+        }
+      } {
+        % No separator: it means the line is empty
+        \str_put_right:cn { l__robExt_placeholder_#1_str } {^^J}
+      }
+    }{
+      % The string was not completely empty: raise an error
+      \msg_error:nnxxx{robExt}{remove spaces until non spaces characters}{#1}{\l_tmpa_tl}{#3}
+    }
+  }
+}
+\let\placeholderRemoveSpacesUntil\robExtPlaceholderRemoveSpacesUntil
+
+% Usage:
+% \robExtPlaceholderPrependAllLines{__MY_PLACEHOLDER__}{    }
+\NewDocumentCommand{\robExtPlaceholderPrependAllLines}{mm}{
+  %% Cut the string in lines
+  \seq_set_split_keep_spaces:Nnv \l_tmpa_seq {^^J} { l__robExt_placeholder_#1_str }
+  \str_clear:c { l__robExt_placeholder_#1_str }
+  %% We iterate over the lines
+  \seq_map_variable:NNn \l_tmpa_seq \l_tmpa_tl {
+    \str_put_right:cx { l__robExt_placeholder_#1_str } {
+      #2
+      \l_tmpa_tl ^^J}
+  }
+}
+\let\placeholderPrependAllLines\robExtPlaceholderPrependAllLines
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% Placeholders groups %%%%%%%%%%%%
@@ -2371,6 +2437,25 @@ if __name__ == '__main__':
     \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
     \let\robExtCurrentlyDefiningPreset\undefined%
   },
+  add before preset/.code 2 args={%
+    \robExtStrSetDoubleHash{\robExtTmpStr}{#2}%
+    % Sadly, \expanded{\noexpand } does not work, as I get extra {} around the def, creating a group
+    % so the simpler seems to use this library ^^
+    \robExtPlaceholderFromString{__ROBEXT_TMP__}{\robExtTmpStr}%
+    \robExtEvalPlaceholderReplaceFromList{__ROBEXT_TMP__}{%
+      \pgfkeys{%
+        /robExt/.cd,
+        #1/.prefix style={%
+          % Some styles run differently if inside a preset or not,
+          % like if matches word. This macro helps with detecting it.
+          /utils/exec={\def\robExtCurrentlyDefiningPreset{}},%
+          __ROBEXT_TMP__%
+        },%
+      }%
+    }%
+    \robExtRemovePlaceholder{__ROBEXT_TMP__}% let us clean our variables
+    \let\robExtCurrentlyDefiningPreset\undefined%
+  },
   new preset/.code 2 args={%
     \robExtStrSetDoubleHash{\robExtTmpStr}{#2}%
     % Sadly, \expanded{\noexpand } does not work, as I get extra {} around the def, creating a group
@@ -2512,6 +2597,18 @@ if __name__ == '__main__':
   placeholder double number hashes in place/.code={\robExtPlaceholderDoubleNumberHashesInplace{#1}},
   placeholder replace in place/.code n args={3}{\robExtPlaceholderReplaceInplace{#1}{#2}{#3}},
   placeholder replace in place eval/.code n args={3}{\robExtPlaceholderReplaceInplaceEval{#1}{#2}{#3}},
+  placeholder prepend all lines/.code 2 args={\robExtPlaceholderPrependAllLines{#1}{#2}},
+  prepend all lines/.style={
+    placeholder prepend all lines={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+  },
+  placeholder remove spaces until/.code 2 args={\robExtPlaceholderRemoveSpacesUntil{#1}{#2}},
+  remove spaces until/.style={
+    placeholder remove spaces until={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+  },
+  placeholder strictly remove spaces until/.code 2 args={\robExtPlaceholderRemoveSpacesUntil{#1}[0]{#2}},
+  strictly remove spaces until/.style={
+    placeholder remove spaces until nospace={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+  },
   % Interface to set template
   set template/.style={
     set placeholder first={__ROBEXT_TEMPLATE__}{#1},

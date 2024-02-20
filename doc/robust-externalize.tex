@@ -2000,6 +2000,55 @@ We provide a list of placeholders that are useful to escape parts of the strings
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
+  \extractcommand\robExtPlaceholderRemoveSpacesUntil\marg{placeholder}\opt{\oarg{nb of additional letters to remove}}\marg{separator}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/placeholder remove spaces until=\marg{placeholder}\marg{separator}\@nil
+  \extractkey/robExt/remove spaces until=\marg{separator}\@nil
+  \extractkey/robExt/placeholder strictly remove spaces until=\marg{placeholder}\marg{separator}\@nil
+  \extractkey/robExt/strictly remove spaces until=\marg{separator}\@nil
+  \makeatother%
+  \pgfmanualbody
+  (new in v2.6) Removes all the spaces before |separator|, together with the separator itself and the next character (unless you use the |strictly| version, in that case the next character is not dropped, or if you change the default value of |additional letters to remove| that defaults to 1). Note that |prepend all lines| automatically apply it to the |__ROBEXT_MAIN_CONTENT_ORIG__| placeholder, i.e. the text typed by the user.
+
+  This is useful, for instance, if your editor tends to automatically remove the indentation of your python code while indenting automatically the document.
+\begin{codeAndResult}
+%% See that the python code can be freely indented now:    
+\begin{CacheMeCode}{python print code and result, remove spaces until={>>>}}
+  >>> for i in range(2):
+  >>>    print(f"Hello {i}")
+\end{CacheMeCode}
+\end{codeAndResult}
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
+  \extractcommand\robExtPlaceholderPrependAllLines\marg{placeholder}\marg{text}\@@
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/placeholder prepend all lines=\marg{placeholder}\marg{text}\@nil
+  \extractkey/robExt/prepend all lines=\marg{text}\@nil
+  \makeatother%
+  \pgfmanualbody
+  (new in v2.6) Prepend all lines with |text|. This can be useful, for instance, if you want to indent a whole block of python code automatically. Note that the text is evaluated, so in case you want to insert multiple spaces, use |\space| like in:\\
+  |prepend all lines={\space\space\space\space}|\\
+\begin{codeAndResult}
+\begin{PlaceholderFromCode}{__TMP__}
+  >>> def f(x): % hye # 42
+  >>>     return 42
+  >>>
+  >>> def g(z):
+  >>>     return 48
+\end{PlaceholderFromCode}
+\robExtPlaceholderRemoveSpacesUntil{__TMP__}{>>>}
+\robExtPlaceholderPrependAllLines{__TMP__}{My text\space\space\space\space}
+\printPlaceholderNoReplacement{__TMP__}
+\end{codeAndResult}
+Note that |prepend all lines| automatically adds the text to the |__ROBEXT_MAIN_CONTENT_ORIG__| placeholder, i.e. the text typed by the user.
+\end{pgfmanualentry}
+
+
+\begin{pgfmanualentry}
   \extractcommand\placeholderHalveNumberHashesInplace\marg{placeholder}\@@
   \extractcommand\placeholderDoubleNumberHashesInplace\marg{placeholder}\@@
   \makeatletter%
@@ -2364,6 +2413,7 @@ This content is cached $\delta$.
   \def\extrakeytext{style, }
   \extractkey/robExt/new preset=\marg{name preset}\marg{preset options}\@nil
   \extractkey/robExt/add to preset=\marg{name preset}\marg{preset options}\@nil
+  \extractkey/robExt/add before preset=\marg{name preset}\marg{preset options}\@nil
   \makeatother%
   \pgfmanualbody
   You can then create your own style (or preset) in |\robExtConfigure| (that is basically an alias for |\pgfkeys{/robExt/.cd,#1}|) containing your template, add your own placeholders and commands to configure them etc. We provide two helper functions since v2.0:\\
@@ -2414,6 +2464,7 @@ This content is cached $\delta$.
 This content is cached $\delta$.    
 \end{CacheMe}
 \end{codeexample}
+The |before| variation (from 2.6) simply adds the style before the existing style. May be useful to disable default options of a style.
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -4829,6 +4880,8 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \item v2.6 (current master branch, not yet released):
   \begin{itemize}
   \item Added |\lenToCmNoUnit|
+  \item Added |\placeholderPrependAllLines| and alike
+  \item Added |remove spaces until| and alike
   \end{itemize}
 \item v2.5:
   \begin{itemize}
