@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2.6 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2.7 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -653,7 +653,7 @@ if __name__ == '__main__':
 
 \NewDocumentCommand{\robExtShowPlaceholder}{sm}{
   \cs_if_exist:cTF {l__robExt_placeholder_#2_str} {
-    \message{Placeholder ~ #2 ~ contains:^^J~ \use:c{l__robExt_placeholder_#2_str}}
+    \message{Placeholder ~ #2 ~ contains:^^J \use:c{l__robExt_placeholder_#2_str}}
   }{
     \message{Placeholder ~ #2 ~ does ~ not ~ exist.}
   }
@@ -932,6 +932,18 @@ if __name__ == '__main__':
 }
 \let\addBeforePlaceholderNoImport\robExtAddBeforePlaceholderNoImport
 
+\ExplSyntaxOff
+
+% except inside setplaceholderfromcode, we want to modify by default the main content orig placeholder
+\def\robExtCurrentPlaceholderName{__ROBEXT_MAIN_CONTENT_ORIG__}
+
+\pgfqkeys{/robExt}{
+  defaultPlaceholderFromCodeStyle/.style={
+    remove leading spaces,
+  },
+}
+
+\ExplSyntaxOn
 
 % Usage:
 % \begin{placeholderFromCode}{HELPERFUNCTION}
@@ -940,8 +952,8 @@ if __name__ == '__main__':
 % \end{placeholderFromCode}
 % HELPERFUNCTION will contain at the end "def ..."
 % This environment cannot be placed inside any other macro/align/...
-\NewDocumentEnvironment{RobExtPlaceholderFromCode}{sm}{%
-  \checkIfPlaceholderNameIsLegal{#2}%
+\NewDocumentEnvironment{RobExtPlaceholderFromCode}{sO{defaultPlaceholderFromCodeStyle}m}{%
+  \checkIfPlaceholderNameIsLegal{#3}%
   % % debug part
   % \str_set:Nn \l_test_str {#1}
   % \show\l_test_str
@@ -960,14 +972,17 @@ if __name__ == '__main__':
   \ior_str_map_inline:Nn \g__robExt_read_ior {%
     \str_gput_right:Nx \l__robExt_tmp_str {\tl_to_str:n{##1}^^J}%
   }%
-  \str_set_eq:cN {l__robExt_placeholder_#2_str} \l__robExt_tmp_str%
+  \str_set_eq:cN {l__robExt_placeholder_#3_str} \l__robExt_tmp_str%
+  %% We apply the style, useful for instance to remove indentation
+  \def\robExtCurrentPlaceholderName{#3}%
+  \pgfqkeys{/robExt}{#2}%
   \IfBooleanTF {#1} {} {
-    \robExtAddPlaceholderToList{#2}
+    \robExtAddPlaceholderToList{#3}
     %% Otherwise they will be lost when the environment ends
     \robExtKeepaftergroup{l__robExt_placeholder_group_main_seq}%
-  }
+  }%
   %% for other variable
-  \robExtKeepaftergroup{l__robExt_placeholder_#2_str}%
+  \robExtKeepaftergroup{l__robExt_placeholder_#3_str}%
 }%
 \let\PlaceholderFromCode\RobExtPlaceholderFromCode
 \let\endPlaceholderFromCode\endRobExtPlaceholderFromCode
@@ -1050,7 +1065,7 @@ if __name__ == '__main__':
 %% \end{PlaceholderPathFromCode}
 %% This will copy "some code" in the cache, and set MYLIBPATH to the name of the file in the cache like
 %% MYLIBPATH = robExt-abc.py
-\NewDocumentEnvironment{RobExtPlaceholderPathFromCode}{sO{}m}{
+\NewDocumentEnvironment{RobExtPlaceholderPathFromCode}{sO{}O{defaultPlaceholderFromCodeStyle}m}{
   \XSIMfilewritestart*{\jobnameNoQuotes-robExt-tmp-file-you-can-remove.tmp}
 }{
   \XSIMfilewritestop
@@ -1068,13 +1083,16 @@ if __name__ == '__main__':
   \iow_now:NV \g__robExt_write_iow \l__robExt_tmp_contain_file_str
   \iow_close:N \g__robExt_write_iow
   %% sets the template name to the relative path to the file
-  \str_set:cx { l__robExt_placeholder_#3_str } {\robExtPrefixFilename\l__robExt_tmp_filename_no_prefix_str}
+  \str_set:cx { l__robExt_placeholder_#4_str } {\robExtPrefixFilename\l__robExt_tmp_filename_no_prefix_str}
+  %% We apply the style, useful for instance to remove indentation
+  \def\robExtCurrentPlaceholderName{#4}%
+  \pgfqkeys{/robExt}{#3}%
   \IfBooleanTF {#1} {} {
-    \robExtAddPlaceholderToList{#3}
+    \robExtAddPlaceholderToList{#4}
     \robExtKeepaftergroup{l__robExt_placeholder_group_main_seq}
   }
   %% Otherwise they will be lost when the environment ends
-  \robExtKeepaftergroup{l__robExt_placeholder_#3_str}
+  \robExtKeepaftergroup{l__robExt_placeholder_#4_str}
 }
 \let\PlaceholderPathFromCode\RobExtPlaceholderPathFromCode
 \let\endPlaceholderPathFromCode\endRobExtPlaceholderPathFromCode
@@ -2618,7 +2636,7 @@ if __name__ == '__main__':
   remove placeholders/.style={
     remove placeholder/.list={#1},
   },
-    set main content/.style={
+  set main content/.style={
     set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#1}
   },
   copy placeholder/.code 2 args={\robExtCopyPlaceholder{#1}{#2}},
@@ -2661,19 +2679,19 @@ if __name__ == '__main__':
   placeholder replace in place eval/.code n args={3}{\robExtPlaceholderReplaceInplaceEval{#1}{#2}{#3}},
   placeholder prepend all lines/.code 2 args={\robExtPlaceholderPrependAllLines{#1}{#2}},
   prepend all lines/.style={
-    placeholder prepend all lines={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+    placeholder prepend all lines={\robExtCurrentPlaceholderName}{#1},
   },
   placeholder remove spaces until/.code 2 args={\robExtPlaceholderRemoveSpacesUntil{#1}{#2}},
   remove spaces until/.style={
-    placeholder remove spaces until={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+    placeholder remove spaces until={\robExtCurrentPlaceholderName}{#1},
   },
   placeholder strictly remove spaces until/.code 2 args={\robExtPlaceholderRemoveSpacesUntil{#1}[0]{#2}},
   strictly remove spaces until/.style={
-    placeholder remove spaces until nospace={__ROBEXT_MAIN_CONTENT_ORIG__}{#1},
+    placeholder remove spaces until nospace={\robExtCurrentPlaceholderName}{#1},
   },
   placeholder remove leading spaces/.code={\robExtPlaceholderRemoveLeadingSpaces{#1}},
-  remove leading spaces/.code={\robExtPlaceholderRemoveLeadingSpaces{__ROBEXT_MAIN_CONTENT_ORIG__}},
-  remove leading spaces if not disabled/.code={\ifdefined\robExtDoNotRemoveLeadingSpaces\else\robExtPlaceholderRemoveLeadingSpaces{__ROBEXT_MAIN_CONTENT_ORIG__}\fi},
+  remove leading spaces/.code={\robExtPlaceholderRemoveLeadingSpaces{\robExtCurrentPlaceholderName}},
+  remove leading spaces if not disabled/.code={\ifdefined\robExtDoNotRemoveLeadingSpaces\else\robExtPlaceholderRemoveLeadingSpaces{\robExtCurrentPlaceholderName}\fi},
   do not remove leading spaces/.code={\def\robExtDoNotRemoveLeadingSpaces{}},
   % Interface to set template
   set template/.style={

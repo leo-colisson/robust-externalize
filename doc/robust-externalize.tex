@@ -105,7 +105,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.6}\\[3mm]
+  {Léo Colisson \quad Version 2.7}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -1711,8 +1711,8 @@ This is contrary to |\getPlaceholder| that is not expandable, so if you do want 
 
 
 \begin{pgfmanualentry}
-  \extractenvironement{PlaceholderFromCode}\opt{*}\marg{name placeholder}\@@
-  \extractenvironement{SetPlaceholderCode}\opt{*}\marg{name placeholder}\@@
+  \extractenvironement{PlaceholderFromCode}\opt{*}\opt{\oarg{style}}\marg{name placeholder}\@@
+  \extractenvironement{SetPlaceholderCode}\opt{*}\opt{\oarg{style}}\marg{name placeholder}\@@
   \pgfmanualbody
 
   These two (aliased) environments are useful to set a verbatim value to a given placeholder: the advantage is that you can put inside any code, including \LaTeX{} comments, the downside is that you cannot use it inside macros and some environments (so you typically define it before the macros and call it inside).
@@ -1757,6 +1757,27 @@ def my_function(b): # this is a python code
 \end{codeexample}
 }
 Note that of course, you can define a placeholder before a macro and call it inside (explaining how we can generate this documentation).
+
+You can use the optional style (only after 2.7; note that it defaults to |defaultPlaceholderFromCodeStyle|, which contains by default |remove leading spaces|) to apply some operations on the style. This way, by default, it will remove any leading indentation, allowing you, for instance, to indent your python code based on the surrounding LaTeX environment):
+\begin{codeAndResult}
+\begin{PlaceholderFromCode}{__TMP_MAIN_CONTENT__}
+  # See, you can indent this code with two spaces without disturbing python (that expects no indentation)    
+  import matplotlib.pyplot as plt
+  year = [2014, 2015, 2016, 2017, 2018, 2019]  
+  tutorial_count = [39, 117, 111, 110, 67, 29]
+  plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+  plt.xlabel('Year')  
+  plt.ylabel('Number of futurestud.io Tutorials')   
+  plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+\end{PlaceholderFromCode}
+
+\fbox{\begin{CacheMeNoContent}
+  python,
+  set includegraphics options={width=.8\linewidth},
+  set main content={__TMP_MAIN_CONTENT__},
+\end{CacheMeNoContent}}
+\end{codeAndResult}
+
 
 Note that the star and no import version does NOT import the placeholder it the main group (unless you try to optimize the compilation time you should not need it, but see \cref{sec:importSystem} for details).
 \end{pgfmanualentry}
@@ -4911,6 +4932,10 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
+\item v2.7:
+  \begin{itemize}
+  \item apply |remove leading spaces| by default also in |placeholderFromCode| and |PlaceholderPathFromCode|, and allow the user to customize the style. This produces a very minor backward incompatibility as it might disturb code where all lines start with a space.
+  \end{itemize}
 \item v2.6:
   \begin{itemize}
   \item Added |\lenToCmNoUnit|
