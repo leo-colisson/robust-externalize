@@ -254,7 +254,7 @@ You can also cache all tikz pictures by default, except those that are run from 
   \tikz[baseline=(A.base)] \node(A)[rounded corners,fill=green]{my cached node \whereIAm};
 \end{codeexample}
 
-will gives you: {%
+will give you: {%
   %% this will cache \tikz and tikzpictures by default (using the tikz preset)
   \cacheTikz
   %% possibly add stuff to the tikz preset
@@ -362,9 +362,9 @@ We also provide a number of other functionalities, among others:
 \item To get maximum purity while minimizing the number of rebuild, we provide functions to forward macros defined in the parent document, and the set of macros that must be forwarded can be automatically detected for each element to cache. It is also possible to conditionally import a library if the element contains a given macro.
 \item We provide a way to compile a template via:\\
   |new compiled preset={compiled ZX}{templateZX, compile latex template}{}|\\
-  in order to make the compilation even faster (but you cannot use presets except |add to preamble|)
+  in order to make the compilation even faster (but you cannot use placeholders except |add to preamble|)
 \item We give a highly configurable template, compilation and inclusion system, to cache basically anything
-\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| or |\robExtConfigure{compile in parallel after=5}| (make sure to have xargs installed, which is available by default on linux but must be installed on Windows via by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
+\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| or |\robExtConfigure{compile in parallel after=5}| (make sure to have xargs installed, which is available by default on linux but must be installed on Windows by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
 \item We furnish commands to automatically clean the cache while keeping cached elements that are still needed.
 \item And more\dots
 \end{itemize}
@@ -5012,4 +5012,5 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 % Local Variables:
 % TeX-command-extra-options: "--shell-escape -halt-on-error"
 % TeX-engine: luatex
+% jinx-languages: "en"
 % End:
