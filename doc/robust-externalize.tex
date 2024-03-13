@@ -105,7 +105,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.7}\\[3mm]
+  {Léo Colisson \quad Version 2.8}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -159,7 +159,7 @@ for name in ["Alice", "Bob"]:
 \end{CacheMeCode}
 \end{codeAndResult}
 
-Actually, we also provide this style by default (and explain how to write it yourself), just make sure to load:
+Actually, we also provide this style by default (and explain how to write it yourself), just use the above code (WARNING: in v2.7, a bug was introduced, fixed in v2.8, that was adding a new line in front of the code), just make sure to load:
 \begin{verbatim}
 \usepackage{pythonhighlight}
 \usepackage[most]{tcolorbox}
@@ -4011,7 +4011,7 @@ or using the style |force python3| that forces |python3|.
   \extractkey/robExt/python print code and result\@nil
   \makeatother%
   \pgfmanualbody
-  This is a demo style that can print a python code and its result.
+  (Warning: in 2.7 a bug was introduced (fixed in v2.8) where an empty line was automatically added in front of the code) This is a demo style that can print a python code and its result.
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result, set title={The for loop}}
 for name in ["Alice", "Bob"]:
@@ -4932,6 +4932,10 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
+\item v2.8 (current master, not yet released):
+  \begin{itemize}
+  \item Fix a regression bug introduced in 2.7: |python print code and result| was adding a new line above the code printed. This is fixed now.
+  \end{itemize}
 \item v2.7:
   \begin{itemize}
   \item apply |remove leading spaces| by default also in |placeholderFromCode| and |PlaceholderPathFromCode|, and allow the user to customize the style. This produces a very minor backward incompatibility as it might disturb code where all lines start with a space.

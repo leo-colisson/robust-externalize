@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2.7 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2.8 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -1434,16 +1434,19 @@ if __name__ == '__main__':
   \int_compare:nNnTF {\l_tmpa_int} = {\c_max_int} {} {
     \str_clear:c { l__robExt_placeholder_#1_str }
     %% We iterate over the lines to recreate the appropriate placeholder
-    \seq_map_variable:NNn \l_tmpa_seq \l_tmpa_tl {
+    \int_set:Nn \l_tmpb_int {\seq_count:N \l_tmpa_seq}
+    \seq_map_indexed_inline:Nn \l_tmpa_seq {
       \str_put_right:cx { l__robExt_placeholder_#1_str } {
-        \str_range:Nnn \l_tmpa_tl {\l_tmpa_int + 1} {-1}
-        ^^J
+        \str_range:nnn {##2} {\l_tmpa_int + 1} {-1}
+        % We do not want to add ^^J for the very last line, otherwise it will create a new line everytime we call it
+        \int_compare:nNnTF {##1} = {\l_tmpb_int} {} {
+          ^^J
+        }
       }
     }
   }
 }
 \let\placeholderRemoveLeadingSpaces\robExtPlaceholderRemoveLeadingSpaces
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
