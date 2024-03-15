@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2.8 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2024/03/15 v2.9 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -857,7 +857,7 @@ if __name__ == '__main__':
 
 
 \NewDocumentCommand{\robExtPlaceholderFromString}{smm}{
-  \str_set_eq:cN { l__robExt_placeholder_#2_str } {#3}
+  \str_set_eq:cN { l__robExt_placeholder_#2_str } #3
   \checkIfPlaceholderNameIsLegal{#2}
   \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
 }
