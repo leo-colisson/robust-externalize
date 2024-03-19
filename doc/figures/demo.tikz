@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+	\begin{pgfonlayer}{nodelayer}
+		\node [style=Z dot] (0) at (0, 0) {};
+		\node [style=X dot] (1) at (1, 0) {};
+	\end{pgfonlayer}
+	\begin{pgfonlayer}{edgelayer}
+		\draw [bend left=60] (0) to (1);
+		\draw [bend right=60] (0) to (1);
+		\draw (0) to (1);
+	\end{pgfonlayer}
+\end{tikzpicture}

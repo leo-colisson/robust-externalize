@@ -1,0 +1,3031 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Version: 2023/09/06
+%%% License: MIT
+%%% Author: Léo Colisson
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Understand why if a "fake" alias does not exists but was created before I get no error
+
+% A tikzlibrary[libraryName].code.tex is loaded automatically by tikz when using
+% \usetikzlibrary{libraryName}. Therefore, you should just use
+% \usetikzlibrary{zx} to load this library. We also provide a package to
+% directly load this library using \usepackage{zx}.
+
+%%% Some random notes for myself:
+%%% - \tikz@pp@name{X} outputs the name prefix + X + the name suffix, where these prefix are local prefix assigned to all node names. While they are often empty, it might not be always the case.
+
+\RequirePackage{amssymb} % For short minus
+\RequirePackage{etoolbox} % \AfterEndPreamble...
+\RequirePackage{ifthen} % For conditions
+\RequirePackage{xparse} % For NewDocumentComments
+\RequirePackage{bm} % For bold math fonts
+
+\usetikzlibrary{cd,backgrounds,positioning,shapes,calc,intersections,fit}
+% Declare layers.
+\pgfdeclarelayer{background} % Fox boxes using "fit" to group parts of the graph.
+\pgfdeclarelayer{belownodelayer} % For nodes that always want to stay below any arrow...
+\pgfdeclarelayer{edgelayer} % For nodes that always want to stay below any arrow...
+\pgfdeclarelayer{nodelayer} % For nodes... in theory, this fails for now.
+\pgfdeclarelayer{main}
+\pgfdeclarelayer{abovenodelayer} % For nodes that want to stay above others.
+\pgfdeclarelayer{box} % For boxes using "fit" to fake multi-column boxes
+\pgfdeclarelayer{labellayer} % For labels... in theory, this fails for now. https://tex.stackexchange.com/questions/618823/node-on-layer-style-in-tikz-matrix-tikzcd
+\pgfdeclarelayer{foreground} % For the user, if they want to put anything really above everything.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% User modifiable variables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define colors, can be redefine by user
+\definecolor{colorZxZ}{RGB}{204,255,204}
+\definecolor{colorZxX}{RGB}{255,136,136}
+\definecolor{colorZxH}{RGB}{255,255,0}
+\definecolor{colorZxMatrix}{RGB}{200,200,200}
+
+%%% Some wires (the one having an intermediate H, X, or S gate) may need some additional space for
+%%% specific columns.
+%%% Use these spaces like &[\zxHCol] or \\[\zxHRow] in that case
+%% Defines the space to add for columns and rows containing a connection with Hadamard
+% This is for "curved" wires
+\newcommand{\zxHCol}{1mm}
+\newcommand{\zxHRow}{1mm}
+% This is for "flat" wires (usually takes more space)
+\newcommand{\zxHColFlat}{1.5mm}
+\newcommand{\zxHRowFlat}{1.5mm}
+%% Defines the space to add for columns and rows containing a connection with small X/Z
+\newcommand{\zxSCol}{1mm}
+\newcommand{\zxSRow}{1mm}
+\newcommand{\zxSColFlat}{1.5mm}
+\newcommand{\zxSRowFlat}{1.5mm}
+%% Defines the space to add for columns having both H and Spiders
+\newcommand{\zxHSCol}{1mm}
+\newcommand{\zxHSRow}{1mm}
+\newcommand{\zxHSColFlat}{1mm}
+\newcommand{\zxHSRowFlat}{1mm}
+%% Wires only: when adding only wires with empty nodes, the space between columns can be too small. Useful not to shrink swap gates...
+\newcommand{\zxWCol}{2mm}
+\newcommand{\zxWRow}{2mm}
+%% Same as zxWCol, but when a single empty node is connected to a non-empty node.
+\newcommand{\zxwCol}{1mm}
+\newcommand{\zxwRow}{1mm}
+%% When vdots/dots are used in lines
+\newcommand{\zxDotsCol}{3mm}
+\newcommand{\zxDotsRow}{3mm}
+%% Default separation between rows and columns
+\newcommand{\zxDefaultColumnSep}{1.5mm}
+\newcommand{\zxDefaultRowSep}{1.5mm}
+% To cancel the default tow separation
+\newcommand{\zxZeroCol}{-\zxDefaultColumnSep}
+\newcommand{\zxZeroRow}{-\zxDefaultRowSep}
+%% When adding two lines with only empty nodes, it can create quite a large space. Use this to reduce it
+%% Yes, we can add multiple arguments, space will add up (see documentation pgfmatrixnextcell)
+\newcommand{\zxNCol}{-\zxDefaultColumnSep,.5mm}
+\newcommand{\zxNRow}{-\zxDefaultRowSep,.5mm}
+
+
+% Angles by default for s and o related arrows
+\def\zxDefaultSoftAngleS{30}
+\def\zxDefaultSoftAngleN{60}
+\def\zxDefaultSoftAngleO{40}
+\def\zxDefaultSoftAngleChevron{60}
+
+% Angles by default for s and o related arrows
+\def\zxDefaultSoftAngleS{30}
+\def\zxDefaultSoftAngleN{60}
+\def\zxDefaultSoftAngleO{40}
+\def\zxDefaultSoftAngleChevron{60}
+
+% Angles by default for s and o related arrows (in/out version)
+\def\zxDefaultSoftAngleN{60}
+\def\zxDefaultSoftAngleO{40}
+\def\zxDefaultSoftAngleChevron{60}
+
+\def\zxGroundScale{1.8}
+
+% Styles for O,N,... (new bezier version)
+\tikzset{
+  /zx/args/-andL/.cd,
+  defaultO/.style={-=.2,L=.4},
+  defaultN/.style={-=.2,L=.8},
+  defaultN-/.style={1-=.4,1L=0},
+  defaultNN/.style={},
+  defaultNIN/.style={1-=0,1L=.6},
+  defaultChevron/.style={}, % < should be stronger than N- also in ui mode.
+  defaultChevronDown/.style={}, % The ^ v versions (default NN and default NIN will be loaded before).
+  defaultS/.style={-=.8,L=0},
+  defaultS'/.style={-=.8,L=.2},
+  default-S/.style={1-=.8,1L=0},
+  defaultSIS/.style={1-=0,1L=.8},
+  % Loads the default styles for the "use intersection" method.
+  /zx/args/-andL/ui/.style={
+    /zx/args/-andL/defaultO/.style={-=.2,L=.17},
+    /zx/args/-andL/defaultN/.style={-=.2,L=.7},
+    /zx/args/-andL/defaultN-/.style={1-=.5,1L=.2,2-=.2,2L=.5}, %% Todo: write a different style for <
+    /zx/args/-andL/defaultNN/.style={},
+    /zx/args/-andL/defaultChevron/.style={1-=.2,1L=0,2-=.2,2L=.8},
+    /zx/args/-andL/defaultChevronDown/.style={1L=.2,1-=0,2L=.2,2-=.8},
+    /zx/args/-andL/defaultNIN/.style={1-=0,1L=.66,2-=.55,2L=.16},
+    /zx/args/-andL/defaultS/.style={-=.8,L=0},
+    /zx/args/-andL/defaultS'/.style={-=.8,L=.3},
+    /zx/args/-andL/default-S/.style={1-=.8,1L=0},
+    /zx/args/-andL/defaultSIS/.style={1-=0,1L=.8,2-=.15,2L=.6},
+  },
+}
+
+
+% Scale to use when scaling 3 dots
+\def\zxScaleDots{.7}
+
+% 0.4pt is default in tikz. Also used to ensure it has not been modified document wise by other libraries
+% (quantikz notably changes this parameter).
+\newcommand{\zxDefaultLineWidth}{0.4pt}
+
+% For phase in content: How to convert sign ("-" for minus, nothing for "+", anything else should be inserted directly),
+% above fraction (no parens), below fraction (no parens), above fraction (with parens), below fraction (with parens)
+\NewExpandableDocumentCommand{\zxConvertToFracInContent}{mmmmm}{%
+  \ifthenelse{\equal{#1}{-}}{\zxMinus}{#1}\frac{#2}{#3}%
+}
+
+% For phase in label: How to convert sign ("-" for minus, nothing for "+", anything else should be inserted directly),
+% above fraction (no parens), below fraction (no parens), above fraction (with parens), below fraction (with parens)
+\NewExpandableDocumentCommand{\zxConvertToFracInLabel}{mmmmm}{%
+  \ifthenelse{\equal{#1}{-}}{\zxMinus}{#1}#4/#5%
+}
+
+% Minus sign to use in \zxZ-{\alpha}
+%\NewExpandableDocumentCommand{\zxMinusInShort}{}{-}
+\NewExpandableDocumentCommand{\zxMinusInShort}{}{-}
+
+% The library tries to find intersection between fake center east/... and the border of the node
+% to draw the nodes directly on the border.
+% To enable this function (can also be set locally), enable this macro:
+% \def\zxEnableIntersectionsNodes{} %% To add the "name shape" on each node
+% \def\zxEnableIntersectionsWires{} %% For wires only (can't work without \zxEnableIntersectionsNodes)
+\newcommand{\zxEnableIntersections}{%
+  \def\zxEnableIntersectionsWires{}%
+  \def\zxEnableIntersectionsNodes{}%
+}
+% to disable intersections, undefined it:
+\let\zxEnableIntersectionsNodes\undefined
+\let\zxEnableIntersectionsWires\undefined
+\newcommand{\zxDisableIntersections}{%
+  \let\zxEnableIntersectionsNodes\undefined%
+  \let\zxEnableIntersectionsWires\undefined%
+}
+% Now, if it cannot find a good intersection (either because "name path" is disabled, or
+% because no intersection is found, or because intersections are disabled anyway) we need to
+% have a fallback mechanism. Either we choose instead the "fake center" (or center if fake
+% center does not exists), but then the wire will be hidden behind the node (it is a problem
+% mostly if you use H nodes a lot, otherwise we recommend this solution):
+\def\zxWireInsideIfNoIntersectionName{}
+% If you prefer to start the wire on the surface of the node, do that instead... but it will take longer to compute. See also our ui style
+% as the default styles are not meant to work in that setting.
+% \let\zxWireInsideIfNoIntersectionName\undefined
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Adding anchors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% We add anchors "fake center {north, south, east, west}" to the nodes. The wires will leave from these anchors (except in IO mode) depending on the direction. If the anchor does not exist, center is picked.
+% https://tex.stackexchange.com/questions/14769/add-more-anchors-to-standard-tikz-nodes
+\def\zx@pgfaddtoshape#1#2{%
+  \begingroup
+  \def\pgf@sm@shape@name{#1}%
+  \let\anchor\pgf@sh@anchor
+  #2%
+  \endgroup
+}
+\def\zx@useanchor#1#2{\csname pgf@anchor@#1@#2\endcsname}
+\zx@pgfaddtoshape{rounded rectangle}{%
+  \anchor{fake center east}{%
+    \zx@useanchor{rounded rectangle}{north east}%
+    \pgf@yc=.5\pgf@y% final y = 0.5*this y + 0.5*other y.
+    \zx@useanchor{rounded rectangle}{south east}%
+    \pgf@y=.5\pgf@y%
+    \advance\pgf@y by \pgf@yc%
+  }%
+  \anchor{fake center west}{%
+    \zx@useanchor{rounded rectangle}{north west}%
+    \pgf@yc=.5\pgf@y% final y = 0.5*this y + 0.5*other y.
+    \zx@useanchor{rounded rectangle}{south west}%
+    \pgf@y=.5\pgf@y%
+    \advance\pgf@y by \pgf@yc%
+  }%
+  \anchor{fake center north}{%
+    \zx@useanchor{rounded rectangle}{center}%
+  }%
+  \anchor{fake center south}{%
+    \zx@useanchor{rounded rectangle}{center}%
+  }%
+}
+
+\zx@pgfaddtoshape{coordinate}{%
+  \anchor{fake center east}{%
+    \zx@useanchor{coordinate}{center}%
+  }%
+  \anchor{fake center west}{%
+    \zx@useanchor{coordinate}{center}%
+  }%
+  \anchor{fake center north}{%
+    \zx@useanchor{coordinate}{center}%
+  }%
+  \anchor{fake center south}{%
+    \zx@useanchor{coordinate}{center}%
+  }%
+}
+
+\zx@pgfaddtoshape{circle}{%
+  \anchor{fake center east}{%
+    \zx@useanchor{circle}{center}%
+  }%
+  \anchor{fake center west}{%
+    \zx@useanchor{circle}{center}%
+  }%
+  \anchor{fake center north}{%
+    \zx@useanchor{circle}{center}%
+  }%
+  \anchor{fake center south}{%
+    \zx@useanchor{circle}{center}%
+  }%
+}
+
+\zx@pgfaddtoshape{rectangle}{
+  \anchor{fake center east}{%
+    \zx@useanchor{rectangle}{center}%
+  }%
+  \anchor{fake center west}{%
+    \zx@useanchor{rectangle}{center}%
+  }%
+  \anchor{fake center north}{%
+    \zx@useanchor{rectangle}{center}%
+  }%
+  \anchor{fake center south}{%
+    \zx@useanchor{rectangle}{center}%
+  }%
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Tikz styles
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% For arguments later:
+\tikzset{
+  /zx/args/-andL/.cd,
+  % - is "towards the point", or "x value",
+  % L is "perpendicular to the line going towards the point" (L is for the perpendicular shape), or "y value".
+  1-/.initial=.5, % random value, defaultO... will change that.
+  2-/.initial=.5,
+  -/.style={
+    1-=#1,
+    2-=#1,
+  },
+  1L/.initial=.5,
+  2L/.initial=.5,
+  L/.style={
+    1L=#1,
+    2L=#1,
+  },
+  symmetry-L/.code={% 1- <-> 1L, 2- <-> 2L
+    \edef\zx@tmpone{\pgfkeysvalueof{/zx/args/-andL/1-}}%
+    \edef\zx@tmptwo{\pgfkeysvalueof{/zx/args/-andL/2-}}%
+    \pgfkeysalso{%
+      1-/.evaluated=\pgfkeysvalueof{/zx/args/-andL/1L},
+      2-/.evaluated=\pgfkeysvalueof{/zx/args/-andL/2L},
+      1L/.evaluated=\zx@tmpone,
+      2L/.evaluated=\zx@tmptwo,
+    }%
+  },
+  symmetry/.code={% 1- <-> 2-, 1L <-> 2L
+    \edef\zx@tmpone{\pgfkeysvalueof{/zx/args/-andL/1-}}%
+    \edef\zx@tmptwo{\pgfkeysvalueof{/zx/args/-andL/1L}}%
+    \pgfkeysalso{
+      1-/.evaluated=\pgfkeysvalueof{/zx/args/-andL/2-},
+      1L/.evaluated=\pgfkeysvalueof{/zx/args/-andL/2L},
+      2-/.evaluated=\zx@tmpone,
+      2L/.evaluated=\zx@tmptwo,
+    }%
+  },
+  negate1L/.style={
+    /zx/args/-andL/1L/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/1L},
+  },
+  negate2L/.style={
+    /zx/args/-andL/2L/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/2L},
+  },
+  negateL/.style={
+    negate1L,
+    negate2L,
+  },
+  negate1-/.style={
+    /zx/args/-andL/1-/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/1-},
+  },
+  negate2-/.style={
+    /zx/args/-andL/2-/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/2-},
+  },
+  negate-/.style={
+    negate1-,
+    negate2-,
+  },
+  negateL/.style={
+    negate1L,
+    negate2L,
+  },
+  oneMinus1-/.style={
+    /zx/args/-andL/2-/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/2-},
+  },
+  oneMinus2-/.style={
+    /zx/args/-andL/2-/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/2-},
+  },
+  oneMinus1L/.style={
+    /zx/args/-andL/1L/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/1L},
+  },
+  oneMinus2L/.style={
+    /zx/args/-andL/2L/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/2L},
+  },
+  % Angle/length:
+  1 angle and length/.code 2 args={%
+    \pgfmathparse{#2*cos(#1)}%
+    \pgfkeysalso{1-/.expand once=\pgfmathresult}%
+    \pgfmathparse{#2*sin(#1)}%
+    \pgfkeysalso{1L/.expand once=\pgfmathresult}%
+  },
+  2 angle and length/.code 2 args={%
+    \pgfmathparse{#2*cos(#1)}%
+    \pgfkeysalso{2-/.expand once=\pgfmathresult}%
+    \pgfmathparse{#2*sin(#1)}%
+    \pgfkeysalso{2L/.expand once=\pgfmathresult}%
+  },
+  1al/.style 2 args={
+    1 angle and length={#1}{#2}
+  },
+  2al/.style 2 args={
+    2 angle and length={#1}{#2}
+  },
+  al/.style 2 args={
+    1 angle and length={#1}{#2},
+    2 angle and length={#1}{#2},
+  },
+  1 angle/.style={
+    1 angle and length={#1}{.6}
+  },
+  2 angle/.style={
+    2 angle and length={#1}{.6}
+  },
+  1a/.style={
+    1 angle={#1},
+  },
+  2a/.style={
+    2 angle={#1},
+  },
+  angle/.style={
+    1 angle={#1},
+    2 angle={#1},
+  },
+  a/.style={
+    1 angle and length={#1}{.6},
+    2 angle and length={#1}{.6},
+  },
+}
+
+%%% Useful debug functions
+%% This function will be called when debugging the library.
+\def\zx@message#1{}
+% The ^^J adds a new line:
+\def\zx@verbose@message#1{\message{#1^^J}} % For more important messages. Like to show the code is not looping forever
+% To enable debugging:
+% WARNING: if you use in code, do not forget the makeatletter!
+%\def\zx@message#1{\message{#1^^J}}
+% To display stroke of while trying to compute the intersections:
+% WARNING: if you use in code, do not forget the makeatletter!
+%\def\zx@draw@stroke@inter@debug{}
+
+
+%% This function checks if the node has a "name path", if so it computes the intersection between
+%% if not if \zxWireInsideIfNoIntersectionName is defined it defines the \tikzto* to the
+%% new@center (argument #2), otherwise it does nothing.
+% #1: Node to consider: \tikztostart or \tikztotarget
+% #2: name of the new@center node corresponding to #1
+% #3: name of the other new@center node
+% #4: result will be stored in this macro... if there is something to change.
+% #5: 1 if start, 2 if end
+% Result will be moved back into #1
+\def\zx@find@intersection@fakecenter#1#2#3#4#5{%
+  % First, we check if the user wants to compute the intersection:
+  \ifdefined\zxEnableIntersectionsWires%
+     %% We compute the intersection
+    \edef\tikz@intersect@path@a{zx@name@path@#1}%
+    \ifcsname tikz@intersect@path@name@\tikz@intersect@path@a \endcsname%
+      \zx@verbose@message{[ZX] I will start computing intersections}%
+      \pgfintersectionofpaths{%
+        \begin{pgfinterruptboundingbox}%
+          %%%% /!\ This lines is the one I'm not sure how to write:
+          \expandafter\pgfsetpath\csname tikz@intersect@path@name@\tikz@intersect@path@a\endcsname%
+          \pgfgetpath\temppath%
+          \ifdefined\zx@draw@stroke@inter@debug%
+            \pgfusepath{stroke} % We draw it, useful to debug, and realize the shape is moved.
+          \fi%
+          \pgfsetpath\temppath%
+        \end{pgfinterruptboundingbox}%
+      }{% The first path is moved to the center... So we need to shift it also here.
+        %%% First intersection: we use the line between the two nodes... but it's really ugly (e.g. in o it does not make a lot of sense)
+        \begin{pgfinterruptboundingbox}%
+          \ifdefined\zxIntersectionLineBetweenStartEnd%
+            \pgfpointdiff{\pgfpointanchor{#1}{center}}{\tikz@scan@one@point\pgf@process(#2)}%
+            \pgfpathmoveto{\pgfpoint{\pgf@x}{\pgf@y}}%
+            \pgfpointdiff{\pgfpointanchor{#1}{center}}{\tikz@scan@one@point\pgf@process(#3)}%
+            \pgfpathlineto{\pgfpoint{\pgf@x}{\pgf@y}}%
+          \else%
+            %% We use now the method used for bezier curve (at least it's what I see "experimentally")
+            %% More precisely, we use the direction of the bezier curve to know where to start the wire.
+            %% Parse once the control points for efficiency reasons:
+            %% First parse the fake centers.
+            \tikz@scan@one@point\pgf@process(#2)%
+            \edef\zx@tmp@current@fake@x{\the\pgf@x}%
+            \edef\zx@tmp@current@fake@y{\the\pgf@y}%
+            \zx@message{The input fakes are #2 and #3.}%
+            \tikz@scan@one@point\pgf@process(#3)%
+            \edef\zx@tmp@other@fake@x{\the\pgf@x}%
+            \edef\zx@tmp@other@fake@y{\the\pgf@y}%
+            \zx@message{The parsed input fakes are (\zx@tmp@current@fake@x , \zx@tmp@current@fake@y) and (\zx@tmp@other@fake@x , \zx@tmp@other@fake@y).}%
+            %% Reorder the controls to compute. #5 = 1 if "start fake center" is "current fake center".
+            \ifnum#5=1 % <-- important space!!!
+              \edef\zx@tmp@start@fake@x{\zx@tmp@current@fake@x}%
+              \edef\zx@tmp@start@fake@y{\zx@tmp@current@fake@y}%
+              \edef\zx@tmp@end@fake@x{\zx@tmp@other@fake@x}%
+              \edef\zx@tmp@end@fake@y{\zx@tmp@other@fake@y}%
+            \else%
+              \edef\zx@tmp@end@fake@x{\zx@tmp@current@fake@x}%
+              \edef\zx@tmp@end@fake@y{\zx@tmp@current@fake@y}%
+              \edef\zx@tmp@start@fake@x{\zx@tmp@other@fake@x}%
+              \edef\zx@tmp@start@fake@y{\zx@tmp@other@fake@y}%
+            \fi%
+            \zx@message{We computed: start fake (\zx@tmp@start@fake@x , \zx@tmp@start@fake@y) end fake (\zx@tmp@end@fake@x , \zx@tmp@end@fake@y )}%
+            \pgfkeysalso{/zx/tmp/zx@getControlPoints={\zx@tmp@start@fake@x}{\zx@tmp@start@fake@y}{\zx@tmp@end@fake@x}{\zx@tmp@end@fake@y}}%
+            % Now results are in controlOne, and controlTwo
+            \ifnum#5=1 \relax%
+              \def\zx@control{\controlOne}%
+            \else%
+              \def\zx@control{\controlTwo}%
+            \fi%
+            %%% Parse new control
+            \tikz@scan@one@point\pgf@process(\zx@control)%
+            \edef\zx@tmp@current@ctrl@x{\the\pgf@x}%
+            \edef\zx@tmp@current@ctrl@y{\the\pgf@y}%
+            \zx@message{[ZX] Current control is number #5, i.e. \zx@control (both are \controlOne and \controlTwo)}%
+            % We store the center coordinates since it's used several times
+            \pgfpointanchor{#1}{center}%
+            \edef\zx@tmp@real@center@x{\the\pgf@x}%
+            \edef\zx@tmp@real@center@y{\the\pgf@y}%
+            %%% Go to  current fake center, except that real center is the new origin.
+            \pgfpointdiff{\pgfpoint{\zx@tmp@real@center@x}{\zx@tmp@real@center@y}}{\pgfpoint{\zx@tmp@current@fake@x}{\zx@tmp@current@fake@y}}%
+            \pgfpathmoveto{\pgfpoint{\pgf@x}{\pgf@y}}%
+            %% What, now both axis are inverted??? If someone can explain me this...
+            %% We scale the point to force it to cross the boundary.
+            \pgfpathlineto{%
+              \pgfpointadd{%
+                \pgf@process{%
+                  \pgfpointscale{10}{%
+                    \pgf@process{%
+                      \pgfpointdiff{%
+                        \pgfpoint{\zx@tmp@current@fake@x}{\zx@tmp@current@fake@y}%
+                      }{%
+                        \pgfpoint{\zx@tmp@current@ctrl@x}{\zx@tmp@current@ctrl@y}%
+                      }%
+                    }%
+                  }%
+                }%
+              }{%
+                \pgfpointdiff{%
+                  \pgfpoint{\zx@tmp@real@center@x}{\zx@tmp@real@center@y}%
+                }{%
+                  \pgfpoint{\zx@tmp@current@fake@x}{\zx@tmp@current@fake@y}%
+                }%
+              }%
+            }%
+          \fi%
+          \pgfgetpath\temppath%
+          \ifdefined\zx@draw@stroke@inter@debug%
+            \pgfusepath{stroke}% We draw it, useful to debug, and realize the shape is moved.
+          \fi%
+          \pgfsetpath\temppath%
+        \end{pgfinterruptboundingbox}%
+      }%
+      \pgfintersectionsolutions%
+      \pgfpointintersectionsolution{1}%
+      \ifnum\pgfintersectionsolutions=1%% The good number of solution has been found!
+        \zx@message{[ZX] Cool, just found one solution!}
+        %% Store the intersection (warning: the center of the shape is moved to the center!)
+        \edef\zx@relinter@x{\the\pgf@x}%
+        \edef\zx@relinter@y{\the\pgf@y}%
+        %% Because the shape was moved to center, we shift it back by adding the coord of the shape:
+        \pgfextractx\pgf@xa{\pgfpointanchor{#1}{center}}%
+        \pgfextractx\pgf@xb{\pgfpointanchor{#1}{center}}%
+        % WARNING! pgfmath removes the dimension (converted in pt). Make sure to put them back after
+        \pgfmathsetmacro{\zx@inter@x}{\pgf@x+\zx@relinter@x}%
+        \pgfmathsetmacro{\zx@inter@y}{\pgf@y+\zx@relinter@y}%
+        \edef#4{\zx@inter@x pt,\zx@inter@y pt}%
+      \else% The bad number of solution has been found
+        \zx@message{[ZX] WARNING: expecting one solution, found \pgfintersectionsolutions}%
+        \ifdefined\zxWireInsideIfNoIntersectionName%
+          % No intersection was found, but still want to use fake center (or center).
+          % ==> The wire will be inside the shape
+          % Basically \tikztostart := tikztostart@new@center
+          \edef#4{#2}%
+        \fi% Otherwise, do nothing
+      \fi%
+    \else%
+      \zx@message{ZX: no path named \tikz@intersect@path@a was found.}%
+      \ifdefined\zxWireInsideIfNoIntersectionName%
+        % No intersection was found, but still want to use fake center (or center).
+        % ==> The wire will be inside the shape
+        % Basically \tikztostart := tikztostart@new@center
+        \edef#4{#2}%
+      \fi% Otherwise, do nothing
+    \fi%
+  \else%
+      \zx@message{[ZX]: intersection mechanism disabled}%
+      \ifdefined\zxWireInsideIfNoIntersectionName%
+        % No intersection was found, but still want to use fake center (or center).
+        % ==> The wire will be inside the shape
+        % Basically \tikztostart := tikztostart@new@center
+        \edef#4{#2}%
+      \fi% Otherwise, do nothing
+  \fi%
+}%
+
+% Styles. User should not modify "wires definition", but is free to change:
+% - "/zx/default style nodes/" to change completely the node style
+% - "/zx/user overlay nodes" to add stuff on current node style
+% - "/zx/default style wires" to change the wire style
+% - "/zx/user overlay wires/" to add stuff on wire style
+% The user is not supposed to use node styles directly (use \zxZ{}, \zxZ{\alpha+\beta}, \zxFrac-{\pi}{4}...)
+% but is free (and encouraged) to use the styles in "wires definition" like \ar[r,o'].
+\tikzset{
+  /zx/wires definition/.style={
+    %%% Basic default properties
+    draw,
+    -,
+    line width=\zxDefaultLineWidth,
+    %%% Useful shortcut (shorter lines means easy "align" of & symbols. Love M-x align in emacs btw.)
+    ls/.style={looseness=##1},
+    looseness wires only/.style={% Looseness used for wires only.
+      looseness=1.2,
+    },
+    lw/.style={looseness wires only},
+    bold/.style={very thick},
+    non bold/.style={line width=\zxDefaultLineWidth,},
+    B/.style={bold},
+    NB/.style={non bold},
+    %% Adds a n above to denote the number of wires
+    Bn/.style={BnArgs={##1}{}},
+    Bn/.default={n},
+    boldn/.style={BnArgs={##1}{}},
+    boldn/.default={n},
+    Bn'/.style={Bn'Args={##1}{}},
+    Bn'/.default={n},
+    boldn'/.style={Bn'Args={##1}{}},
+    boldn'/.default={n},
+    Bn./.style={Bn.Args={##1}{}},
+    Bn./.default={n},
+    boldn./.style={Bn.Args={##1}{}},
+    boldn./.default={n},
+    Bn-/.style={Bn-Args={##1}{}},
+    Bn-/.default={n},
+    boldn-/.style={Bn-Args={##1}{}},
+    boldn-/.default={n},
+    %% For wires left to right
+    Bn'Args/.style 2 args={bold, "/" {anchor=center,##2}, "##1" {above,yshift=3pt,##2}},
+    Bn'Args/.default={n}{},
+    Bn.Args/.style 2 args={bold, "/" {anchor=center,##2}, "##1" {below,yshift=-3pt,##2}},
+    Bn.Args/.default={n}{},
+    %% for wires top/down (left,right)
+    BnArgs/.style 2 args={bold, "/" {rotate=90,anchor=center,##2}, "##1" {left,xshift=-2pt,##2}},
+    BnArgs/.default={n}{},
+    Bn-Args/.style 2 args={bold, "/" {rotate=90,anchor=center,##2}, "##1" {right,xshift=2pt,##2}},
+    Bn-Args/.default={n}{},
+    % boldnPos/.style={bold, "/" {anchor=center}, "##1" {yshift=3pt}},
+    % boldnPos/.default={n}{pos=50},
+    % boldn.Pos/.style={bold, "/" {anchor=center}, "##1" {below,yshift=-3pt}},
+    % boldn.Pos/.default={n}{pos=50},
+    % Use this when you are drawing lines between none nodes only (like swap gates...) in IO mode
+    between none/.style={
+      looseness wires only,
+      wire centered
+    },
+    bn/.style={
+      between none
+    },
+    % To debug the bezier curve.
+    edge above/.code={%
+      \def\zxEdgesAbove{}%
+    },%
+    edge not above/.code={%
+      \let\zxEdgesAbove\undefined%
+    },
+    control points visible/.code={%
+      \def\zxControlPointsVisible{}%
+    },%
+    control points not visible/.code={%
+      \let\zxControlPointsVisible\undefined%
+    },
+    % See explaination at the beginning where we define \def\zxEnableIntersectionsWires{}
+    % Rouhgly, tries to start the wires on the border of the shape on the line between the
+    % fake anchors.
+    use intersections/.code={%
+      \def\zxEnableIntersectionsWires{}%
+    },
+    dont use intersections/.code={%
+      \let\zxEnableIntersectionsWires\undefined%
+    },
+    ui/.style={
+      use intersections,
+      /zx/args/-andL/ui
+    },
+    intersections mode between start end/.code={%
+      \def\zxIntersectionLineBetweenStartEnd{}%
+    },
+    intersections mode bezier controls/.code={%
+      \let\zxIntersectionLineBetweenStartEnd\undefined%
+    },
+    wires behind nodes/.code={%
+      \def\zxWireInsideIfNoIntersectionName{}%
+    },
+    no wires behind nodes/.code={%
+      \let\zxWireInsideIfNoIntersectionName\undefined%
+    },
+    intersection between start end/.code={
+      \def\zxIntersectionLineBetweenStartEnd{}%
+    },
+    intersection bezier control/.code={
+      \let\zxIntersectionLineBetweenStartEnd\undefined%
+    },
+    % ------------------------------
+    % Practical stuff to draw lines easily:
+    % Prefer to use these are they can be easily customized for each style and shorter to type.
+    % Note that the letter is supposed to represent the shape of the link
+    % dots/dashes are used to specify the position of the arrow.
+    % Typically ' means top, . bottom, X- is right to X (or should arrive with angle 0),
+    % -X is left to X (or should leave with angle zero). These shapes are usually designed to
+    % work when the starting node is left most (or above of both nodes have the same column).
+    % But they may work both way for some of them.
+    % ------------------------------
+    %%% Cup/Cap
+    % Like a C shape (with without a perfect half circle). Useful maybe when perfect circles are too big.
+    % If only tex was a functional language... https://tex.stackexchange.com/questions/618955
+    C@generic/.style n args={8}{ % min/max, angle1, angle2, anchor, \x or \y, \y or \x, where to move,radius code (for circle should be "radius=\n3")
+      to path={
+        \pgfextra{%% <- we will use def... so need to "exit" a few seconds pgf
+          % Test if tikztostart is a point or a node, and define StartPoint accordingly.
+          \ifPgfpointOrNode{\tikztostart}{%
+            \def\StartPoint{\tikztostart}%
+          }{%
+            % For some nodes, "north" might not point to north (notably after a rotation). So we can define some anchors "true north" that actually point
+            % to the north.
+            % Test if "true north" etc exists:
+            \ifAnchorExistsNodeSpecific{\tikztostart}{true ##4}{%
+              \def\StartPoint{\tikztostart.true ##4}%
+            }{%
+              \def\StartPoint{\tikztostart.##4}%
+            }%  
+          }%
+          % Test if tikztostart is a point or a node, and define StartPoint accordingly.
+          \ifPgfpointOrNode{\tikztotarget}{%
+            \def\TargetPoint{\tikztotarget}%
+          }{%
+            % Test if "true north" etc exists:
+            \ifAnchorExistsNodeSpecific{\tikztotarget}{true ##4}{%
+              \def\TargetPoint{\tikztotarget.true ##4}%
+            }{%
+              \def\TargetPoint{\tikztotarget.##4}%
+            }%  
+          }%
+        }%
+        (\StartPoint) % <- the path starts at StartPoint
+        %%% Get x coordinate of left-most point
+        let \p1=(\StartPoint),
+        \p2=(\TargetPoint),
+        \n1={##1(##51,##52)}, % coordinate of the most left part (when ##1=min and ##5=\x: ##52 goes to \x2)
+        \n3={abs(##61-##62)/2} % Radius of circle
+        in % Warning: no comma after last line before in
+        %%%% We go on the left if needed (we check that we do move, otherwise we break the arrows tip if
+        %%%% we stay on place
+        %%%% First go to the left if needed
+        \pgfextra{%
+          %% We check if we are moving or not (required to preserve arrow tip direction)
+          \pgfmathapproxequalto{##51}{\n1}%
+        }%
+        \ifpgfmathcomparison\else -- ##7\fi
+        %%%% Version 1:
+        \pgfextra{%
+          \pgfmathparse{%
+            ifthenelse(##61<##62, % if end angle < angle, draw clockwis
+            "arc[start angle=##3,end angle=##2,##8]",%
+            "arc[start angle=##2,end angle=##3,##8]"%
+            )%
+          }%
+        }%
+        \pgfmathresult%
+        \pgfextra{%
+          %% We check if we are moving or not (required to preserve arrow tip direction)
+          \pgfmathapproxequalto{##52}{\n1}%
+        }%
+        \ifpgfmathcomparison\else -- (\TargetPoint)\fi
+        \tikztonodes% All to path finishes with that to deal with future nodes I think
+      }
+    },
+    % At the first version, styles were defined using in=... out=... looseness=... However
+    % it gives sometimes bad results (like the curve goes forward at some points) when nodes are
+    % too close or too far appart. However, it may still be useful, so now we define the old
+    % styles, that you can use them using \ar[r,IO,C].
+    % NB: for the newest styles, we add new anchors to the nodes depending on the direction.
+    C/.style={C@generic={min}{90}{180+90}{west}{\x}{\y}{(\n1,\y1)}{y radius=\n3, x radius=##1*\n3}},
+    C/.default=1,
+    % Like C, but rotated
+    C-/.style={C@generic={max}{90}{-90}{east}{\x}{\y}{(\n1,\y1)}{y radius=\n3, x radius=##1*\n3}},
+    C-/.default=1,
+    C'/.style={C@generic={max}{0}{180}{north}{\y}{\x}{(\x1,\n1)}{x radius=\n3, y radius=##1*\n3}},
+    C'/.default=1,
+    C./.style={C@generic={min}{0}{-180}{south}{\y}{\x}{(\x1,\n1)}{x radius=\n3, y radius=##1*\n3}},
+    C./.default=1,
+    %%% bezier{px1}{py1}{px2}{py2} creates a bezier curve where px1/py1 are the
+    %%% coordinates of the first control (in "percentage" 0<px1<1, between start and end point) and px2/py2
+    %%% are the coordinates in % of the second control point
+    %%% bezier@general is used to construct also x/y versions, 5 and 6'th argument are \x or \y.
+    bezier@general/.style n args={6}{
+      possibly@on@edge@layer/.code={%% see "edges above" style. for debug mode only.
+        \ifdefined\zxEdgesAbove\else%
+          \pgfkeysalso{%
+            on layer=edgelayer%
+          }%
+        \fi%
+      },
+      possibly@on@edge@layer,
+      to path={%
+        %%% First, check that inputs/outputs are points.
+        \pgfextra{% <- Type latex code inside path
+          %% Setup the startup node. This code can be changed by styles
+          %% /zx/tmp/zx@setup@start@node will contain the anchor of the first fake center
+          %% /zx/tmp/zx@setup@end@node will contain the anchor of the second fake center
+          %% If none of them are defined, nothing happens and the start point will be a node.
+          % Retrieve the content of the keys
+          % But first check if they are defined
+          \pgfkeysifdefined{/zx/tmp/zx@setup@start@node}{}{% Put an empty value
+            \pgfkeysalso{/zx/tmp/zx@setup@start@node/.initial=,}%
+          }%
+          \pgfkeysifdefined{/zx/tmp/zx@setup@end@node}{}{% Put an empty value
+            \pgfkeysalso{/zx/tmp/zx@setup@end@node/.initial=,}%
+          }%
+          \pgfkeysalso{
+            /zx/tmp/zx@setup@start@node/.get=\zx@anchor@start@node,
+            /zx/tmp/zx@setup@end@node/.get=\zx@anchor@end@node,
+            /zx/tmp/zx@getControlPoints/.code n args={4}{%
+              \zx@message{I will evaluate my control points:}%
+              % Args: start point, x,y then end point x,y
+              % Use ########1 ... (yes, LaTeX is a funny exponential language, and I love nested functions)
+              % Because to path is considered as a function already.
+              \def\x################1{%
+                \ifnum################1=1 % <-- super important space...
+                  ########1%
+                \else%
+                  ########3%
+                \fi%
+              }%
+              \zx@message{[ZX] x is defined.}%
+              \def\y################1{%
+                \ifnum ################1 = 1 % <-- super important space...
+                  ########2%
+                \else%
+                  ########4%
+                \fi%
+              }%
+              \tikz@scan@one@point\pgf@process(\x1-##51*##1+##52*##1,\y1-##61*##2+##62*##2)%
+              \edef\controlOne{\the\pgf@x,\the\pgf@y}%
+              \tikz@scan@one@point\pgf@process(\x1-##51*##3+##52*##3,\y1-##61*##4+##62*##4)%
+              \edef\controlTwo{\the\pgf@x,\the\pgf@y}%
+              \zx@message{[ZX] First control point is: \controlOne, second is \controlTwo.}%
+            },%
+          }%
+          %%% This will be the new \tikztostart and \tikztotarget... if someone defines them
+          \let\new@tikztostart\undefined%
+          \let\new@tikztotarget\undefined%
+          % Check if a start anchor was defined...
+          \ifthenelse{\equal{\zx@anchor@start@node}{}}{%
+            % No start anchor was chosen... :c
+            \ifthenelse{\equal{\zx@anchor@end@node}{}}{%
+              % Nothing was defined... So I won't do anything! :C
+            }{%
+              % An end node was defined :D Let's configure its end anchor.
+              \pgfkeysalso{%
+                /zx/utils/change@tikz@fake@center@intersect={\tikztotarget}{\zx@anchor@end@node}{\tikztostart}{center}{\new@tikztotarget}{2},
+              }%
+            }%
+          }{% A start node was chosen :D
+            \ifthenelse{\equal{\zx@anchor@end@node}{}}{%
+              % No end node was chosen... I'll take center to configure the start node,
+              % and not configure the end node.
+              \pgfkeysalso{
+                /zx/utils/change@tikz@fake@center@intersect={\tikztostart}{\zx@anchor@start@node}{\tikztotarget}{center}{\new@tikztostart}{1},
+              }%
+            }{%
+              % And an end node was chosen :D
+              \zx@message{[ZX] Both anchors are set. Lets configure intersection.}%
+              \pgfkeysalso{
+                /zx/utils/change@tikz@fake@center@intersect={\tikztostart}{\zx@anchor@start@node}{\tikztotarget}{\zx@anchor@end@node}{\new@tikztostart}{1},
+                /zx/utils/change@tikz@fake@center@intersect={\tikztotarget}{\zx@anchor@end@node}{\tikztostart}{\zx@anchor@start@node}{\new@tikztotarget}{2},
+              }%
+            }%
+          }%
+          \ifdefined\new@tikztostart%
+            \edef\tikztostart{\new@tikztostart}%
+          \fi%
+          \ifdefined\new@tikztotarget%
+            \edef\tikztotarget{\new@tikztotarget}%
+          \fi%
+          %%% Test if tikztostart is a point or a node, and define StartPoint accordingly.
+          % \ifPgfpointOrNode{\tikztostart}{%
+          %   \def\StartPoint{\tikztostart}%
+          % }{%
+          %   \def\StartPoint{\tikztostart.center}%
+          % }%
+          % % Test if tikztostart is a point or a node, and define StartPoint accordingly.
+          % \ifPgfpointOrNode{\tikztotarget}{%
+          %   \def\TargetPoint{\tikztotarget}%
+          % }{%
+          %   \def\TargetPoint{\tikztotarget.center}%
+          % }%
+          %%% Well, let's just use \tikztostart and \tikztotarget in any case, setting it to
+          %%% center will put the wire below the node which is not really desired for H nodes
+          %%% (position will be wrong) or when using arrows. And if center is really desired
+          %%% it's easy to force it using start anchor and end anchor.
+          \def\StartPoint{\tikztostart}%
+          \def\TargetPoint{\tikztotarget}%
+          %%% TODO: check that it does not change the shape of the wire since I'm not sure what \x1
+          %%% is in that case%
+        }%
+        let
+        \p1=(\StartPoint),
+        \p2=(\TargetPoint),%% ##5 = \x or \y, so ##51 = \x1 or \y1.
+        \p{control1}=(\x1-##51*##1+##52*##1, \y1-##61*##2+##62*##2),
+        \p{control2}=(\x1-##51*##3+##52*##3, \y1-##61*##4+##62*##4) in
+        (\StartPoint) .. controls (\p{control1}) and (\p{control2}) .. (\TargetPoint)
+        \ifdefined\zxControlPointsVisible
+          (\StartPoint) node[anchor=center,circle,fill=yellow,inner sep=.5pt,on layer=foreground]{}
+          -- (\p{control1}) node[anchor=center,circle,fill=orange,inner sep=.5pt,on layer=foreground]{}
+          (\p{control2}) node[anchor=center,circle,fill=purple,inner sep=.5pt,on layer=foreground]{}
+          -- (\TargetPoint) node[anchor=center,circle,fill=brown,inner sep=.5pt,on layer=foreground]{}
+        \fi
+        \tikztonodes
+      },
+    },
+    %% Not sure it will be very useful, compared to bezier, bezier x and bezier y directly.
+    bezier 4/.style n args={4}{
+      bezier@general={##1}{##2}{##3}{##4}{\x}{\y},
+    },
+    % Like bezier, all proportions are relative to x distance
+    bezier 4 x/.style n args={4}{
+      bezier@general={##1}{##2}{##3}{##4}{\x}{\x}
+    },
+    % Like bezier, all proportions are relative to y distance
+    bezier 4 y/.style n args={4}{
+      bezier@general={##1}{##2}{##3}{##4}{\y}{\y}
+    },
+    bezier/.code={%
+      \pgfkeys{
+        /zx/args/-andL/.cd,
+        ##1
+      }%
+      \pgfkeysalso{
+        bezier 4={\pgfkeysvalueof{/zx/args/-andL/1-}}{\pgfkeysvalueof{/zx/args/-andL/1L}}{\pgfkeysvalueof{/zx/args/-andL/2-}}{\pgfkeysvalueof{/zx/args/-andL/2L}}
+      }%
+    },
+    bezier x/.code={%
+      \pgfkeys{
+        /zx/args/-andL/.cd,
+        ##1
+      }%
+      \pgfkeysalso{
+        bezier 4 x={\pgfkeysvalueof{/zx/args/-andL/1-}}{\pgfkeysvalueof{/zx/args/-andL/1L}}{\pgfkeysvalueof{/zx/args/-andL/2-}}{\pgfkeysvalueof{/zx/args/-andL/2L}}
+      }%
+    },
+    bezier y/.code={%
+      \pgfkeys{
+        /zx/args/-andL/.cd,
+        ##1
+      }%
+      \pgfkeysalso{
+        bezier 4 y={\pgfkeysvalueof{/zx/args/-andL/1-}}{\pgfkeysvalueof{/zx/args/-andL/1L}}{\pgfkeysvalueof{/zx/args/-andL/2-}}{\pgfkeysvalueof{/zx/args/-andL/2L}}
+      }%
+    },
+    % Directions: configure start/end points to "fake center *" if it exists.
+    % If the input is not a node, it's copied to ##3
+    /zx/utils/change@tikz@fake@center/.code n args={3}{%
+      % ##1: \tikztostart or \tikztotarget,
+      % ##2: fake center north...
+      % ##3 name of result. e.g. \tikztostart
+      \ifPgfpointOrNode{##1}{%
+        %%% Sometimes, ##1 is not (1pt,2pt) but "tikz-1-2.north east". Since later we use
+        %%% a parsing mechanism which assumes that we have a coordinate... this is a problem.
+        \edef##3{##1}%
+        % This is a great explaination of how parsing is done in tikz:
+        % https://tex.stackexchange.com/a/516897/116348
+      }{% This is a node, not a point:
+        % "zx add anchor to node" might define per-node anchors, and they are stored in
+        % a macro called like \pgf@sh@ma@tikz@f@3-2-2, so we need to read this first:
+        % TODO: maybe use pp@name everywhere? (see comment beginning of this file)
+        \begingroup% This group avoids pollution done by executing pgf@sh@ma@NODENAME
+          \pgfutil@ifundefined{pgf@sh@ma@\tikz@pp@name{##1}}{}{%
+            % We the per-node macro exists, we run it.
+            \csname pgf@sh@ma@\tikz@pp@name{##1}\endcsname%
+          }%
+          \ifAnchorExists{##1}{##2}{%
+            \pgfpointanchor{##1}{##2}%
+          }{%
+            \pgfpointanchor{##1}{center}%
+          }%
+          %%% Whoo, pgfpoint only redefine pgf@x/pgf@y, but in no way it stores it!!!
+          %%% So can't do \pgfpoint{\pgf@x}{\pgf@y}...
+          %%% I needed to create my own system... see \zx@parse@coordx.
+          \xdef##3{\the\pgf@x,\the\pgf@y}%
+        \endgroup%
+      }%
+    },
+    % Directions: configure start/end points to the intersection between
+    % the "fake center *" if it exists and the "fake center *" of the destination.
+    % If the input is not a node, nothing is done.
+    /zx/utils/change@tikz@fake@center@intersect/.code n args={6}{%
+      % ##1: \tikztostart or \tikztotarget
+      % ##2: fake center north... for ##1
+      % ##3: \tikztostart or \tikztotarget, the other one (needed to compute the intersection)
+      % ##4 fake center north... for ##3
+      % ##5: result will be moved to that macro
+      % ##6: 1 if start, 2 if end.
+      \ifPgfpointOrNode{##1}{}{% This is a node, not a point:
+        %% Configure the zx@new@center@* which should point to "fake center" if it exists.
+        \pgfkeysalso{%
+          /zx/utils/change@tikz@fake@center={##1}{##2}{\zx@new@center},%
+        }%
+        \pgfkeysalso{%
+          /zx/utils/change@tikz@fake@center={##3}{##4}{\zx@new@center@other},%
+        }%
+        \zx@message{ZX: coordinate of new center is \zx@new@center}%
+        \zx@message{ZX: coordinate of new other center is \zx@new@center@other}%
+        \zx@find@intersection@fakecenter{##1}{\zx@new@center}{\zx@new@center@other}{##5}{##6}%
+      }%
+    },
+    start fake center east/.style={%
+      /zx/tmp/zx@setup@start@node/.initial=fake center east,
+    },
+    start fake center west/.style={%
+      /zx/tmp/zx@setup@start@node/.initial=fake center west,
+    },
+    start fake center north/.style={%
+      /zx/tmp/zx@setup@start@node/.initial=fake center north,
+    },
+    start fake center south/.style={%
+      /zx/tmp/zx@setup@start@node/.initial=fake center south,
+    },
+    start real center/.style={
+      /zx/tmp/zx@setup@start@node/.initial=center,
+    },
+    start no fake center/.style={
+      /zx/tmp/zx@setup@start@node/.initial=,
+    },
+    end fake center east/.style={%
+      /zx/tmp/zx@setup@end@node/.initial=fake center east,
+    },
+    end fake center west/.style={%
+      /zx/tmp/zx@setup@end@node/.initial=fake center west,
+    },
+    end fake center north/.style={%
+      /zx/tmp/zx@setup@end@node/.initial=fake center north,
+    },
+    end fake center south/.style={%
+      /zx/tmp/zx@setup@end@node/.initial=fake center south,
+    },
+    end real center/.style={
+      /zx/tmp/zx@setup@end@node/.initial=center,
+    },
+    end no fake center/.style={
+      /zx/tmp/zx@setup@end@node/.initial=,
+    },
+    left to right/.style={
+      start fake center east,
+      end fake center west
+    },
+    right to left/.style={
+      start fake center west,
+      end fake center east
+    },
+    up to down/.style={
+      start fake center south,
+      end fake center north
+    },
+    down to up/.style={
+      start fake center north,
+      end fake center south
+    },
+    no fake center/.style={
+      start no fake center,
+      end no fake center,
+      start anchor=,
+      end anchor=,
+    },
+    %% To go to a subnode defined in a pic with from subnode=mysubnode.
+    start subnode/.code={\edef\tikzcd@ar@start{\tikzcd@ar@start##1}},
+    end subnode/.code={\edef\tikzcd@ar@target{\tikzcd@ar@target##1}},
+    %% Forced versions are versions which do not nicely fallback to center if shape does not
+    %% have "fake center XXX". This is used mostly for wires based on in/out (our function b.
+    %% Not sure how to have a code which always fallback to center if shape does not.
+    %% All shapes used in the default style should work with force left to right.
+    force left to right/.style={
+      on layer=edgelayer,
+      start anchor=fake center east,
+      end anchor=fake center west
+    },
+    force right to left/.style={
+      on layer=edgelayer,
+      start anchor=fake center west,
+      end fake center east
+    },
+    force up to down/.style={
+      on layer=edgelayer,
+      start anchor=fake center south,
+      end fake center north
+    },
+    force down to up/.style={
+      on layer=edgelayer,
+      start anchor=fake center north,
+      end fake center south
+    },
+    % Similar to C, but with a softer angle. The '.- marker represents the portion of
+    % the circle (hence the o) to keep (top, bottom,left/right).
+    % Angle is customizable, for instance o'=50.
+    %%% Actually, it may not be super useful to define it via bezier since it's used only
+    %%% horizontally and vertically... Anyway.
+    o'/.style={%
+      left to right,
+      bezier x={
+        defaultO,
+        ##1,
+        %% 2- --> 1 - (2-)
+        oneMinus2-,
+      },
+    },
+    o./.style={%
+      left to right,
+      bezier x={%
+        /zx/args/-andL/.cd,
+        defaultO,
+        ##1,
+        %% 2- --> 1 - (2-)
+        oneMinus2-,
+        negate1L,
+        negate2L,
+      },%
+    },
+    -o/.style={%
+      up to down,
+      bezier y={%
+        /zx/args/-andL/.cd,
+        defaultO,
+        ##1,
+        /zx/args/-andL/2-/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/2-},
+        symmetry-L,
+      }
+    },
+    o-/.style={%
+      up to down,
+      bezier y={%
+        /zx/args/-andL/.cd,
+        defaultO,
+        ##1,
+        /zx/args/-andL/2-/.evaluated=1-\pgfkeysvalueof{/zx/args/-andL/2-},
+        /zx/args/-andL/1L/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/1L},
+        /zx/args/-andL/2L/.evaluated=-\pgfkeysvalueof{/zx/args/-andL/2L},
+        symmetry-L,
+      },
+    },
+    % Similar to o, but can be used also for diagonal items. Combine it with
+    % The dot versions are mode logic in "left to right", and the others for up to down (possible to change)
+    % Can combine with "force left to right"...
+    (/.style={
+      bend right=##1,
+    },
+    (/.default=30,
+    )/.style={
+      bend left=##1,
+    },
+    )/.default=30,
+    ('/.style={
+      bend left=##1
+    },
+    ('/.default=30,
+    (./.style={
+      bend right=##1
+    },
+    (./.default=30,
+    %%%% Links with a N-shape, i.e. like s shape, but symetric against the diagonal. Equivalently, it's a soft 's' shape with a much wider angle (>45).
+    %% Nbase will be reused later by < > shapes as well. It's useful to make a distinction between N and
+    %% Nbase when user will want to overwrite N without overwritting < >.
+    Nbase/.style={
+      left to right,
+      bezier={
+        /zx/args/-andL/.cd,
+        defaultN,
+        ##1,
+        oneMinus2-,
+        oneMinus2L,
+      },
+    },
+    N/.style={Nbase={##1}},
+    % With this model, we don't need differences between N' and N. so we can also call it N.
+    % But keep other notations to allow easy style change (to use IO again for instance).
+    N'/.style={N={##1}},
+    N./.style={N={##1}},
+    -N/.style={N={defaultN-,##1}},
+    -N'/.style={-N={##1}},
+    -N./.style={-N={##1}},
+    N-/.style={-N'={symmetry,##1}},
+    N'-/.style={N-={##1}},
+    N.-/.style={N-={##1}},
+    %% Up to down version
+    NN/.style={N'={symmetry-L,defaultNN,##1},up to down},
+    NN./.style={NN={##1}},
+    .NN/.style={NN={##1}},
+    NIN/.style={NN={defaultNIN,##1}},
+    INN/.style={NIN={symmetry,##1}},
+    NNI/.style={INN={##1}},
+    %%% <' is basically like -N' (historically < was first), we just put an anchor on the east/....
+    <'/.style={Nbase={defaultN,defaultN-,defaultChevron,symmetry,##1},end anchor=west},
+    <./.style={<'={##1}},
+    % Don't use <>^ alone char as style name, it could be useful later for other shortcuts
+    % (replacement directions)
+    '>/.style={Nbase={defaultN,defaultN-,defaultChevron,##1},start anchor=east},
+    .>/.style={'>={##1}},
+    ^./.style={
+      Nbase={defaultN,defaultN-,defaultChevron,symmetry-L,defaultNN,defaultNIN,defaultChevronDown,symmetry,##1},
+      end anchor=north
+    },
+    .^/.style={^.={##1}},
+    'v/.style={
+      Nbase={defaultN,defaultN-,defaultChevron,symmetry-L,defaultNN,defaultNIN,defaultChevronDown,##1},
+      start anchor=south
+    },
+    v'/.style={'v={##1}},
+    %%%% Links with a s-like shape.
+    s/.style={
+      left to right,
+      bezier={%
+        /zx/args/-andL/.cd,
+        defaultS,
+        ##1,
+        oneMinus2-,
+        oneMinus2L,
+      }
+    },
+    % like S, but with anchor east and west
+    S/.style={
+      s={##1}, start anchor=east, end anchor=west
+    },
+    % -s'.- shapes are like s, but with a soften (customizable like o) angle.
+    % The '. say if you are going up or down, and - forces a sharp angle (- is flat) on the side of the -
+    s'/.style={s={defaultS',##1}},
+    s./.style={s'={##1}},
+    -s/.style={s'={default-S,##1}},
+    -s'/.style={-s={##1}},  % To fit with s' notation
+    -s./.style={-s={##1}},
+    s-/.style={-s'={symmetry,##1}},
+    s'-/.style={s-={##1}},
+    s.-/.style={s-={##1}},
+    % Anchor more marked
+    S/.style={s={##1}, start anchor=east, end anchor=west,},
+    -S/.style={-s'={##1},start anchor=east},
+    -S'/.style={-S={##1}},
+    -S./.style={-S={##1}},
+    S-/.style={s'-={##1},end anchor=west},
+    S'-/.style={S-={##1}},
+    S.-/.style={S-={##1}},
+    %%%% Doubling = up to down.
+    % Links with a s-like shape... but read from top to bottom
+    ss/.style={s={symmetry-L,##1},up to down},
+    SS/.style={ss={##1}, start anchor=south, end anchor=north},
+    % -s'.- shapes are like s, but with a soften (customizable like o) angle.
+    % The '. say if you are going up or down, and 'I' forces a sharp angle (I is flat) on the side of the I
+    ss./.style={s.={symmetry-L,##1},up to down},
+    .ss/.style={ss.={##1}},
+    sIs/.style={ss={defaultSIS,##1}},
+    sIs./.style={ss.={defaultSIS,##1}},
+    .sIs/.style={sIs.={##1}},
+    Iss/.style={sIs={symmetry,##1}},
+    ssI/.style={Iss={##1}},
+    ss.I/.style={sIs.={symmetry,##1}},
+    I.ss/.style={ss.I={##1}},
+    SIS/.style={sIs={##1},start anchor=south},
+    .SIS/.style={.sIs={##1},start anchor=south},
+    ISS/.style={ssI={##1},end anchor=north},
+    SS.I/.style={ss.I={##1},end anchor=north},
+    I.SS/.style={SS.I={##1}},
+    SSI/.style={ISS={##1}},
+    % At the first version, styles were defined using in=... out=... looseness=... However
+    % it gives sometimes bad results (like the curve goes forward at some points) when nodes are
+    % too close or too far appart. However, it may still be useful, so now we define the old
+    % styles, that you can use them using \ar[r,IO,C].
+    IO/.style={
+      C/.style={/tikz/in=180,/tikz/out=180,looseness=2},
+      % Like C, but symetric
+      C-/.style={/tikz/in=0,/tikz/out=0,looseness=2},
+      C'/.style={/tikz/in=90,/tikz/out=90,looseness=2},
+      C./.style={/tikz/in=-90,/tikz/out=-90,looseness=2},
+      % Similar to C, but with a softer angle. The '.- marker represents the portion of
+      % the circle (hence the o) to keep (top, bottom,left/right).
+      % Angle is customizable, for instance o'=50.
+      o'/.style={/tikz/out=####1,/tikz/in=180-####1},
+      o'/.default=\zxDefaultSoftAngleO,
+      o./.style={/tikz/out=-####1,/tikz/in=180+####1},
+      o./.default=\zxDefaultSoftAngleO,
+      -o/.style={/tikz/out=-90-####1,/tikz/in=90+####1},
+      -o/.default=\zxDefaultSoftAngleO,
+      o-/.style={/tikz/out=-90+####1,/tikz/in=90-####1},
+      o-/.default=\zxDefaultSoftAngleO,
+      % Similar to o, but can be used also for diagonal items.
+      % Why ()? Visualize fixing the top part and moving the bottom part.
+      (/.style={bend right=####1},
+      (/.default=30,
+      )/.style={bend left=####1},
+      )/.default=30,
+      ('/.style={bend left=####1},
+      ('/.default=30,
+      (./.style={bend right=####1},
+      (./.default=30,
+      <'/.style={out=####1,in=180,looseness=0.65},
+      <'/.default=\zxDefaultSoftAngleChevron,
+      <./.style={out=-####1,in=180,looseness=0.65},
+      <./.default=\zxDefaultSoftAngleChevron,
+      '>/.style={out=0,in=180-####1,looseness=0.65},
+      '>/.default=\zxDefaultSoftAngleChevron,
+      .>/.style={out=0,in=180+####1,looseness=0.65},
+      .>/.default=\zxDefaultSoftAngleChevron,
+      ^./.style={out=-90+####1,in=90,looseness=0.65},
+      ^./.default=\zxDefaultSoftAngleChevron,
+      .^/.style={out=-90-####1,in=90,looseness=0.65},
+      .^/.default=\zxDefaultSoftAngleChevron,
+      'v/.style={out=90+####1,in=-90,looseness=0.65},
+      'v/.default=\zxDefaultSoftAngleChevron,
+      v'/.style={out=90-####1,in=-90,looseness=0.65},
+      v'/.default=\zxDefaultSoftAngleChevron,
+      % Links with a s-like shape.
+      s/.style={/tikz/out=0,/tikz/in=180,looseness=0.6},
+      % -s'.- shapes are like s, but with a soften (customizable like o) angle.
+      % The '. say if you are going up or down, and - forces a sharp angle (- is flat) on the side of the -
+      s'/.style={/tikz/out=####1,/tikz/in=180+####1},
+      s'/.default=\zxDefaultSoftAngleS,
+      s./.style={/tikz/out=-####1,/tikz/in=180-####1},
+      s./.default=\zxDefaultSoftAngleS,
+      -s'/.style={/tikz/out=0,/tikz/in=180+####1},
+      -s'/.default=\zxDefaultSoftAngleS,
+      -s./.style={/tikz/out=0,/tikz/in=180-####1},
+      -s./.default=\zxDefaultSoftAngleS,
+      s'-/.style={/tikz/out=####1,/tikz/in=180},
+      s'-/.default=\zxDefaultSoftAngleS,
+      s.-/.style={/tikz/out=-####1,/tikz/in=180},
+      s.-/.default=\zxDefaultSoftAngleS,
+      % Links with a s-like shape... but read from top to bottom
+      ss/.style={/tikz/out=0-90,/tikz/in=180-90,looseness=0.6},
+      % -s'.- shapes are like s, but with a soften (customizable like o) angle.
+      % The '. say if you are going up or down, and - forces a sharp angle (- is flat) on the side of the -
+      ss./.style={/tikz/out=####1-90,/tikz/in=180-90+####1},
+      ss./.default=\zxDefaultSoftAngleS,
+      .ss/.style={/tikz/out=-####1-90,/tikz/in=180-90-####1},
+      .ss/.default=\zxDefaultSoftAngleS,
+      sIs./.style={/tikz/out=0-90,/tikz/in=180-90+####1},
+      sIs./.default=\zxDefaultSoftAngleS,
+      .sIs/.style={/tikz/out=0-90,/tikz/in=180-90-####1},
+      .sIs/.default=\zxDefaultSoftAngleS,
+      ss.I/.style={/tikz/out=####1-90,/tikz/in=180-90},
+      ss.I/.default=\zxDefaultSoftAngleS,
+      I.ss/.style={/tikz/out=-####1-90,/tikz/in=180-90},
+      I.ss/.default=\zxDefaultSoftAngleS,
+      %%%% Links with a N-shape, i.e. like s shape, but symetric against the diagonal. Equivalently, it's a soft 's' shape with a much wider angle (>45).
+      N'/.style={/tikz/out=####1,/tikz/in=180+####1},
+      N'/.default=\zxDefaultSoftAngleN,
+      N./.style={/tikz/out=-####1,/tikz/in=180-####1},
+      N./.default=\zxDefaultSoftAngleN,
+      -N'/.style={/tikz/out=0,/tikz/in=180+####1},
+      -N'/.default=\zxDefaultSoftAngleN,
+      -N./.style={/tikz/out=0,/tikz/in=180-####1},
+      -N./.default=\zxDefaultSoftAngleN,
+      N'-/.style={/tikz/out=####1,/tikz/in=180},
+      N'-/.default=\zxDefaultSoftAngleN,
+      N.-/.style={/tikz/out=-####1,/tikz/in=180},
+      N.-/.default=\zxDefaultSoftAngleN,
+    },
+    % No line but vdots/dots in between.
+    3 vdots/.style={draw=none, "\makebox[0pt][r]{\footnotesize\smash{##1\,}}\scalebox{\zxScaleDots}{$\cvdotsCenterMathline$}" {anchor=center,zxNormalFont}},
+    3 vdots/.default={},
+    3 vdotsr/.style={draw=none, "\scalebox{\zxScaleDots}{$\cvdotsCenterMathline$}\makebox[0pt][l]{\footnotesize\smash{\,##1}}" {anchor=center,zxNormalFont}},
+    3 vdotsr/.default={},
+    3 dots/.style={draw=none, "\makebox[0pt][r]{\footnotesize\smash{##1}}\scalebox{\zxScaleDots}{$\chdots$}" {anchor=center,zxNormalFont}},
+    3 dots/.default={},
+    % Add a Hadmard/Z/X (no phase) in the middle of the line. Practical to add small nodes without creating
+    % a new column/row. However, make sure the corresponding row/column is larger, using &[\zxHCol]
+    % for columns and \\[\zxHRow] for rows (for Z/X style, use zxSCol and sxSRow), if you have both spiders
+    % and Hadamard, use \zxHSCol and \zxHSRow.
+    H/.style={"" {zxHSmall,anchor=center,##1}},
+    H/.default={},
+    Z/.style={"" {zxNoPhaseSmallZ,anchor=center,##1}},
+    Z/.default={},
+    X/.style={"" {zxNoPhaseSmallX,anchor=center,##1}},
+    X/.default={},
+    % Sometimes, it might be handy to specify an anchor only if no anchor was set before, notably when using "post arrow style if end node" (see
+    % for instance the Divider).
+    end anchor if not set/.code={%
+      \ifx\tikzcd@endanchor\pgfutil@empty% If there is no anchor, we can set ours:
+        \pgfkeysalso{/tikz/commutative diagrams/end anchor={##1}}%
+      \fi%
+    },
+    start anchor if not set/.code={%
+      \ifx\tikzcd@startanchor\pgfutil@empty% If there is no anchor, we can set ours:
+        \pgfkeysalso{/tikz/commutative diagrams/start anchor=##1}%
+      \fi%
+    },
+    % Arrow will go out from the center of the shape instead of from the border. Useful e.g.
+    % when connecting nodes with different shapes, it will give back a symetric connection.
+    wire centered/.style={
+      on layer=edgelayer,
+      /tikz/commutative diagrams/start anchor=center,
+      /tikz/commutative diagrams/end anchor=center,
+    },
+    wire centered start/.style={
+      on layer=edgelayer,
+      /tikz/commutative diagrams/start anchor=center,
+    },
+    wire centered end/.style={
+      on layer=edgelayer,
+      /tikz/commutative diagrams/end anchor=center,
+    },
+    wc/.style={wire centered},
+    wcs/.style={wire centered start},
+    wce/.style={wire centered end},
+    wire not centered/.style={
+      /tikz/commutative diagrams/start anchor=,
+      /tikz/commutative diagrams/end anchor=,
+    },
+  },
+  %% Will be loaded in tikzcd options directly.
+  /zx/styles/rounded style preload/.style={
+    content fixed baseline/.style={
+      /zx/user overlay nodes/.style={
+        zxShort/.append style={content fixed baseline},
+        % fixed baseline gives poor result in fractions, so we disable it here
+        zxSpecificFrac/.append style={content vertically centered},
+      },
+    },
+    content fixed baseline also frac/.style={
+      /zx/user overlay nodes/.style={
+        zxShort/.append style={content fixed baseline},
+      },
+    },
+    content vertically centered/.style={
+      /zx/user overlay nodes/.style={
+        zxShort/.append style={content vertically centered}
+      },
+    },
+    /zx/styles/rounded style common nodes and ZX,
+  },
+  % These styles make sense both in "ZX" options and in nodes options.
+  /zx/styles/rounded style common nodes and ZX/.style={
+    small minus/.code={
+      \def\zxMinus{\zxShortMinus}%
+      \def\zxMinusInShort{\zxShortMinus}%
+    },
+    big minus/.code={
+      \def\zxMinus{-}%
+      \def\zxMinusInShort{-}%
+    },
+  },
+  /zx/styles/rounded style/.style={
+    /zx/styles/rounded style common nodes and ZX,
+    %% Can be redefined by user
+    % Style for empty nodes
+    zxSpacingInsideNodes/.style={
+      execute at begin node={\thinmuskip=0mu\medmuskip=0mu\thickmuskip=0mu}, % Reduce space around +/-...
+    },
+    %% Normalize fonts to avoid different rendering when document has a different font shape.
+    zxNormalFont/.style={
+      font={\fontsize{10}{12}\selectfont},
+    },
+    % Practical styles to either vertically center the content, or fix the position of the baseline.
+    content fixed baseline/.style={
+      text height=1.5mm,%5.4pt,%1.5mm,%.45em,
+      text depth=0.1mm,%1.8pt,%0.1mm,%.15em,
+    },
+    % Style for empty nodes
+    content vertically centered/.style={
+      text height=,
+      text depth=,
+    },
+    bold/.style={very thick},
+    B/.style={bold},
+    non bold/.style={line width=\zxDefaultLineWidth,},
+    NB/.style={non bold},
+    %% To set bold all wires connected to the current wire
+    wires bold/.style={
+      post arrow style if end node={B},
+      post arrow style if start node={B},
+    },
+    Bw/.style={wires bold},
+    BBw/.style={bold, wires bold,},
+    zxAllNodes/.style={
+      shape=rectangle, % Otherwise nodes are asymetrical rectangle, which is not practical in our case. Gives notably anchor "center" which is really centered compared to asymatrical rectangles
+      anchor=center, % Center cells
+      line width=\zxDefaultLineWidth,
+      % Normalize the font size (avoids different rendering of dots...)
+      zxSpacingInsideNodes,
+      zxNormalFont,
+    },
+    % Use this to denote an empty diagram
+    zxEmptyDiagram/.style={
+      zxAllNodes,
+      draw,
+      dashed,
+      minimum size=4mm,
+    },
+    % Style to use when no node is drawn
+    zxNone/.style={
+      zxAllNodes,
+      shape=coordinate, % A coordinate has just a center. Nothing more.
+    },
+    % Style to use when no node is drawn, but a bit of space is required not to make the diagram too small
+    zxNone+/.style={
+      zxAllNodes,
+      inner sep=1mm,
+      outer sep=0mm
+    },
+    % Like zxNone+, but without width (wold prefer |, but special car in |[]|...
+    zxNoneI/.style={
+      zxNone+,
+      inner xsep=0mm,
+    },
+    % Like zxNone+, but without height
+    zxNone-/.style={
+      zxNone+,
+      inner ysep=0mm,
+    },
+    % Style to use when no node is drawn, but a large space must be reserved (typically used to fake two
+    % nodes on a single line) (for +I- versions)
+    zxNoneDouble/.style={
+      shape=coordinate
+    },
+    % Style to use when no node is drawn, but a bit of space is required not to make the diagram too small
+    zxNoneDouble+/.style={
+      zxAllNodes,
+      inner sep=.6em,
+      outer sep=0mm
+    },
+    % Like zxNoneDouble+, but without width (wold prefer |, but special car in |[]|...
+    zxNoneDoubleI/.style={
+      zxNoneDouble+,
+      inner xsep=0mm,
+    },
+    % Like zxNoneDouble+, but without height
+    zxNoneDouble-/.style={
+      zxNoneDouble+,
+      inner ysep=0mm,
+    },
+    % Used to compute the intersection with the node's boundary
+    allow boundary intersection/.code={%
+      \ifdefined\zxEnableIntersectionsNodes%
+        \edef\zx@name@path{zx@name@path@\tikz@fig@name}%
+        \zx@message{[ZX] The name of the path will be \zx@name@path.}%
+        \pgfkeysalso{
+          name path=\zx@name@path, % Used by intersection library
+        }%
+      \fi%
+    },
+    % Will be specific to all spiders
+    zxSpiders/.style={
+      draw=black,
+      allow boundary intersection,% Used later to do math on it.
+    },
+    % Will use this style when drawing a X/Z node without phase (not for end user directly)
+    zxNoPhase/.style={
+      zxAllNodes,
+      zxSpiders,
+      inner sep=0mm,
+      minimum size=2mm,
+      shape=circle,
+    },
+    % Used only in decoration of wires, to add small empty X/Z nodes.
+    zxNoPhaseSmall/.style={
+      zxNoPhase
+    },
+    % Style for nodes that are small enough to fit in a circle, like $\zxMinus \frac{\pi}{4}$ or $- \alpha$
+    zxShort/.style={
+      zxAllNodes,
+      zxSpiders,
+      minimum size=5mm,
+      font={\fontsize{8}{10}\selectfont\boldmath},
+      rounded rectangle,
+      inner sep=0.0mm,
+      scale=0.8,
+    },% negative outer sep would draw lines from inside...
+    % Style for nodes that are bigger, like $\alpha+\beta$ or $(a\oplus b)\pi$
+    zxLong/.style={zxShort, inner xsep=1.2mm},
+    %%% Styles of the label when |phase in label| is used
+    stylePhaseInLabel/.style={
+      font={\fontsize{8}{10}\selectfont\boldmath},
+      inner sep=2pt,
+      outer sep=0pt,
+      rounded rectangle,
+      % node on layer=labellayer, %% Fails in tikzcd: https://tex.stackexchange.com/questions/618823/node-on-layer-style-in-tikz-matrix-tikzcd
+    },
+    stylePhaseInLabelZ/.style={
+      stylePhaseInLabel,
+      fill=green!20!white
+    },
+    stylePhaseInLabelX/.style={
+      stylePhaseInLabel,
+      fill=red!20!white
+    },
+    % Some styles should be applied only on frac
+    zxSpecificFrac/.style={
+    },
+    %%%%%%%%%%% Style defined depending on above ones. Feel free to redefine.
+    zxNoPhaseZ/.style={zxNoPhase,fill=colorZxZ},
+    zxNoPhaseX/.style={zxNoPhase,fill=colorZxX},
+    zxNoPhaseSmallZ/.style={zxNoPhaseSmall,fill=colorZxZ},
+    zxNoPhaseSmallX/.style={zxNoPhaseSmall,fill=colorZxX},
+    zxShortZ/.style={zxShort,fill=colorZxZ},
+    zxShortX/.style={zxShort,fill=colorZxX},
+    zxLongZ/.style={zxLong,fill=colorZxZ},
+    zxLongX/.style={zxLong,fill=colorZxX},
+    %%%%%%%%%%%
+    %%% Instead of adding directly the style as the node's content (which would make
+    %%% impossible styles that adds the phase in a label outside of the node)
+    %%% add@Phase@Spider{,Z,X}={phase of the node} will be in charge of adding it.
+    % add@Phase@Spider{emptyStyle}{ShortStyle}{LongStyle}{label style}{node content}
+    add@Phase@Spider/.style n args={5}{%
+      zx@emptyStyle/.style={##1},
+      zx@shortStyle/.style={##2},
+      zx@notEmptyStyle/.style={##3},
+      zx@labelStyle/.style={##4},
+      /zx/zx@content/.initial={##5},
+      phase in content,
+    },
+    add@Phase@Spider@Frac/.style n args={8}{% add@Phase@Spider{emptyStyle}{NotEmptyStyle}{labelstyle}{sign}{above fraction (no parens)}{below fraction (no parens)}{above fraction (parens)}{below fraction (parens)}
+      zx@emptyStyle/.style={##1},
+      zx@notEmptyStyle/.style={##2},
+      zx@labelStyle/.style={##3},
+      % Useful to help "phase in content" to know if we are in Frac or not.
+      /zx/zx@isInFrac/.initial={true},
+      phase in content,
+    },
+    % #1 is the node content. Seems that storing it in /zx/zx@content is not enough because keys
+    % seems to be local to nodes and are not transfered to label.
+    zx@Execute@Very@End/.style n args={5}{
+      zx@commandToExecuteVeryEnd/.try={##1}{##2}{##3}{##4}{##5},
+    },
+    zx@Execute@Very@End/.default={}{}{}{},
+    %% zx@Execute@Very@End@Frac={emptystyle}{contentstyle}{labelstyle}{sign}{above frac (no parens)}{below frac (no parens)}{above frac (parens)}{below frac (parens)}
+    zx@Execute@Very@End@Frac/.style n args={8}{
+      zx@commandToExecuteVeryEndFrac/.try={##1}{##2}{##3}{##4}{##5}{##6}{##7}{##8},
+    },
+    zx@Execute@Very@End@Frac/.default={}{}{}{}{}{}{}{},
+    %% /!\ WARNING: the following styles "phase..." must be loaded by or *after* add@Phase@Spider...
+    %% To load it on the whole picture, prefer to do:
+    %% \zx[/zx/user post preparation labels/.style={phase in label}]{
+    %%   \zxZ{\alpha}
+    %% }
+    phase in content/.code={%
+      % Check if we are in a Frac or not
+      \ifthenelse{\equal{\pgfkeysvalueof{/zx/zx@isInFrac}}{true}}{%
+        %%% ### We are in a fraction node!
+        %% Modifies zx@commandToExecuteVeryEnd (which is executed at the very end by zx@Execute@Very@End)
+        %% in order to add the good style
+        \pgfkeysalso{
+          % zx@commandToExecuteVeryEndFrac{emptystyle}{contentstyle}{labelstyle}{sign}{above frac (no parens)}{below frac (no parens)}{above frac (parens)}{below frac (parens)}
+          zx@commandToExecuteVeryEndFrac/.style n args={8}{%
+            execute at begin node={\zxConvertToFracInContent{####4}{####5}{####6}{####7}{####8}},%
+          },%
+          % Adds the style:
+          zx@notEmptyStyle,
+        }%
+      }{ %%% ### We are NOT in a fraction node.
+        %% Modifies zx@commandToExecuteVeryEnd (which is executed at the very end by zx@Execute@Very@End)
+        %% in order to add the good style
+        \pgfkeysalso{
+          zx@commandToExecuteVeryEnd/.style n args={5}{%
+            execute at begin node={####5},% ####4 = content
+          }%
+        }%
+        % Checks if the content (stored by add@Phase@Spider in /zx/zx@content) is empty or not
+        \ifthenelse{\equal{\pgfkeysvalueof{/zx/zx@content}}{}}{%
+          \pgfkeysalso{%
+            zx@emptyStyle,%
+          }%
+        }{% We check if we need to force "short mode" (zxShort instead of zxLong)
+          \ifthenelse{\equal{\pgfkeysvalueof{/zx/zx@shortModeForced}}{true}}{%
+            \pgfkeysalso{%
+              zx@shortStyle,%
+            }%
+          }{% Otherwise, just use the default style.
+            \pgfkeysalso{%
+              zx@notEmptyStyle,%
+            }%
+          }%
+        }%
+      }%
+    },
+    phase in label/.code={
+      % Check if we are in a Frac or not
+      \ifthenelse{\equal{\pgfkeysvalueof{/zx/zx@isInFrac}}{true}}{%
+        %%% ### We are in a fraction node!
+        \pgfkeysalso{%
+          % zx@commandToExecuteVeryEndFrac{emptystyle}{contentstyle}{labelstyle}{sign}{above frac (no parens)}{below frac (no parens)}{above frac (parens)}{below frac (parens)}
+          zx@commandToExecuteVeryEndFrac/.code n args={8}{%
+            \pgfkeysalso{
+              label={[####3,##1] \zxConvertToFracInLabel{####4}{####5}{####6}{####7}{####8}},%
+            }%
+          },%
+          zx@emptyStyle,
+        }%
+      }{%
+        \pgfkeysalso{%
+          % ##1 is the argument of "phase in label", i.e. the style of the label
+          zx@commandToExecuteVeryEnd/.code n args={5}{% ####4: label style, ####5: content
+            % Checks if the content (stored by add@Phase@Spider in /zx/zx@content) is empty or not
+            \ifthenelse{\equal{####5}{}}{% Content is empty
+            }{% Content is not empty
+              \pgfkeysalso{
+                label={[####4,##1] ####5},%
+              }%
+            }%
+          },%
+          zx@emptyStyle,
+        }%
+      }%
+    },
+    pil/.style={phase in label={##1}},
+    phase in label below/.style={
+      phase in label={label position=below,##1}
+    },
+    pilb/.style={phase in label below={##1}},
+    phase in label above/.style={
+      phase in label={label position=above,##1}
+    },
+    pila/.style={phase in label above={##1}},
+    phase in label right/.style={
+      phase in label={label position=right,##1}
+    },
+    pilr/.style={phase in label right={##1}},
+    phase in label left/.style={
+      phase in label={label position=left,##1}
+    },
+    pill/.style={phase in label left={##1}},
+    %%% Was supposed to automatically find the good style depending on content... Can't find how to do.
+    % Styles zxLong{X/Z} zxNoPhase{X/Z} are automatically selected by \zxZ4{...} and \zxX4{...} commands
+    % and zxShort is selected for fractions only like in \zxFracZ-{\pi}{4}
+    % zxZ/.style={zxChoose={##1},fill=colorZxZ},
+    % zxX/.style={zxChoose={##1},fill=colorZxX},
+    %%% First argument is additional style.
+    %%% Second argument is the minus mode: "-" for minus sign, which forces short mode.
+    %%% Third argument is "*" for forced short mode.
+    %%% 4th argument is content of node.
+    zx@spider/.code n args={8}{
+      %% ##1: zxnophase style
+      %% ##2: zxshort style
+      %% ##3: zxlong style
+      %% ##4: label style
+      %% user provided:
+      %% ##5: additional tikz options
+      %% ##6: minus "-" or empty, like "-alpha"
+      %% ##7: star "*" or empty, to force short mode
+      %% ##8: content
+      %%% The argument is a minus. Like \zxZ-{\alpha}, goal is to typeset "-\alpha" in short mode.
+      \ifthenelse{\equal{##6}{-}}{% It's a minus!
+        \pgfkeysalso{% We update the content to "-content"
+          /zx/zx@shortModeForced/.initial={true},%
+        }%
+      }{}%
+      \ifthenelse{\equal{##7}{*}}{% We force short mode!
+        \pgfkeysalso{%
+          /zx/zx@shortModeForced/.initial={true},%
+        }%
+      }{}%
+      %  It's a minus, and LaTeX is... grrrr. How to get a cleaner code? Tried def/let, not working.
+      \ifthenelse{\equal{##6}{-}}{%
+        \pgfkeysalso{%
+          add@Phase@Spider={##1}{##2}{##3}{##4}{\zxMinusInShort##8},%
+        }%
+      }{%
+        \pgfkeysalso{%
+          add@Phase@Spider={##1}{##2}{##3}{##4}{##8},%
+        }%
+      }%
+      \pgfkeysalso{%
+        /zx/post preparation labels,
+        /zx/user post preparation labels,
+        % /zx/user overlay nodes,
+        ##5,
+      }%
+      \ifthenelse{\equal{##6}{-}}{% It's a minus, and LaTeX is... grrrr
+        \pgfkeysalso{%
+          zx@Execute@Very@End={##1}{##2}{##3}{##4}{\zxMinusInShort##8},%
+        }%
+      }{%
+        \pgfkeysalso{%
+          zx@Execute@Very@End={##1}{##2}{##3}{##4}{##8},%
+        }%
+      }%
+    },
+    %% ##1: additional tikz options
+    %% ##2: minus "-" or empty, like "-alpha"
+    %% ##3: star "*" or empty, to force short mode
+    %% ##4: content
+    zxZ4/.style n args={4}{
+      zx@spider={zxNoPhaseZ}{zxShortZ}{zxLongZ}{stylePhaseInLabelZ}{##1}{##2}{##3}{##4}
+    },
+    zxX4/.style n args={4}{
+      zx@spider={zxNoPhaseX}{zxShortX}{zxLongX}{stylePhaseInLabelX}{##1}{##2}{##3}{##4}
+    },
+    %% These take 6 arguments: additional style, sign (string "-" for minus, nothing for "+",
+    %% otherwise inserted directly), above fraction (no parens), below fraction (no parens), above fraction (parens), below fraction (parens).
+    zxFracZ6/.style n args={6}{
+      add@Phase@Spider@Frac={zxNoPhaseZ}{zxShortZ,zxSpecificFrac}{stylePhaseInLabelZ}{##2}{##3}{##4}{##5}{##6},
+      /zx/post preparation labels,
+      /zx/user post preparation labels,
+      ##1,
+      zx@Execute@Very@End@Frac={zxNoPhaseZ}{zxShortZ,zxSpecificFrac}{stylePhaseInLabelZ}{##2}{##3}{##4}{##5}{##6},
+    },
+    zxFracX6/.style n args={6}{
+      add@Phase@Spider@Frac={zxNoPhaseX}{zxShortX}{stylePhaseInLabelX}{##2}{##3}{##4}{##5}{##6},
+      /zx/post preparation labels,
+      /zx/user post preparation labels,
+      ##1,
+      zx@Execute@Very@End@Frac={zxNoPhaseX}{zxShortX}{stylePhaseInLabelX}{##2}{##3}{##4}{##5}{##6},
+    },
+    % For Hadamard
+    zxH/.style={
+      zxAllNodes,
+      outer sep=0pt,
+      fill=colorZxH,
+      draw,
+      inner sep=0.6mm,
+      minimum height=1.5mm,
+      minimum width=1.5mm,
+      shape=rectangle},
+    zxHSmall/.style={zxH},
+  },
+  % Default style. Can be changed by user
+  /zx/default style nodes/.style={
+    /zx/styles/rounded style
+  },
+  % Will be executed in tikzcd options. Useful to define a "global" option specific to a given style.
+  /zx/default style nodes preload/.style={
+    /zx/styles/rounded style preload,
+  },
+  % User can put here any additional property
+  /zx/user overlay nodes/.style={
+  },
+  % User can put here any global ZX options
+  /zx/user overlay/.style={
+  },
+  % Any additional property that needs to be loaded after add@Phase@Spider (by script, not by user).
+  /zx/post preparation labels/.style={
+  },
+  % User can put here any additional property that needs to be loaded after add@Phase@Spider
+  /zx/user post preparation labels/.style={
+  },
+  % Default wire style. Can be changed by user.
+  /zx/default style wires/.style={
+  },
+  % User can add stuff in this style to improve wire styles
+  /zx/user overlay wires/.style={
+  },
+  /zx/defaultEnv/.style={
+    %tiny depends on the size of the font... which we want to keep consistent look
+    column sep=\zxDefaultColumnSep,
+    row sep=\zxDefaultRowSep,
+    zx column sep/.code={%
+      \def\zxDefaultColumnSep{##1}%
+      \pgfkeysalso{
+        column sep=##1,
+      }%
+    },
+    zx row sep/.code={%
+      \def\zxDefaultRowSep{##1}%
+      \pgfkeysalso{%
+        row sep=##1,
+      }%
+    },
+    %column sep=tiny,
+    %row sep=tiny,
+    % center on the math axis
+    baseline={([yshift=-axis_height]current bounding box.center)},
+    % Fix 1-row diagram baseline
+    % By default, 1-row diagrams have a different baseline... This package does not want a special case for 1-row diagrams.
+    1-row diagram/.style={},
+    %% usage: math baseline=wantedBaseline, where you have somewhere \zxX[a=wantedBaseline]{\beta}
+    math baseline/.style={baseline={([yshift=-axis_height]##1)}},
+    math baseline row/.style={math baseline=\tikzcdmatrixname-##1-1},
+    math baseline row/.default={1},
+    mbr/.style={math baseline row={##1}},
+    mbr/.default={1},
+    debug mode/.code={\def\zxDebugMode{}},
+    no debug mode/.code={\let\zxDebugMode\undefined},
+    amp/.style={
+      ampersand replacement=\&,
+    },
+    %%% Include a diagram in another diagram.
+    use diagram/.style 2 args={
+      execute at end picture={
+        \node[fit=##2,anchor=center,inner sep=0pt,yshift=-axis_height]{\zxUseDiagram{##1}};
+      }
+    },
+    %%% Include a diagram in another diagram.
+    use diagram advanced/.style n args={3}{
+      execute at end picture={
+        \node[fit=##2,anchor=center,inner sep=0pt,yshift=-axis_height,##3]{\zxUseDiagram{##1}};
+      }
+    },
+    % Load (thanks ".search also") our own style
+    /tikz/every node/.style={%
+      % Otherwise, the empty nodes take some space… and create weird bugs. But I don't know how to add empties
+      % https://tex.stackexchange.com/questions/675958/tikz-empty-nodes-with-different-style-coordinate
+      % ==> solved, see "empty"
+      nodes={
+        zxAllNodes,
+        inner sep=0pt,
+        outer sep=0mm,
+      },
+      % For quickly adding alias, and displaying this alias in debug mode.
+      a/.code={%
+        \pgfkeysalso{%
+          % alias=####1,%
+          % alias seems to fail with nodes in pic… let's try another method. See also:
+          % https://tex.stackexchange.com/questions/679647/tikz-pic-alias-to-internal-node
+          %% TODO: according to the above discussion, this append after command should be done after the
+          %% add anchor to node is finished, as an alias is basically copying all the macros of the initial node,
+          %% so you want to do it once its finished (in particular to preserve the anchors). But maybe
+          %% append after command is already avoiding that issue. In any case it would be good to make it more
+          %% robust (\tikzlastnode might change, so defining my own \tikzlastnode might help, use link instead
+          %% of copy alias to be sure the anchors are preserved etc...)
+          append after command={\pgfextra{%
+              \pgfnodealias{####1}{\tikzlastnode}%
+              % There is no way anymore to remember the link between the alias and the non-alias. Let's rembember it
+              % manually
+              \expanded{\noexpand\gdef\csname zx@alias@\zxCurrentDiagram @####1\endcsname{\tikzlastnode}}%
+            }%
+          },
+        }%
+        %% name path won't work with alias... So let's create two name path ^^
+        %% https://tex.stackexchange.com/questions/619622
+        \ifdefined\zxEnableIntersectionsNodes%
+          \edef\zx@name@path{zx@name@path@####1}%
+          \zx@message{[ZX] Name given using an alias: \zx@name@path.}%
+          \pgfkeysalso{
+            name path=\zx@name@path, % Used by intersection library
+          }%
+        \fi%
+        \ifdefined\zxDebugMode%
+          \pgfkeysalso{%
+            label={[inner sep=0pt,overlay,red,font={\fontsize{5}{6}}]-45:\scalebox{.5}{####1}}
+          }%
+        \fi%
+      },
+      %% This allows nodes to specify styles for the arrows that start/end from them.
+      %% This style will be loaded last as otherwise we don't know yet the starting and ending point.
+      %% See how we apply it on the arrow side using "every arrow post"
+      post arrow style if start node/.style={%
+        append after command={% This expects a path, but we want to write a code without any path:
+          \pgfextra% this syntax with \endpgfextra completely turns off the tikz syntax, that might be safer than \pgfextra{...}.
+            \def\zx@arguments{####1}%
+            \edef\zx@tmp{%
+              /zx/internals/postRunIfIamStartNode-\tikzlastnode/.append style={\unexpanded\expandafter{\zx@arguments}},%
+            }% https://tex.stackexchange.com/questions/47905/how-to-globally-tikzset-styles
+            {%
+              \globaldefs=1\relax%
+              \pgfkeysalsofrom{\zx@tmp}%
+            }%
+          \endpgfextra%
+        },%
+      },
+      post arrow style if end node/.style={%
+        append after command={% This expects a path, but we want to write a code without any path:
+          \pgfextra% this syntax with \endpgfextra completely turns off the tikz syntax, that might be safer than \pgfextra{...}.
+            \def\zx@arguments{####1}%
+            \edef\zx@tmp{%
+              /zx/internals/postRunIfIamEndNode-\tikzlastnode/.append style={\unexpanded\expandafter{\zx@arguments}},%
+            }% https://tex.stackexchange.com/questions/47905/how-to-globally-tikzset-styles
+            {%
+              \globaldefs=1\relax%
+              \pgfkeysalsofrom{\zx@tmp}%
+            }%
+          \endpgfextra%
+        },%
+      },%
+      /zx/default style nodes,
+      /zx/user overlay nodes,
+    },
+    every arrow/.style={%
+      /zx/wires definition,
+      /zx/default style wires,
+      /zx/user overlay wires,
+      %%% Load the post arrow style at the end:
+      /tikz/commutative diagrams/every arrow post/.append style={%
+        /utils/exec={% We provide a way to disable the default behavior
+          \ifdefined\zxDisablePostRunStart\else%
+            %%% If it is an alias, we replace it with the original node:
+            \ifcsname zx@alias@\zxCurrentDiagram @\tikzcd@ar@start\endcsname% This is an alias: let's rename it to the original node
+              \edef\tikzcd@ar@start{\csname zx@alias@\zxCurrentDiagram @\tikzcd@ar@start\endcsname}%
+            \fi%
+            %%% Load the arrow style set by the start node:
+            \edef\zx@tmp{% Make sure that the style exists and load it:
+              /zx/internals/postRunIfIamStartNode-\tikzcd@ar@start/.append style={},%
+              /zx/internals/postRunIfIamStartNode-\tikzcd@ar@start,%
+            }%
+            \pgfkeysalsofrom{\zx@tmp}%
+          \fi%
+          %%% Load the arrow style set by the end node:
+          \ifdefined\zxDisablePostRunEnd\else%
+            %%% If it is an alias, we replace it with the original node:
+            \ifcsname zx@alias@\zxCurrentDiagram @\tikzcd@ar@target\endcsname% This is an alias: let's rename it to the original node
+              \edef\tikzcd@ar@target{\csname zx@alias@\zxCurrentDiagram @\tikzcd@ar@target\endcsname}%
+            \fi%
+            \edef\zx@tmp{% Make sure that the style exists and load it:
+              /zx/internals/postRunIfIamEndNode-\tikzcd@ar@target/.append style={},%
+              /zx/internals/postRunIfIamEndNode-\tikzcd@ar@target,%
+            }%
+            \pgfkeysalsofrom{\zx@tmp}%
+          \fi%
+        }%
+      },%
+      disable post run start/.code={\def\zxDisablePostRunStart{}},
+      disable post run end/.code={\def\zxDisablePostRunEnd{}},
+      disable post run/.style={
+        disable post run start,
+        disable post run end,
+      },
+    },
+    %% We add an empty coordinate in every node. This has multiple advantages: first this avoids errors about
+    %% single ampersand when the matrix does not start with None, and it also avoids using \zxN{} everywhere.
+    %% However, we can't just use 'nodes in empty cells=true' or it will add nodes that might take some space:
+    /tikz/execute at empty cell={
+      \coordinate[
+        % yshift=axis_height, % We already do that elsewhere
+        name=\tikzmatrixname
+      -\the\pgfmatrixcurrentrow-\the\pgfmatrixcurrentcolumn];
+    },
+    % When an arrow is present, it will not detect it as an empty cell… The below code tries to avoid this issue, but actually has another issue as it removes all nodes without text in it, like |[circle, draw, inner sep=3pt]|, so
+    % we disable it for now.
+    %% https://tex.stackexchange.com/questions/675958/tikz-empty-nodes-with-different-style-coordinate/675971#675971
+    % /tikz/every node/.append code={%
+    %   \tikz@addoption{%
+    %     \ifdim\wd\pgfnodeparttextbox=0pt
+    %       \pgfutil@ifx\tikz@shape\tikz@coordinate@text{}{%
+    %         \def\tikz@shape{coordinate}%
+    %         \pgftransformyshift{axis_height}}%
+    %     \fi}%
+    % },
+    %%% To be used only in \zx{...} environment.
+    %%% Exemple:
+    phase in content/.style={
+      /zx/post preparation labels/.append style={
+        phase in content,
+      }
+    },
+    phase in label/.style={
+      /zx/post preparation labels/.append style={
+        phase in label={##1},
+      }
+    },
+    phase in label above/.style={
+      /zx/post preparation labels/.append style={
+        phase in label above={##1},
+      }
+    },
+    phase in label below/.style={
+      /zx/post preparation labels/.append style={
+        phase in label below={##1},
+      }
+    },
+    phase in label right/.style={
+      /zx/post preparation labels/.append style={
+        phase in label right={##1},
+      }
+    },
+    phase in label left/.style={
+      /zx/post preparation labels/.append style={
+        phase in label left={##1},
+      }
+    },
+    % for "Phase In Label"
+    pil/.style={phase in label={##1}},
+    pilb/.style={phase in label below={##1}},
+    pila/.style={phase in label above={##1}},
+    pilr/.style={phase in label right={##1}},
+    pill/.style={phase in label left={##1}},
+    % Load the global options style-specific
+    /zx/default style nodes preload,
+    /zx/user overlay,
+  },
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Helper functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% Defines a "on layer=nameoflayer" style. TODO: check if better to move it in /zx/
+% https://tex.stackexchange.com/questions/20425/z-level-in-tikz/20426#20426
+% For path: on layer=namelayer, for nodes "node on layer=..."
+% /!\ node on layer fails in tikzcd: https://tex.stackexchange.com/questions/618823/node-on-layer-style-in-tikz-matrix-tikzcd
+\pgfkeys{%
+  /tikz/on layer/.code={
+    \pgfonlayer{#1}\begingroup
+    \aftergroup\endpgfonlayer
+    \aftergroup\endgroup
+  },
+  /tikz/node on layer/.code={
+    \gdef\node@@on@layer{%
+      \setbox\tikz@tempbox=\hbox\bgroup\pgfonlayer{#1}\unhbox\tikz@tempbox\endpgfonlayer\egroup}
+    \aftergroup\node@on@layer
+  },
+  /tikz/end node on layer/.code={
+    \endpgfonlayer\endgroup\endgroup
+  }
+}
+\def\node@on@layer{\aftergroup\node@@on@layer}
+
+%%% Declare a symbol for a short minus (useful in fractions)
+\DeclareMathSymbol{\zxShortMinus}{\mathbin}{AMSa}{"39}% Requires amssymb. This version should not be redefined by the user to obtain a normal minus (or "small minus" won't work anymore)
+\def\zxMinus{\zxShortMinus}
+
+%%% Checks if a function is a point or a node.
+%%% Not sure if best solution (needed to dig into source of TeX), but can't find anything better in manual
+%%% https://tex.stackexchange.com/questions/6189553
+\def\ifPgfpointOrNode#1#2#3{%
+  \pgfutil@ifundefined{pgf@sh@ns@#1}{%
+    #2%
+  }{%
+    #3%
+  }%
+}
+
+% shape anchor name if exists if not. Works, while doing \pgfutil@ifundefined{pgf@anchor@\shapenode{}@#2} fails.
+% I guess it has to do with the way macro are expanded...
+\def\ifAnchorExistsFromShape#1#2#3#4{%
+  \pgfutil@ifundefined{pgf@anchor@#1@#2}{%
+    #4%
+  }{%
+    #3%
+  }%
+}
+
+% node name, anchor name, if exists, if not.
+\def\ifAnchorExists#1#2#3#4{%
+  %%% First we extract the shape of the node:
+  \edef\pgf@node@name{#1}%
+  \edef\shapenode{\csname pgf@sh@ns@\pgf@node@name\endcsname}% e.g. rectangle
+  \ifAnchorExistsFromShape{\shapenode}{#2}{#3}{#4}%
+}
+
+%% If we manually add an anchor to a note, \ifAnchorExists will not work. Hence this improved version:
+%% Note that #3 and #4 will run in a group
+\def\ifAnchorExistsNodeSpecific#1#2#3#4{%
+  \let\zxcalculus@tmp\undefined% This is used to run #3 and #4 outside the group
+  {% group not to pollute stuff with pgf@sh@ma
+    \ifcsname pgf@sh@ma@#1\endcsname% per node config
+      \csname pgf@sh@ma@#1\endcsname% we run the config
+    \fi%
+    %%% First we extract the shape of the node:
+    \edef\pgf@node@name{#1}%
+    \edef\shapenode{\csname pgf@sh@ns@\pgf@node@name\endcsname}% e.g. rectangle
+    \ifAnchorExistsFromShape{\shapenode}{#2}{\gdef\zxcalculus@tmp{}}{}%    
+  }%
+  \ifdefined\zxcalculus@tmp%
+    #3%
+  \else%
+    #4%
+  \fi%
+}
+
+%%% Create different kinds of dots...
+%% https://tex.stackexchange.com/questions/617959
+%% https://tex.stackexchange.com/questions/528774/excess-vertical-space-in-vdots/528775#528775
+\DeclareRobustCommand\cvdotsAboveBaseline{%
+  \vbox{\baselineskip4\p@ \lineskiplimit\z@%
+    \hbox{.}\hbox{.}\hbox{.}}
+}
+
+\DeclareRobustCommand{\cvdotsCenterMathline}{%
+  % vcenter is used to center the argument on the 'math axis', which is at half the height of an 'x', or about the position of a minus sign.
+  \vcenter{\cvdotsAboveBaseline}%
+}
+
+\DeclareRobustCommand{\cvdotsCenterBaseline}{%
+  \raisebox{-.5\height}{%
+    $\cvdotsAboveBaseline$%
+  }%
+}
+
+\DeclareRobustCommand{\chdots}{%
+  \raisebox{-.5\height}{%
+    \rotatebox{90}{% Maybe better options than rotatebox...
+      $\cvdotsAboveBaseline$%
+    }%
+  }%
+}
+
+\DeclareRobustCommand{\cvdots}{\cvdotsCenterMathline}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Practical functions to nest diagrams
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\NewDocumentCommand{\zxSaveDiagram}{mO{}m}{
+  \newsavebox{#1}%
+  \savebox{#1}{%
+    \ifdefined\tikz@library@external@loaded% Library external is loaded...
+      \tikzset{external/optimize=false}% Otherwise, tikz will try to optimize and replace the box with a text
+    \fi%
+    \begin{ZX}[#2]#3\end{ZX}
+  }%
+}
+
+\NewDocumentCommand{\zxUseDiagram}{m}{
+  \usebox{#1}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%
+%%% Main environments
+%%%%%%%%%%%%%%%%%%%%%
+
+% Quantikz has a bug which adds space automatically.
+% https://tex.stackexchange.com/questions/618330
+% Fixing that by copying the original (unpatched) functions, and reusing them later.
+% Warning: you must load this package **before** quantikz otherwise the fix will not work.
+\let\tikzcd@@originalCopyZx\tikzcd@
+\let\endtikzcd@originalCopyZx\endtikzcd
+
+%%%%% Main environment \begin{ZX}...\end{ZX}. However, we call it ZXNoExt because when using
+%%%%% externalization (to save compilation time), we need to wrap it around a figure.
+\NewDocumentEnvironment{ZXNoExt}{O{}}{%
+  \bgroup%
+  % Do not change the font size here or it will change axis_height... Use \fontsize{10}{12}\selectfont
+  % when drawing some texts instead.
+  % Add a switch in case someone really wants the current tikzcd version:
+  \ifdefined\doNotPatchQuantikz% Do not patch tikzcd.
+  \else% Restore locally original tikzcd.
+    \let\tikzcd@\tikzcd@@originalCopyZx%
+    \let\endtikzcd\endtikzcd@originalCopyZx%
+  \fi%
+  \ifdefined\zxDoNotPatchArrows% Do not patch arrows (we need sometimes "every arrow post")
+  \else% Copy/pasted from https://github.com/astoff/tikz-cd/blob/master/tikzlibrarycd.code.tex, just added "every arrow post".
+    %% I'm not sure which method is more resilient: patchcmd is likely to fail on minor library update,
+    %% while redefining \tikzcd@ar@new might not apply some major library upgrades (note that we redefine it
+    %% only locally). Since I don't know what is better, I do both depending on this macro
+    \ifdefined\zxUsePatchCmdToPatchArrows%
+      \patchcmd\tikzcd@ar@new%
+      {\path[/tikz/commutative diagrams/.cd,everyx arrow,#1]}%
+      {\path[/tikz/commutative diagrams/.cd,every arrow,#1,every arrow post]}%
+      {}%
+      {}%
+    \else%
+      \def\tikzcd@ar@new[##1]{% Make sure to turn #1 into ##1 as the command is nested
+        \pgfutil@g@addto@macro\tikzcd@savedpaths{%
+          \path[/tikz/commutative diagrams/.cd,every arrow,##1,every arrow post]%<--- we added every arrow post
+          (\tikzcd@ar@start\tikzcd@startanchor) to (\tikzcd@ar@target\tikzcd@endanchor); }}%
+    \fi%
+  \fi%
+  % We make sure "every arrow post" exists:
+  \tikzset{%
+    /tikz/commutative diagrams/every arrow post/.append style={}%
+  }%
+  \pgfsetlayers{background,belownodelayer,edgelayer,nodelayer,main,abovenodelayer,box,labellayer,foreground}% Layers are defined locally to avoid to disturb other drawings
+  %% Provide a way to reference the current diagram. This way it is for instance possible to do
+  %% \ar[from=Zbotright, to=\zxCurrentDiagram-1-1]
+  %% For this to work, you should not modify the name of the matrix.
+  \def\zxCurrentDiagram{tikz@f@\the\tikz@fig@count}%Does not exists yet... Hopefully it's updated soon enough
+  % We provide a way to get the current matrix name:
+  \begin{tikzcd}[%
+    /zx/defaultEnv,%
+    #1]%
+  }{\end{tikzcd}\egroup}
+
+% https://tex.stackexchange.com/a/619983/116348
+\ExplSyntaxOn
+%%%%% Shortcut macro \zxNoExt{...} equivalent to \begin{ZX}...\end{ZX}
+%%%%% We will create an alias \zx, but when we use externalization we
+%%%%% wrap it around a figure.
+\NewDocumentCommand{\zxNoExt}{O{}+m}{% Warning, expl syntax removes space.
+  \tl_rescan:nn { \char_set_catcode_active:N \& } { \begin{ZXNoExt}[#1] #2 \end{ZXNoExt} }
+}
+\ExplSyntaxOff
+
+%% Version to use when using externalize (it wraps it around a 
+\NewDocumentCommand{\zxExt}{O{}O{}O{}+m}{% Warning, expl syntax removes space.
+  \begin{tikzpicture}[baseline=(zxlibrarymainnode.base),#2]%
+    \node(zxlibrarymainnode)[inner sep=0pt,outer sep=0pt,#3]{\zxNoExt[#1]{#4}};%
+  \end{tikzpicture}%
+}
+
+\NewDocumentEnvironment{ZXExt}{O{}O{}O{}+b}{%
+  \zxExt[#1][#2][#2]{#4}%
+}{}%
+
+\NewDocumentEnvironment{ZX}{O{}O{}O{}+b}{%
+  \zx[#1][#2][#3]{#4}%
+}{}
+
+% The external library is not compatible with tikzcd directly.
+% So if:
+% \zx@external@mode is enabled, we wrap the figure into another figure to be compatible with tikz externalize
+% otherwise, we check if the external library is loaded, and disable it temporarily.
+\NewDocumentCommand\zx{O{}O{}O{}+m}{%
+  {%
+    % Suffix for pictures made only with zx when using the external library
+    \ifdefined\tikz@library@external@loaded% Library external is loaded...
+      \ifdefined\zx@external@suffix%
+        \tikzappendtofigurename{\zx@external@suffix}%
+      \fi%
+    \fi%
+    \ifdefined\zx@external@mode%
+      % We wrap everything around figures and enable tikz external (useful when many figures
+      % are not compatible with external):
+      \ifthenelse{\equal{\zx@external@mode}{wrapForceExt}}{%
+        {\tikzexternalenable\zxExt[#1][#2][#3]{#4}}%
+      }{
+        \ifthenelse{\equal{\zx@external@mode}{wrap}}{% We wrap everything around figures to be compatible with external
+          \zxExt[#1][#2][#3]{#4}%
+        }{% We don't wrap anything inside figures, so we lose external compatibility.
+          \ifthenelse{\equal{\zx@external@mode}{noWrapNoExt}}{%
+            % We disable the tikz external library temporarily (tikzcd is not compatible with it)
+            \ifdefined\tikz@library@external@loaded% Library external is loaded...
+              \tikzexternaldisable%
+              \message{WARNING: you chose to disable temporarily the tikz external library.}%
+            \fi%
+          }{}
+          \zxNoExt[#1]{#4}%
+        }%
+      }%
+    \else% Mode auto enabled
+      {% If the tikz library is loaded:
+        \ifdefined\tikz@library@external@loaded% Library external is loaded...
+          \zxExt[#1][#2][#3]{#4}%
+        \else%
+          \zxNoExt[#1]{#4}%      
+        \fi%
+      }%
+    \fi%
+  }%
+}
+
+%% By default, the error displayed when compiling using "external"
+%% is not meaningful and does not stop if a picture already exists.
+%% https://tex.stackexchange.com/questions/633100/stop-at-error-meaningfull-errors-with-shell-escape-and-tikz-externalize/633121#633121
+%% See also this bug, that shows that if you have an error and compile twice, the error disappears, but the old file is used instead.
+%% https://github.com/pgf-tikz/pgf/issues/1137
+\NewDocumentCommand\zxConfigureExternalSystemCall{O{}}{
+  %% Code inspired by https://github.com/pgf-tikz/pgf/blob/a7b45b35e99af11bf7156aa3697b897b98870e5b/tex/generic/pgf/frontendlayer/tikz/libraries/tikzexternalshared.code.tex#L277
+  \expandafter\def\csname zx@driver@pgfsys-luatex.def\endcsname{%
+    \pgfkeyssetvalue{/tikz/external/system call}{%
+      lualatex \tikzexternalcheckshellescape #1 -jobname "\image" "\texsource"%
+    }%
+  }%
+  \expandafter\def\csname zx@driver@pgfsys-pdftex.def\endcsname{%
+    \pgfutil@IfUndefined{directlua}{%
+      \pgfkeyssetvalue{/tikz/external/system call}{%
+        pdflatex \tikzexternalcheckshellescape #1 -jobname "\image" "\texsource"%
+      }%
+    }{%
+      \pgfkeyssetvalue{/tikz/external/system call}{%
+        lualatex \tikzexternalcheckshellescape #1 -jobname "\image" "\texsource"%
+      }%
+    }%
+  }%
+  \expandafter\def\csname zx@driver@pgfsys-xetex.def\endcsname{%
+    \pgfkeyssetvalue{/tikz/external/system call}{%
+      xelatex \tikzexternalcheckshellescape #1 -jobname "\image" "\texsource"%
+    }%
+  }%
+  \expandafter\def\csname zx@driver@pgfsys-dvips.def\endcsname{%
+    \pgfkeyssetvalue{/tikz/external/system call}{%
+      latex \tikzexternalcheckshellescape #1 -jobname "\image" "\texsource" %
+      && dvips -o "\image".ps "\image".dvi %
+    }%
+  }%
+  % Auto-select a suitable default value fo 'system call':
+  \pgfutil@ifundefined{tikzexternal@driver@\pgfsysdriver}{%
+    % fallback. We do not know the driver here.
+    \csname zx@driver@pgfsys-pdftex.def\endcsname
+  }{%
+    \csname zx@driver@\pgfsysdriver\endcsname
+  }%
+}
+
+% Call zxConfigureExternalSystemCall with the same system call as the calling program
+% Useful otherwise the error may be missed (for instance errorstopmode works in pdflatex but not in
+% emacs, and nonstopmode works in emacs, but not in pdflatex).
+% The current mode is stored in \interactionmode, 0, 1, 2, 3 corresponding respectively to batch, nonstop, scroll or errorstop. 
+% https://tex.stackexchange.com/questions/91592/where-to-find-official-and-extended-documentation-for-tex-latexs-commandlin
+\NewDocumentCommand\zxConfigureExternalSystemCallAuto{}{%
+  \message{XXX Configuring auto.}
+  \ifnum\interactionmode=0 %
+  \message{XXX Configuring auto 0.}
+    \zxConfigureExternalSystemCall[-interaction=batchmode]%
+  \fi%
+  \ifnum\interactionmode=1 %
+  \message{XXX Configuring auto 1.}
+    \zxConfigureExternalSystemCall[-interaction=nonstopmode]% emacs
+  \fi%
+  \ifnum\interactionmode=2 %
+  \message{XXX Configuring auto 2.}
+    \zxConfigureExternalSystemCall[-interaction=scrollmode]%
+  \fi%
+  \ifnum\interactionmode=3 %
+  \message{XXX Configuring auto 3.}
+    \zxConfigureExternalSystemCall[-interaction=errorstopmode]% pdflatex by default
+  \fi%
+}
+
+
+\ifdefined\zxDoNotPatchSystemCall\else%
+  \zxConfigureExternalSystemCallAuto
+\fi
+
+% \zx@external@mode can be undefined (=auto), wrap or nowrap.
+
+%% Automatically check if the external library is loaded, and use it.
+\NewDocumentCommand\zxExternalAuto{}{%
+  \let\zx@external@mode\undefined%
+}
+
+%% Force to wrap the ZX figures around a figure to ensure compatibility with external.
+\NewDocumentCommand\zxExternalWrap{}{%
+  \def\zx@external@mode{wrap}%
+}
+
+%% Do not wrap the ZX figures around another figure (not compatible with external)
+\NewDocumentCommand\zxExternalNoWrap{}{%
+  \def\zx@external@mode{nowrap}%
+}
+
+%% Do not wrap the ZX figures, but disable external for these figures (semi-compatible with external)
+\NewDocumentCommand\zxExternalNoWrapNoExt{}{%
+  \def\zx@external@mode{noWrapNoExt}%
+}
+
+%% Wrap the ZX figures, and enable external for these figures (useful when most other environments
+%% are not compatible with tikz external)
+\NewDocumentCommand\zxExternalWrapForceExt{}{%
+  \def\zx@external@mode{wrapForceExt}%
+}
+
+% Mode auto is enabled by default
+\zxExternalAuto
+
+\NewDocumentCommand\zxExternalSuffix{m}{
+  \ifthenelse{\equal{#1}{}}{% Nothing submitted: we erase the suffix
+    \let\zx@external@suffix\undefined%
+  }{%
+    \def\zx@external@suffix{#1}
+  }%
+}
+
+\zxExternalSuffix{zx}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Custom nodes from Pic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% It is quite complicated to define custom node shapes, especially when using anchors. Here, we define a
+%% Way to easily create a custom node from a picture.
+
+%% This code allows to add a new anchor to a given node:
+%% https://tex.stackexchange.com/a/676090/116348
+\tikzset{
+  zx add anchor to node/.code n args={3}{%
+    \edef\tikz@temp##1{% \tikz@pp@name/\tikzlastnode needs to be expanded
+      %% This codes does the following thing:
+      %% First, it modifies the "\pgf@anchor@rectangle@fake center west" macro (rectangle might be another shape,
+      %% same for anchor). But since this macro might be different between nodes sharing the same shape,
+      %% it adds it to a per-node macro called like \pgf@sh@ma@tikz@f@3-2-2 (tikz@f@3-2-2 is the name of the
+      %% node).
+      \noexpand\pgfutil@g@addto@macro\expandafter\noexpand\csname pgf@sh@ma@\tikz@pp@name{#1}\endcsname{%
+        \def\expandafter\noexpand\csname pgf@anchor@\csname pgf@sh@ns@\tikz@pp@name{#1}\endcsname @#2\endcsname{##1}%
+      }%
+    }%
+    \tikz@temp{#3}%
+  },
+  zx add anchor to pic default/.style={/tikz/zx add anchor to pic={#1}{#1}},
+  zx add anchor to pic/.code 2 args={%
+    % If base coordinate isn't created yet, do so at (0,0)
+    % in the current coordinate system!
+    \pgfutil@ifundefined{pgf@sh@ns@\tikz@pp@name{}}{%
+      \pgfcoordinate{\tikz@pp@name{}}{\pgfpointorigin}%
+    }{}%
+    \begingroup
+      % What is the distance between coordinate and base?
+      % We have to do this in the coordinate system of the base coordinate.
+      \pgfsettransform{\csname pgf@sh@nt@\tikz@pp@name{}\endcsname}%
+      \pgf@process{\pgfpointanchor{\tikz@pp@name{#2}}{center}}%
+      % This distance is the new anchors coordinate
+      % in the base's coordinate system.
+      % Adding an anchor to a node must be global
+      % which is why we can do this inside the group.
+      \pgfkeysalso{
+        /tikz/zx add anchor to node/.expanded=%
+          {}{#1}{\noexpand\pgfqpoint{\the\pgf@x}{\the\pgf@y}}
+      }%
+    \endgroup
+  }%
+}
+
+%%% Create automatically a new pic-based node
+%%% \zxNewNodeFromPic{nameOfNode}[default style before user][default style after user]{content of the pic}
+%%% - In 'default style before user', we can put any style that is given to the pic (e.g. colors, rotate, scale…)
+%%% or even custom properties that will be read by the pic (e.g. to allow the define the number of spikes of a
+%%% star). This style can notably have "zx create anchors={a, list, of, coordinates, to, turn, into, anchors}"
+%%% that will automatically turn any coordinate in the pic in the list of coordinates into an anchor of the
+%%% parent node.
+%%% - In 'default style after user', the style is run after the code provided by the user. In particular, you can
+%%% use "invert top bottom"  to invert the "top" version with the "bottom" version (rotation is minus 90 instead
+%%% of 90 for instance).
+\NewDocumentCommand{\zxNewNodeFromPic}{mO{}O{}O{}O{}m}{%
+  \tikzset{%
+    #1Pic/.pic={%
+      #6%
+      % The user can even add more stuff to draw after if needed by redefining this macro:
+      \ifdefined\zxCustomPicAdditionalPic\zxCustomPicAdditionalPic\fi%
+      \tikzset{%
+        % We store the list of anchors to create into \zxListOfNewAnchors. If it does not exist we create it:
+        /utils/exec={\ifdefined\zxListOfNewAnchors\else\def\zxListOfNewAnchors{}\fi},
+        % We add the coordinates in \zxListOfNewAnchors as anchors for the node
+        zx add anchor to pic default/.list/.expanded={\zxListOfNewAnchors}}%
+    },%
+    #1/.style={%
+      %shape=coordinate, %yshift=axis_height, %% already applied
+      #4,
+      append after command={%
+        pic[
+        % We configure the name and position of the pic
+        at=(\tikzlastnode), name=\tikzlastnode,
+        % We create a command to add anchors via zx create anchors={my, list, of, anchors}. This way, it also allows dynamic anchors using
+        % the default style after user.
+        zx create anchors/.store in={\zxListOfNewAnchors},
+        zx create anchors={},
+        % We create a new style to apply to the main node
+        zx main node/.style={
+          name=,
+          zx forward to node/.append style={},
+          zx forward to node,
+        },
+        % We load the other default arguments:
+        #2,
+        % We try to load a potentially global style configured by the user (mostly used to override this library)
+        /zx/picCustomStyleBeforeUser#1/.append style={}, % Make sure it exists to avoid errors
+        /zx/picCustomStyleBeforeUser#1,
+        % We load the per-instance arguments:
+        ##1,
+        % We try to load a potentially global style configured by the user (mostly used to override this library)
+        /zx/picCustomStyleAfterUser#1/.append style={}, % Make sure it exists to avoid errors
+        /zx/picCustomStyleAfterUser#1,
+        #3,
+        % We try to load a potentially global style configured by the user (mostly used to override this library)
+        /zx/picCustomStyleLastPic#1/.append style={}, % Make sure it exists to avoid errors
+        /zx/picCustomStyleLastPic#1,
+        ]{#1Pic}%
+      },
+    }%
+  }%
+  %% \ExpandArgs{c} is an equivalent of expandafter + csname, to expand the first argument before evaluating the function:
+  %% https://tex.stackexchange.com/a/676103/116348
+  %% ##1: pic additional style
+  %% ##2: node additional style
+  %% ##3: text to consume with \tikzpictext
+  % \ExpandArgs{c}\NewExpandableDocumentCommand{zx#1}{t.t-t'O{}O{}m}{%
+  %   |[#1={pic text={##6}, ##4}, ##5]|%
+  % }%
+  \ExpandArgs{c}\NewExpandableDocumentCommand{zx#1}{O{}O{}t.t-t't/t*e_m}{%
+    |[#1={
+      pic text={##9},
+      %% The alias=… should rather be called on the second element. But it's quite handy to write it here, so here we go:
+      a/.style={%
+        zx forward to node/.append style={
+          a={########1},
+        },
+      },
+      %% The mode stored in \zxRotationMode contains the current rotation mode (i.e. the angle between 0 and 359, typically 0,90,180,270),
+      %% to allow further tweaks (for instance, a pic might be mirrored instead of rotated by 180° when using the parameter -, and this
+      %% can be configured by reading this variable).
+      /utils/exec={%
+        \def\zxCurrentRotationMode{0}%
+        %%% Fake center is mostly for curves like <', and true north/ is mostly for curves like C, C'...
+        %%% These anchor name are changed depending on the rotation: the north/… is before the rotation.
+        \def\zxVirtualCenterNorth{fake center north}%
+        \def\zxVirtualCenterSouth{fake center south}%
+        \def\zxVirtualCenterEast{fake center east}%
+        \def\zxVirtualCenterWest{fake center west}%
+        \def\zxTrueNorth{true north}%
+        \def\zxTrueSouth{true south}%
+        \def\zxTrueEast{true east}%
+        \def\zxTrueWest{true west}%
+        \IfBooleanT{##3}{%
+          \def\zxCurrentRotationMode{90}%
+          \def\zxVirtualCenterNorth{fake center west}%
+          \def\zxVirtualCenterSouth{fake center east}%
+          \def\zxVirtualCenterEast{fake center north}%
+          \def\zxVirtualCenterWest{fake center south}%
+          \def\zxTrueNorth{true west}%
+          \def\zxTrueSouth{true east}%
+          \def\zxTrueEast{true north}%
+          \def\zxTrueWest{true south}%
+        }%
+        \IfBooleanT{##4}{%
+          \def\zxCurrentRotationMode{180}%
+          \def\zxVirtualCenterNorth{fake center south}%
+          \def\zxVirtualCenterSouth{fake center north}%
+          \def\zxVirtualCenterEast{fake center west}%
+          \def\zxVirtualCenterWest{fake center east}%
+          \def\zxTrueNorth{true south}%
+          \def\zxTrueSouth{true north}%
+          \def\zxTrueEast{true west}%
+          \def\zxTrueWest{true east}%
+        }%
+        \IfBooleanT{##5}{%
+          \def\zxCurrentRotationMode{270}%
+          \def\zxVirtualCenterNorth{fake center east}%
+          \def\zxVirtualCenterSouth{fake center west}%
+          \def\zxVirtualCenterEast{fake center south}%
+          \def\zxVirtualCenterWest{fake center north}%
+          \def\zxTrueNorth{true east}%
+          \def\zxTrueSouth{true west}%
+          \def\zxTrueEast{true south}%
+          \def\zxTrueWest{true north}%
+        }%
+        \IfBooleanT{##6}{%
+          \def\zxModeSlash{}%
+        }%
+        \IfBooleanT{##7}{%
+          \def\zxModeStar{}%
+        }%
+        % Embellishments can contain something like \zxMynode_{Text A}{Text B}
+        \IfNoValueTF{##8}{}{%
+          \def\zxModeUnderscore{##8}%
+        }%
+      },
+      rotate=\zxCurrentRotationMode,%
+      %%% Sometimes it can be quite handy to invert the top and the bottom version if it does not match with the
+      %%% intuitive position it should have.
+      %%% Make sure to call this in the second optional parameter (after user style)
+      invert top bottom/.style={
+        rotate=-\zxCurrentRotationMode,
+        /utils/exec={%
+          \ifnum\zxCurrentRotationMode=90\relax
+            \def\zxCurrentRotationMode{270}%
+          \else
+            \ifnum\zxCurrentRotationMode=270\relax
+              \def\zxCurrentRotationMode{90}%
+            \fi
+          \fi
+        },
+        rotate=\zxCurrentRotationMode,%        
+      },%
+      invert right left/.style={
+        rotate=-\zxCurrentRotationMode,
+        /utils/exec={%
+          \ifnum\zxCurrentRotationMode=0\relax
+            \def\zxCurrentRotationMode{180}%
+          \else
+            \ifnum\zxCurrentRotationMode=180\relax
+              \def\zxCurrentRotationMode{0}%
+            \fi
+          \fi
+        },
+        rotate=\zxCurrentRotationMode,%        
+      },%
+      ##1}, #5, ##2]|%
+  }%
+}%
+
+%% Useful to increase or decrease the bounding box of a custom node.
+%% Parameters are like extend=5mm (that extends on all directions), and similarly for top/bottom/left/right/horizontal/vertical
+\NewExpandableDocumentCommand{\zxExtendBoundingBox}{m}{%
+  \pgfkeys{
+    /zx/.cd,
+    left/.store in=\zx@left,
+    left=0pt,
+    right/.store in=\zx@right,
+    right=0pt,
+    top/.store in=\zx@top,
+    top=0pt,
+    bottom/.store in=\zx@bottom,
+    bottom=0pt,
+    horizontal/.style={
+      left=##1,
+      right=##1,
+    },
+    vertical/.style={
+      /zx/top=##1,
+      /zx/bottom=##1,
+    },
+    extend/.style={
+      vertical=##1,
+      horizontal=##1,
+    },
+    #1,
+  }%
+  \path[use as bounding box] ([xshift=-\zx@left,yshift=\zx@top]current bounding box.north west)
+    rectangle ([xshift=\zx@right,yshift=-\zx@bottom]current bounding box.south east);%
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Some special nodes based on \zxNewNodeFromPic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Ground symbol
+\zxNewNodeFromPic{Ground}[scale=\zxGroundScale][invert top bottom]{
+  \draw[line width=\zxDefaultLineWidth]
+  (0,0) -- (1mm,0)
+  -- +(0,1mm) -- +(0,-1mm)
+  ++(.4mm,0)
+  -- +(0,.7mm) -- +(0,-.7mm)
+  ++(.4mm,0)
+  -- +(0,.35mm) -- +(0,-.35mm);
+  \coordinate() at (0,0); % Empty coordinate make the center start at the right position
+}
+
+%% From scalable ZX calculus
+\zxNewNodeFromPic{Divider}[][
+  % Because of the rounded corners, the lines will stop before touching the shape when arriving on the angle. So we force such nodes to be drawn below
+  % the shape, targeting a point inside the node.
+  %post arrow style if end node/.expanded={% we need to expand everything before setting the style, as this style will be executed much later in the arrow,
+  post arrow style if end node={% if the text contains macro like \zxVirtualCenterWest use post arrow style if end node/.expanded instead as these macro
+    % will not exist anymore once the line is drawn
+    on layer=edgelayer,%
+    end anchor if not set=fake center north,
+  },%
+  post arrow style if start node={% if the text contains macro like \zxVirtualCenterWest use post arrow style if end node/.expanded instead as these macro
+    % will not exist anymore once the line is drawn
+    on layer=edgelayer,%
+    start anchor if not set=fake center south,
+  },%
+  zx create anchors={\zxVirtualCenterWest, \zxVirtualCenterEast, \zxVirtualCenterNorth, \zxVirtualCenterSouth},
+  every node/.append style={transform shape}
+]{
+  \node[regular polygon, regular polygon sides=3,shape border rotate=90, draw=black,fill=gray!50, inner sep=1.6pt, rounded corners=0.8mm,zx main node] {};
+  \coordinate(\zxVirtualCenterEast) at (.2mm,0); % Used to start lines on the side of the shape
+  \coordinate(\zxVirtualCenterWest) at (-1mm,0);
+  \coordinate(\zxVirtualCenterNorth) at (\zxVirtualCenterWest); % Synonyme, useful to determine where to start
+  \coordinate(\zxVirtualCenterSouth) at (\zxVirtualCenterEast); % Synonyme, useful to determine where to start
+}
+
+%% Matrix symbol
+\zxNewNodeFromPic{Matrix}
+  [
+    % As we want - to only swap the position of the label but not the rotation (we use * already for transpose)
+    % we disable the above rotation:
+    rotate=-\zxCurrentRotationMode,
+    % Otherwise the space between colums is too big
+    /utils/exec={\setlength\arraycolsep{1pt}}, 
+  ][zx create anchors={true north,true south,true east,true west}]{
+  \node[zx main node, draw, signal, fill=colorZxMatrix, inner sep=1pt, minimum height=6pt, transform shape,
+    % The direction of the shape is turned when using the * symbol (transpose). 
+    signal to/.expanded={\ifdefined\zxModeStar west\else east\fi},
+    signal from/.expanded={\ifdefined\zxModeStar east\else west\fi},
+    % We disabled the default rotation (* is for transpose), but we still want to rotate it to read to/down:
+    rotate/.expanded={mod(-\zxCurrentRotationMode,180)},
+    % If we want the syntax \zxMatrix{45:f} to put f at 45 degrees, we want to expand \tikzpictext
+    % *before* to read the key, hence the need for expanded.
+    label/.expanded={[
+      inner sep=2pt,
+      % The position of the label is independent of the rotation, but depends on the rotation mode ('.-):
+      absolute,
+      label position=\ifdefined\zxLabelAngle \zxLabelAngle\else 90+\zxCurrentRotationMode\fi,
+      font=\noexpand\footnotesize, % We don't want to expand \footnotesize before defining the label
+      % we use the / decoration
+      overlay/.expanded={\ifdefined\zxModeSlash true\else false\fi},
+      % Math mode by default:
+      execute at begin node=$, execute at end node=$,
+      /zx/picCustomStyleMatrixLabel/.append style={}, % Make sure it exists to avoid errors
+      /zx/picCustomStyleMatrixLabel,
+      ]
+      % We put as the label the text directly. Note that \unexpanded\expandafter expands the next token only once
+      % as if it gets expanded further, we can get errors (e.g.\ with pmatrix)
+      \unexpanded\expandafter{\tikzpictext}
+      \ifdefined\zxModeUnderscore\noexpand\begin{bmatrix}\noexpand\zxModeUnderscore\noexpand\end{bmatrix}\fi
+    },
+    /zx/picCustomStyleMatrixMainNode/.append style={}, % Make sure it exists to avoid errors
+    /zx/picCustomStyleMatrixMainNode,
+    ]{};
+    \coordinate(true east) at (.east); % Used to start lines on the side of the shape
+    \coordinate(true west) at (.west);
+    \coordinate(true north) at (true west); % Synonyme, useful to determine where to start
+    \coordinate(true south) at (true east); % Synonyme, useful to determine where to start
+}
+
+% %% Box, that just draws... a box
+\zxNewNodeFromPic{Box}[
+  main/.style={
+    /zx/picCustomStyleBoxMainNode/.append style={####1},
+  },
+][zx create anchors={fake center north,fake center south,fake center east,fake center west}]{%
+  \node[draw, inner sep=1.3mm, rectangle, zx main node, execute at begin node=$, execute at end node=$,alias=hello,
+    /zx/picCustomStyleBoxMainNode/.append style={}, % Make sure it exists to avoid errors
+    /zx/picCustomStyleBoxMainNode,
+  ]{\tikzpictext};%
+  \coordinate(fake center north) at (.north);%
+  \coordinate(fake center west) at (.west);%
+  \coordinate(fake center east) at (.east);%  
+  \coordinate(fake center south) at (.south);%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% 
+%%% Now using a special command for fractions (easier to code, and more customizable)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%% Like \zx but uses \& instead of &. This WAS useful for instance in "align" environments
+%%%%% since \zx{} was given an error (even without using &, changing the catcode was enough to
+%%%%% break the function). However, in recent versions, \zx should work as it in align, and
+%%%%% \begin{ZX}...\end{ZX} seems to always work in align without any issues.
+%%%%% Anyway, if at some points you have troubles, either use
+%%%%% \begin{ZX}[amp] ... \end{ZX} (amp is shortcut for "ampersand replacement=\&") or this function:
+\NewDocumentCommand{\zxAmp}{O{}+m}{%
+  \begin{ZX}[ampersand replacement=\&, #1]%
+    #2%
+  \end{ZX}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Practical macros to automatically choose appropriate style and arrows
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% /!\ Warning: you should add {} at the end of all macros (except arrows)!
+% Not using that may work for now, but it may break later...
+% TODO: define them only in \zx environment.
+
+% A swap on one line... Practical mostly to gain space. Must be used with large nodes tough...
+% \NewExpandableDocumentCommand{\OneLineSwap}{}{%
+%   \ar[r,s,start anchor=south,end anchor=north] \ar[r,s,start anchor=north,end anchor=south]
+% }
+
+
+\NewExpandableDocumentCommand{\zxLoop}{O{90}O{20}O{}m}{%
+  \ar[loop,in=#1-#2,out=#1+#2,looseness=8,min distance=3mm,#3]
+}
+
+\NewExpandableDocumentCommand{\zxLoopAboveDots}{O{20}O{}m}{%
+  \ar[loop,in=90-#1,out=90+#1,looseness=8,min distance=3mm,"\cvdotsCenterMathline" {zxNormalFont,scale=.6,anchor=north,yshift=-0.25mm},#2]
+}
+
+
+% Usage: node without any style, but may have space. Default is no space, \zxNone+{} is both horizontal
+% and vertical, \zxNone-{} is only horizontal space, \zxNone|{} is only vertical space.
+\NewExpandableDocumentCommand{\zxNone}{t+t-t|O{}m}{
+  \IfBooleanTF{#1}{% \zxNone+
+    |[zxNone+,#4]| #5%
+  }{
+    \IfBooleanTF{#2}{% \zxNone-
+      |[zxNone-,#4]| #5%
+    }{
+      \IfBooleanTF{#3}{% \zxNone
+        |[zxNoneI,#4]| #5%
+      }{% \zxNone
+        |[zxNone,#4]| #5%
+      }%
+    }%
+  }%
+}
+
+% Usage: alias of \zxNone... To bad token can't be easily forwarded to another function.
+\NewExpandableDocumentCommand{\zxN}{t+t-t|O{}m}{
+  \IfBooleanTF{#1}{% \zxNone+
+    |[zxNone+,#4]| #5%
+  }{
+    \IfBooleanTF{#2}{% \zxNone-
+      |[zxNone-,#4]| #5%
+    }{
+      \IfBooleanTF{#3}{% \zxNone|
+        |[zxNoneI,#4]| #5%
+      }{% \zxNone
+        |[zxNone,#4]| #5%
+      }%
+    }%
+  }%
+}
+
+
+% Usage: can be used without {}. Wait, actually it MUST be used without {} which is disturbing… to fix
+\def\zxNL{
+  \zxN{} \rar \pgfmatrixnextcell[\zxwCol]%
+}
+
+% Usage: can be used without {}
+\def\zxNR{
+  \pgfmatrixnextcell[\zxwCol] \zxN{}  \ar[l]
+}
+
+
+
+% Cf \zxNone, but with larger space.
+\NewExpandableDocumentCommand{\zxNoneDouble}{t+t-t|O{}m}{
+  \IfBooleanTF{#1}{% \zxNoneDouble+
+    |[zxNoneDouble+,#4]| #5%
+  }{
+    \IfBooleanTF{#2}{% \zxNoneDouble-
+      |[zxNoneDouble-,#4]| #5%
+    }{
+      \IfBooleanTF{#3}{% \zxNoneDouble
+        |[zxNoneDoubleI,#4]| #5%
+      }{% \zxNoneDouble
+        |[zxNoneDouble,#4]| #5%
+      }
+    }
+  }
+}
+
+%% For maximum styling liberty, the content is given directly to the style.
+% It allows the style to put the phase in a label.
+\NewExpandableDocumentCommand{\zxZ}{O{}t*t-m}{
+  |[zxZ4={#1}{\IfBooleanTF{#3}{-}{}}{\IfBooleanTF{#2}{*}{}}{#4}]| %
+}
+
+%% For maximum styling liberty, the content is given directly to the style.
+%% It allows the style to put the phase in a label.
+\NewExpandableDocumentCommand{\zxX}{O{}t*t-m}{
+  |[zxX4={#1}{\IfBooleanTF{#3}{-}{}}{\IfBooleanTF{#2}{*}{}}{#4}]| %
+}
+
+\NewExpandableDocumentCommand{\zxH}{O{}m}{
+  |[zxH,#1]| {}%
+}
+
+% Use like: \zxFracX{\pi}{4} for positive values or for negative \zxFracX-{\pi}{4}
+\NewExpandableDocumentCommand{\zxFracZ}{O{}t-moom}{%
+  \IfNoValueTF{#5}{% 2 arguments like: \zxFracZ{\pi}{2}
+    |[zxFracZ6={#1}{\IfBooleanTF{#2}{\zxMinus}{}}{#3}{#6}{#3}{#6}]| %
+  }{% 4 arguments like \zxFracZ{a+b}[(a+b)][(c+d)]{c+d}
+    |[zxFracZ6={#1}{\IfBooleanTF{#2}{\zxMinus}{}}{#3}{#6}{#4}{#5}]| %
+  }%
+}
+
+% Use like: \zxFracX{\pi}{4} for positive values or for negative \zxFracX-{\pi}{4}
+\NewExpandableDocumentCommand{\zxFracX}{O{}t-moom}{%
+  \IfNoValueTF{#5}{% 2 arguments like: \zxFracZ{\pi}{2}
+    |[zxFracX6={#1}{\IfBooleanTF{#2}{\zxMinus}{}}{#3}{#6}{#3}{#6}]| %
+  }{% 4 arguments like \zxFracZ{a+b}[(a+b)][(c+d)]{c+d}
+    |[zxFracX6={#1}{\IfBooleanTF{#2}{\zxMinus}{}}{#3}{#6}{#4}{#5}]| %
+  }%
+}
+
+\NewExpandableDocumentCommand{\zxEmptyDiagram}{}{
+  |[zxEmptyDiagram]| {}%
+}
+
+
+% % Example: \leftManyDots{n}
+% Useful to put on the left of a node like "n \vdots", linked to the next node.  Example: \leftManyDots{n}.
+% First optional argument is scale of text, second is scale of =.
+\NewExpandableDocumentCommand{\leftManyDots}{O{1}O{\zxScaleDots}m}{%
+  |[zxNone+,inner xsep=0pt]| \scalebox{#1}{$#3$\,}\makebox[0pt][l]{\scalebox{#2}{$\cvdotsCenterMathline$}} \ar[r,-N.,start anchor=north east] \ar[r,-N',start anchor=south east] \pgfmatrixnextcell[\zxwCol]%
+}
+
+% Useful to link two nodes and put a vdots in between.
+\NewExpandableDocumentCommand{\middleManyDots}{}{%
+  \ar[r,3 vdots] \ar[o',r] \ar[o.,r]%
+}
+
+% Like \leftManyDots but on the right. Do *not* create a new node, like in |[zxShortZ]| \alpha \rightManyDots{m}
+\NewExpandableDocumentCommand{\rightManyDots}{O{1}O{\zxScaleDots}m}{%
+  \ar[r,N'-,end anchor=north west] \ar[r,N.-,end anchor=south west] \pgfmatrixnextcell[\zxwCol] |[zxNone+,inner xsep=0pt]| \makebox[0pt][r]{\scalebox{#2}{$\cvdotsCenterMathline$}}\scalebox{#1}{\,$#3$}
+}
+
+% Shortcut for frequent wires
+\NewExpandableDocumentCommand{\zxDoubleO}{O{}m}{%
+  \ar[r,o.,#1] \ar[r,o',#1]
+}
+
+% Version going down
+\NewExpandableDocumentCommand{\zxDoubleOD}{O{}m}{%
+  \ar[r,o-,#1] \ar[r,-o,#1]
+}
+
+\NewExpandableDocumentCommand{\zxTtripleO}{O{}m}{%
+  \rar \ar[r,o.,#1] \ar[r,o',#1]
+}
+
+\NewExpandableDocumentCommand{\zxTripleOD}{O{}m}{%
+  \rar \ar[r,-.,#1] \ar[r,o-,#1]
+}
+
+
+\NewExpandableDocumentCommand{\zxOneOverSqrtTwo}{O{}m}{%
+  \zxZ{} \rar[#1] \ar[r,o.,#1] \ar[r,o',#1] \pgfmatrixnextcell \zxX{}
+}
+
+\NewExpandableDocumentCommand{\zxSqrtTwo}{O{}m}{%
+  \zxZ{} \rar[#1] \pgfmatrixnextcell \zxX{}
+}
+
+
+%% Need AfterEndPreamble otherwise there is an error when using tikzexternalize.
+\AfterEndPreamble{
+  \zxSaveDiagram{\zxCteOneOverSqrtTwo}{\zxZ{} \rar \ar[r,o.] \ar[r,o'] \pgfmatrixnextcell \zxX{}}
+  \zxSaveDiagram{\zxCteSqrtTwo}{\zxZ{} \rar \pgfmatrixnextcell \zxX{}}
+}
+
+%% Useful to give name to box
+%% \namedBox{(node1)(node2)}{text}
+%% \namedBox[additional style][color]{(node1)(node2)}[additional label options]{optional position:text}
+%% \begin{ZX}[
+%%   execute at end picture={
+%%     \zxNamedBox{(measZ)(measZ)}{right:Bell measure}
+%%   }
+%%   ]
+%%   \zxN{} \dar[C] \ar[rrr] & & & \zxN{} \\
+%%   \zxN{} \ar[rr] &&\zxX[a=measX]{x\pi} \dar[C-]\\
+%%   & \zxX{r\pi} \rar& \zxZ[a=measZ]{z\pi}
+%% \end{ZX}
+
+%% Helper
+%% https://tex.stackexchange.com/questions/523579/tikz-fit-inner-sep-seperate-values-for-all-4-directions
+% \tikzset{fit margins/.style={
+%     /tikz/afit/.cd,
+%     #1,
+%     /tikz/.cd,
+%     inner xsep=\pgfkeysvalueof{/tikz/afit/left}+\pgfkeysvalueof{/tikz/afit/right},
+%     inner ysep=\pgfkeysvalueof{/tikz/afit/top}+\pgfkeysvalueof{/tikz/afit/bottom},
+%     xshift=-\pgfkeysvalueof{/tikz/afit/left}+\pgfkeysvalueof{/tikz/afit/right},
+%     yshift=-\pgfkeysvalueof{/tikz/afit/bottom}+\pgfkeysvalueof{/tikz/afit/top},
+%     afit/.cd,
+%     left/.initial=1pt,right/.initial=1pt,bottom/.initial=1pt,top/.initial=1pt
+%   }}
+
+\tikzset{
+  fit margins/.style={
+    /tikz/afit/.cd,#1,
+    /tikz/.cd,
+    inner xsep=\pgfkeysvalueof{/tikz/afit/left}+\pgfkeysvalueof{/tikz/afit/right},
+    inner ysep=\pgfkeysvalueof{/tikz/afit/top}+\pgfkeysvalueof{/tikz/afit/bottom},
+    xshift=-\pgfkeysvalueof{/tikz/afit/left}+\pgfkeysvalueof{/tikz/afit/right},
+    yshift=-\pgfkeysvalueof{/tikz/afit/bottom}+\pgfkeysvalueof{/tikz/afit/top}
+  },
+  afit/.cd,
+  left/.initial=1pt,
+  right/.initial=1pt,
+  bottom/.initial=1pt,
+  top/.initial=1pt,
+  horizontal/.style={
+    left=#1,
+    right=#1,
+  },
+  vertical/.style={
+    top=#1,
+    bottom=#1,
+  },
+  all/.style={
+    horizontal=#1,
+    vertical=#1,
+  },
+  /tikz/.cd
+}
+
+\NewExpandableDocumentCommand{\zxNamedBox}{O{}O{blue}mO{}m}{
+  \node[inner sep=2pt, node on layer=background, rounded corners, draw=#2,dashed, fill={#2!50!white}, opacity=.5, fit=#3,label={[#4]#5},#1]{};
+  %\node[fit margins={}, node on layer=background, rounded corners, draw=#2,dashed, fill={#2!50!white}, opacity=.5, fit=#3,label={[#4]#5},#1]{};
+  %\node[inner sep=2pt, node on layer=background, rounded corners, draw=#2,dashed, fill={#2!50!white}, opacity=.5, fit=#3,label={[#4]#5},#1]{};
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Old code that tried to automatically find if zxShort or zxLong should be used...
+%%% Now using a special command for fractions (easier to code, and more customizable)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newsavebox\zx@box % Temporary box to compute height/width/depth
+
+\newlength{\zxMaxDepthPlusHeight}\setlength{\zxMaxDepthPlusHeight}{2em}
+\def\zxMaxRatio{1.3} % Ratio width/(height+depth)
+
+\NewExpandableDocumentCommand{\zxChooseStyle}{mmmm}{%
+  % #1=text,#2=empty style,#3=short style,#4=long style
+  \savebox\zx@box{#1}%
+  % Check if width is 0pt:
+  \ifdimcomp{\wd\zx@box}{=}{0pt}{% Return empty style if box is empty
+    #2%
+  }{% Else compute size of thext
+    % Check if height+depth < zxMaxDepthPlusHeight to see if short style applies
+    \ifdimcomp{\dimexpr\dp\zx@box+\ht\zx@box\relax}{<}{\zxMaxDepthPlusHeight}{%
+      % Check if width < ratio*(height+depth) to see if short style applies
+      \ifdimcomp{\wd\zx@box}{<}{\dimexpr \zxMaxRatio\ht\zx@box + \zxMaxRatio\dp\zx@box\relax}{%
+        #3% Short style is used
+      }{% Else
+        #4% Long style is used
+      }%
+    }{%
+      #4% Long style is used
+    }%
+  }%
+}

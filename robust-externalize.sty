@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2024/03/15 v2.9 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2024/03/19 v2.9+unstable Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -3475,6 +3475,9 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     only placeholders in compilation command={__ROBEXT_LATEX_COMPILATION_COMMAND__,__ROBEXT_LATEX_ENGINE__,__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__},
     only placeholders in template={__ROBEXT_LATEX__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_LATEX_DOCUMENT_CLASS__,__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_LATEX_PREAMBLE_HYPERREF__,__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_LATEX_CREATE_OUT_FILE__,__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
   },
+  dvi to ps/.style={
+    add to placeholder/.expanded={__ROBEXT_COMPILATION_COMMAND__}{ && dvips "__ROBEXT_OUTPUT_PREFIX__.dvi" && \robExtMv\space"__ROBEXT_OUTPUT_PREFIX__.ps" "__ROBEXT_OUTPUT_PDF__"},
+  },
   % some useful presets
   latex/.style={
     enable placeholders,
@@ -3492,6 +3495,10 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     },
     use latexmk/.style={
       set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
+    },
+    use latex and dvi/.style={
+      set placeholder={__ROBEXT_LATEX_ENGINE__}{latex},
+      dvi to ps,
     },
     use lualatex/.style={
       set placeholder={__ROBEXT_LATEX_ENGINE__}{lualatex},
