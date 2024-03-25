@@ -150,7 +150,7 @@ Since v2.3 we also provide a way to include online pictures with |\includegraphi
 Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
 \end{codeexample}
 
-You can also cache arbitrary code (e.g.\ python). You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
+You can also cache arbitrary code (e.g.\ python). Note that if you use a version before 2.7, you cannot indent the python code. You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
 
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result, set title={The for loop}}
@@ -298,7 +298,7 @@ Note that most options can either be specified anywhere in the document like
 \end{codeexample}
 (see that |CacheMe| can be used to cache arbitrary pictures)
 
-Or include images generated in python:
+Or include images generated in python, note that if you use a version before 2.7, you cannot indent the python code:
 
 \begin{codeexample}[code only]
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
@@ -1136,6 +1136,7 @@ Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside m
 The environment |CacheMeCode| can be used for this purpose.
 
 \subsubsection{Python code}
+Note that if you use a version before 2.7, you cannot indent the python code (i.e. the first line must not start with any space).
 
 \paragraph{Generate an image}
 
@@ -1154,8 +1155,7 @@ For instance, you can use the default |python| template to generate an image wit
 \end{CacheMeCode}
 \end{codeexample}
 
-will produce the image visible in \cref{fig:pythonGeneratedImage}. Note that if you use a version before 2.6, you cannot indent the python code (i.e.
-the first line must not start with any space).
+will produce the image visible in \cref{fig:pythonGeneratedImage}. 
 \begin{figure}
 \centering
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
