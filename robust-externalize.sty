@@ -505,20 +505,22 @@ if __name__ == '__main__':
 }
 
 \NewDocumentCommand{\robExtCheckIfPrefixFolderExists}{}{
-  % Check if the output directory exists
+  % Check if the output directory exists and is not empty
   \ifdefined\robExtCacheFolder
-    \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation}
-    {
-      \ifdefined\robExtDoNotMkdirFolder\else
-        \ifdefined\robExtManualMode
-          \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ MANUALLY ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
-        \else
-          \sys_shell_now:x {\robExtPrefixAllCompilationCommands mkdir ~ -p ~ \robExtCacheFolder}
+    \ifx\robExtCacheFolder\empty\else
+      \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation}
+      {
+        \ifdefined\robExtDoNotMkdirFolder\else
+          \ifdefined\robExtManualMode
+            \message{If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ MANUALLY ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
+          \else
+            \sys_shell_now:x {\robExtPrefixAllCompilationCommands mkdir ~ -p ~ \robExtCacheFolder}
+          \fi
         \fi
-      \fi
-    }{
-      \message{Warning: If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
-    }
+      }{
+        \message{Warning: If ~ you ~ get~ an~ error,~ make ~ sure ~ to ~ enable ~ pdflatex ~ -shell-escape ~ or ~ to ~ manually ~ CREATE ~ THE ~ FOLDER ~ \robExtCacheFolder.}
+      }
+    \fi
   \fi
 }
 
@@ -1880,7 +1882,9 @@ if __name__ == '__main__':
     \str_replace_all:Nnx \l__robExt_current_compilation_command_str {__ROBEXT_CACHE_FOLDER__}{\robExtCacheFolder}
     % Make sure this command is run from the cache folder
     \ifdefined\robExtCacheFolder
-      \str_put_left:Nx \l__robExt_current_compilation_command_str {cd ~ \robExtCacheFolder \space && ~ }
+      \ifx\robExtCacheFolder\empty\else
+        \str_put_left:Nx \l__robExt_current_compilation_command_str {cd ~ \robExtCacheFolder \space && ~ }
+      \fi
     \fi%
     %%% We enable manual mode if we enabled "compile in parallel after=N" and we compiled more than N elements
     % Check if we want to run stuff in parallel
@@ -2907,7 +2911,7 @@ if __name__ == '__main__':
   % synonyme, "cache folder" is prefered over ""
   set subfolder and way back/.code 2 args={\def\robExtCacheFolder{#1}\def\robExtCacheFolderWayBack{#2}},
   set cache folder and way back/.code 2 args={\def\robExtCacheFolder{#1}\def\robExtCacheFolderWayBack{#2}},
-  no cache folder/.code={\let\robExtCacheFolder\undefined\def\robExtCacheFolderWayBack{}},
+  no cache folder/.style={set cache folder and way back={}{}},
   % By default we put everything in robustExternalize
   % Change this before starting to cache any library, and if you change it mid-document, be aware
   % that you will not be able to refer to elements in the old folder.
@@ -3491,7 +3495,7 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     set compilation command={__ROBEXT_LATEX_COMPILATION_COMMAND__},
     %% Configure the latex compilation engine
     add to compilation command options/.style={
-      add to placeholder={__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{#1},
+      add to placeholder={__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{##1},
     },
     use latexmk/.style={
       set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
