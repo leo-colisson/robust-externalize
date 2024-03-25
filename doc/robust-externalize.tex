@@ -1154,7 +1154,8 @@ For instance, you can use the default |python| template to generate an image wit
 \end{CacheMeCode}
 \end{codeexample}
 
-will produce the image visible in \cref{fig:pythonGeneratedImage}. \textbf{Importantly: you do not want to indent the content of CacheMeCode, or the space will also appear in the final code.}
+will produce the image visible in \cref{fig:pythonGeneratedImage}. Note that if you use a version before 2.6, you cannot indent the python code (i.e.
+the first line must not start with any space).
 \begin{figure}
 \centering
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
