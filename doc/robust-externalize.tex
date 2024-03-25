@@ -618,7 +618,7 @@ If you only care about \tikzname's picture, you have 3 options:
   |\cacheCommand{yourcommand}[O{default val}m]{your preset options}|\\
   (|O{default val}m| means that the command accepts one optional argument with default value |default val| and one mandatory argument) but \textbf{we do recommend} to use |\cacheCommand| to cache |\tikz| since |\tikz| has a quite complicated parsing strategy (e.g.\ you can write |\tikz[options] \node{foo};| which has no mandatory argument enclosed in |{}|). |\cacheTikz| takes care of this already and caches both the environment |\begin{tikzpicture}| and the macro |\tikz|.
 \item Use |tikzpictureC| instead of |tikzpicture| (this is mostly done to easily convert existing code to this library, but works only for |tikz| pictures).
-\item Use the more general |CacheMe| environment, that can cache \tikzname, \LaTeX{} and much more \LaTeX{} like code.
+\item Use the more general |CacheMe| environment, or |CacheMeCode| if you use non-\LaTeX{} code\footnote{The later involves a more advanced parsing that allows it to contain special symbols like percent, but on the other hand it cannot be used inside macros and some environments directly. On the other hand, the former will remove some characters like percent (that are considered as comments) or newlines (which is harmless for \LaTeX{} code), but can be used anywhere.}, to cache \tikzname, \LaTeX{}, python and much more.
 \end{enumerate}
 
 These 4 options are illustrated below (note that all commands accept a first optional argument enclosed in |<...>| that contains the options to pass to |CacheMe| after loading the |tikzpicture| preset, that loads itself the |tikz| preset first):
