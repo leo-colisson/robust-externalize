@@ -150,12 +150,12 @@ Since v2.3 we also provide a way to include online pictures with |\includegraphi
 Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
 \end{codeexample}
 
-You can also cache arbitrary code (e.g.\ python). You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
+You can also cache arbitrary code (e.g.\ python). Note that if you use a version before 2.7, you cannot indent the python code. You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
 
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result, set title={The for loop}}
-for name in ["Alice", "Bob"]:
-    print(f"Hello {name}")
+    for name in ["Alice", "Bob"]:
+        print(f"Hello {name}")
 \end{CacheMeCode}
 \end{codeAndResult}
 
@@ -298,17 +298,17 @@ Note that most options can either be specified anywhere in the document like
 \end{codeexample}
 (see that |CacheMe| can be used to cache arbitrary pictures)
 
-Or include images generated in python:
+Or include images generated in python, note that if you use a version before 2.7, you cannot indent the python code:
 
 \begin{codeexample}[code only]
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
-import matplotlib.pyplot as plt
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials')   
-plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+    import matplotlib.pyplot as plt
+    year = [2014, 2015, 2016, 2017, 2018, 2019]  
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+    plt.xlabel('Year')  
+    plt.ylabel('Number of futurestud.io Tutorials')   
+    plt.savefig("__ROBEXT_OUTPUT_PDF__")  
 \end{CacheMeCode}
 \end{codeexample}
 
@@ -1136,6 +1136,7 @@ Due to the way \LaTeX{} works, non-\LaTeX{} code can't be reliably read inside m
 The environment |CacheMeCode| can be used for this purpose.
 
 \subsubsection{Python code}
+Note that if you use a version before 2.7, you cannot indent the python code (i.e. the first line must not start with any space).
 
 \paragraph{Generate an image}
 
@@ -1144,27 +1145,27 @@ For instance, you can use the default |python| template to generate an image wit
 
 \begin{codeexample}[code only]
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
-import matplotlib.pyplot as plt
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials')   
-plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+    import matplotlib.pyplot as plt
+    year = [2014, 2015, 2016, 2017, 2018, 2019]  
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+    plt.xlabel('Year')  
+    plt.ylabel('Number of futurestud.io Tutorials')   
+    plt.savefig("__ROBEXT_OUTPUT_PDF__")  
 \end{CacheMeCode}
 \end{codeexample}
 
-will produce the image visible in \cref{fig:pythonGeneratedImage}. \textbf{Importantly: you do not want to indent the content of CacheMeCode, or the space will also appear in the final code.}
+will produce the image visible in \cref{fig:pythonGeneratedImage}. 
 \begin{figure}
 \centering
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
-import matplotlib.pyplot as plt
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials')   
-plt.savefig("__ROBEXT_OUTPUT_PDF__")
+    import matplotlib.pyplot as plt
+    year = [2014, 2015, 2016, 2017, 2018, 2019]  
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+    plt.xlabel('Year')  
+    plt.ylabel('Number of futurestud.io Tutorials')   
+    plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{CacheMeCode}
 \caption{Image generated with python.}
 \label{fig:pythonGeneratedImage}
@@ -1177,8 +1178,8 @@ We also provide by default a number of helper functions. For instance, |write_to
 For instance:
 \begin{codeAndResult}
 \begin{CacheMeCode}{python, do not include pdf}
-import math
-write_to_out(r"\gdef\cosComputedInPython{" + str(math.cos(1)) + r"}")
+    import math
+    write_to_out(r"\gdef\cosComputedInPython{" + str(math.cos(1)) + r"}")
 \end{CacheMeCode}
 
 $\rightarrow$ The cosinus of 1 is \cosComputedInPython.
@@ -2097,8 +2098,8 @@ do not remove leading spaces, python
 Since |remove leading spaces if not disabled| is enabled by default on python, it is therefore fine to indent your python code like in:
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result}
-  for i in range(3):
-      print(f"Hello {i}")
+    for i in range(3):
+        print(f"Hello {i}")
 \end{CacheMeCode}
 \end{codeAndResult}
 \end{pgfmanualentry}
@@ -2185,19 +2186,19 @@ Note that this works well for commands that expand completely, but some more com
   |\lenToCm{.75\linewidth}| will output the length of |.75\linewidth| in cm by default, like |10cm|. If you want to change the unit, you can use the optional argument to specify a different unit (like |in| for inches, see |\dim_to_decimal_in_unit| for details). You can remove the unit at the end using |\lenToCmNoUnit{.75\linewidth}| (needs v2.6) to obtain something like |10| instead of |10cm|. These commands are helpful with |set placeholder eval| to send length from \LaTeX{} to your environment:
 \begin{codeAndResult}
 \begin{CacheMeCode}{python, set placeholder eval={__LINEWIDTH__}{\lenToCmNoUnit[in]{.75\linewidth}}}
-import matplotlib.pyplot as plt
-import matplotlib
-from matplotlib.pyplot import figure
-figure(figsize=(__LINEWIDTH__, __LINEWIDTH__))
-year = [2014, 2015, 2016, 2017, 2018, 2019]
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=2)
-plt.title("Simple plot")
-plt.xlabel('Year')
-plt.ylabel('Number of futurestud.io Tutorials')
-print(get_filename_from_extension(".pgf"))
-# https://stackoverflow.com/a/52587591/4987648
-plt.savefig("__ROBEXT_OUTPUT_PDF__", bbox_inches="tight")   
+    import matplotlib.pyplot as plt
+    import matplotlib
+    from matplotlib.pyplot import figure
+    figure(figsize=(__LINEWIDTH__, __LINEWIDTH__))
+    year = [2014, 2015, 2016, 2017, 2018, 2019]
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=2)
+    plt.title("Simple plot")
+    plt.xlabel('Year')
+    plt.ylabel('Number of futurestud.io Tutorials')
+    print(get_filename_from_extension(".pgf"))
+    # https://stackoverflow.com/a/52587591/4987648
+    plt.savefig("__ROBEXT_OUTPUT_PDF__", bbox_inches="tight")   
 \end{CacheMeCode}
 \end{codeAndResult}
 \end{pgfmanualentry}
@@ -3069,9 +3070,9 @@ command if no externalization/.code={%
     set placeholder eval={__thepage__}{\thepage},
     %% We disable externalization
     disable externalization}
-with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
-    for i in range(5):
-        f.write(f"Hello {i}, we are on page __thepage__\n")
+    with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
+        for i in range(5):
+            f.write(f"Hello {i}, we are on page __thepage__\n")
 \end{CacheMeCode}
 \end{codeAndResult}
 
@@ -3811,9 +3812,9 @@ custom include command={%
   i.e.\ instead of printing the pdf we print the content of the file |__ROBEXT_OUTPUT_PREFIX__-out.txt| using the command in |__ROBEXT_VERBATIM_COMMAND__|, that defaults to |\verbatiminput|:
 \begin{codeAndResult}
 \begin{CacheMeCode}{python, verbatim output}
-with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
-    for i in range(5):
-        f.write(f"Hello {i}\n")
+    with open("__ROBEXT_OUTPUT_PREFIX__-out.txt", "w") as f:
+        for i in range(5):
+            f.write(f"Hello {i}\n")
 \end{CacheMeCode}
 \end{codeAndResult}
 \end{pgfmanualentry}
@@ -3988,9 +3989,9 @@ We provide support for python:
   We demonstrate its usage on a few examples:
 \begin{codeAndResult}
 \begin{CacheMeCode}{python, verbatim output}
-with open(get_verbatim_output(), "w") as f:
-    for i in range(5):
-        f.write(f"Hello {i}\n")
+    with open(get_verbatim_output(), "w") as f:
+        for i in range(5):
+            f.write(f"Hello {i}\n")
 \end{CacheMeCode}
 \end{codeAndResult}
 
@@ -3999,25 +4000,25 @@ Note that if you use a version before 2.6, you cannot indent further the python 
 You can also generate some images. This code will produce the image in \cref{fig:pythonGeneratedImage2}:
 \begin{codeexample}[code only]
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
-import matplotlib.pyplot as plt
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials')   
-plt.savefig("__ROBEXT_OUTPUT_PDF__")  
+    import matplotlib.pyplot as plt
+    year = [2014, 2015, 2016, 2017, 2018, 2019]  
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+    plt.xlabel('Year')  
+    plt.ylabel('Number of futurestud.io Tutorials')   
+    plt.savefig("__ROBEXT_OUTPUT_PDF__")  
 \end{CacheMeCode}
 \end{codeexample}
 {\begin{figure}
 \centering
 \begin{CacheMeCode}{python, set includegraphics options={width=.8\linewidth}}
-import matplotlib.pyplot as plt
-year = [2014, 2015, 2016, 2017, 2018, 2019]  
-tutorial_count = [39, 117, 111, 110, 67, 29]
-plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
-plt.xlabel('Year')  
-plt.ylabel('Number of futurestud.io Tutorials')   
-plt.savefig("__ROBEXT_OUTPUT_PDF__")
+    import matplotlib.pyplot as plt
+    year = [2014, 2015, 2016, 2017, 2018, 2019]  
+    tutorial_count = [39, 117, 111, 110, 67, 29]
+    plt.plot(year, tutorial_count, color="#6c3376", linewidth=3)  
+    plt.xlabel('Year')  
+    plt.ylabel('Number of futurestud.io Tutorials')   
+    plt.savefig("__ROBEXT_OUTPUT_PDF__")
 \end{CacheMeCode}
 \caption{Image generated with python.}
 \label{fig:pythonGeneratedImage2}
@@ -4041,8 +4042,8 @@ or using the style |force python3| that forces |python3|.
   (Warning: in 2.7 a bug was introduced (fixed in v2.8) where an empty line was automatically added in front of the code) This is a demo style that can print a python code and its result.
 \begin{codeAndResult}
 \begin{CacheMeCode}{python print code and result, set title={The for loop}}
-for name in ["Alice", "Bob"]:
-    print(f"Hello {name}")
+    for name in ["Alice", "Bob"]:
+        print(f"Hello {name}")
 \end{CacheMeCode}
 \end{codeAndResult}
 You can set |__ROBEXT_PYTHON_TCOLORBOX_PROPS__| the options of the tcolorbox,\\ |__ROBEXT_PYTHON_CODE_MESSAGE__| and |__ROBEXT_PYTHON_RESULT_MESSAGE__| which are displayed before the corresponding block, |__ROBEXT_PYTHON_LSTINPUT_STYLE__| which contains the default lstinput style and |__MY_TITLE__| (cf |set title|) that contains the title of the box. Make sure to have the following packages to use the default styling:
