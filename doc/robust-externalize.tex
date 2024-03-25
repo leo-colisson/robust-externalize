@@ -3241,9 +3241,11 @@ Really involved macros (e.g.\ defined inside libraries) might call many other ma
   \def\extrakeytext{style, }
   \extractkey/robExt/forward counter=counter to forward\@nil
   \extractkey/robExt/forward counter force value=\marg{counter to forward}\marg{value of counter}\@nil
+  \extractkey/robExt/forward counter back=counter to forward\@nil
+  \extractkey/robExt/forward counter and back=counter to forward\@nil
   \makeatother%
   \pgfmanualbody
-  Forward a counter:
+  |forward counter| forwards a counter to the cached picture:
 \begin{codeexample}[width=0pt]
 \begin{tikzpictureC}<forward counter=page>
   \node[rounded corners, fill=red]{The current page is \thepage.};
@@ -3255,6 +3257,17 @@ The force value also assigns a value to the counter irrespective of the current 
   \node[rounded corners, fill=red]{The current page is \thepage.};
 \end{tikzpictureC}    
 \end{codeexample}
+|forward counter back| does the opposite, it gets the value of the counter at the end of the cached file, and redefines it in the main file, while |forward counter and back| does both |forward counter| and |forward counter back|:
+\begin{codeexample}[width=0pt,vbox]
+\newcounter{mycounter}
+\setcounter{mycounter}{12}
+\begin{CacheMe}{latex, forward counter and back=mycounter}
+  Inside the cached picture, the value of mycounter is \the\value{mycounter}.
+  Let's change it to 42! \setcounter{mycounter}{42}
+\end{CacheMe}\\
+Outside the cached picture, the new value of the counter is \the\value{mycounter}.
+\end{codeexample}
+
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -4951,6 +4964,7 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
   \item Added |dvi to ps| and |use latex and dvi|
   \item Fix bug with |no cache folder|
   \item Fix bug with |add to compilation command options| not working
+  \item Added |forward counter and back| and |forward counter back|
   \end{itemize}
 \item v2.9 (2024/03/15)
   \begin{itemize}

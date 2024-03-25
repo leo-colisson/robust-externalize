@@ -3034,6 +3034,17 @@ if __name__ == '__main__':
       }%
     },%
   },%
+  forward counter back/.style={
+    add to preamble={
+      \AtEndDocument{% Execute at end of file: we propagate back the value of the counter
+        \immediate\write\writeRobExt{\string\setcounter{#1}{\the\value{#1}}}%
+      }
+    },
+  },
+  forward counter and back/.style={
+    forward counter=#1,
+    forward counter back=#1,
+  },
   forward color/.style={
     run command if externalization={%
       \extractcolorspecs{#1}{\zx@tmp@model}{\zx@tmp@cmd}%
