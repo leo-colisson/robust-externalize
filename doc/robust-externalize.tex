@@ -147,7 +147,7 @@ Then type something like this (note the |C| for |cached| at the end of |tikzpict
 
 Since v2.3 we also provide a way to include online pictures with |\includegraphicsWeb|:
 \begin{codeexample}[width=0pt,vbox]
-Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
+Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
 \end{codeexample}
 
 You can also cache arbitrary code (e.g.\ python). Note that if you use a version before 2.7, you cannot indent the python code. You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
@@ -3547,6 +3547,7 @@ if matches word={COLOR}{forward color=COLOR}
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/if matches=\marg{string}\marg{style to apply}\@nil
+  \extractkey/robExt/if matches else=\marg{string}\marg{style to apply if match}\marg{style to apply if no match}\@nil
   \extractkey/robExt/if matches word=\marg{string}\marg{style to apply}\@nil
   \extractkey/robExt/if matches regex=\marg{latex3 regex}\marg{style to apply}\@nil
   \extractkey/robExt/register word with namespace=\marg{namespace}\marg{word}\marg{style}\@nil
@@ -4138,7 +4139,7 @@ We also provide support for online images since v2.3.
   \pgfmanualbody
   |\includegraphicsWeb| is used in place of |\includegraphics| to download online images:
 \begin{codeexample}[width=0pt,vbox]
-Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/300}.
+Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
 \end{codeexample}
 By default, the engine uses |wget| in linux (since it is installed by default) and |curl| on windows (should also be installed by default on recent windows). But you can change it by modifying the |web image| preset (or using the optional robExt options that are loaded after |web image|):
 \begin{codeexample}[width=0pt,vbox]
@@ -4148,7 +4149,7 @@ By default, the engine uses |wget| in linux (since it is installed by default) a
   },
 }
 
-Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{http://placekitten.com/400/303}. 
+Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/303}. 
 \end{codeexample}
 By default, the |wget| and |curl| presets are defined as:
 \begin{verbatim}
@@ -4966,6 +4967,8 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
   \item Fix bug with |no cache folder|
   \item Fix bug with |add to compilation command options| not working
   \item Added |forward counter and back| and |forward counter back|
+  \item Fix infinite compilation time when input does not exist (WARNING:, it will invalidate all previously cached LaTeX documents since this adds a compilation option to LaTeX by default! If you want to use the old buggy behavior to preserve your cache, define |\robExtSetPlaceholder{__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error}|. Anyway, if you want truly reproducible caching, just copy the .sty file in your project)
+  \item Support |if matches else|
   \end{itemize}
 \item v2.9 (2024/03/15)
   \begin{itemize}

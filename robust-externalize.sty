@@ -2373,8 +2373,8 @@ if __name__ == '__main__':
   \regex_match:nVTF {#1} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {\pgfkeysalso{#2}} {}
 }
 
-\NewDocumentCommand{\robExtIfMatchesString}{mm}{
-  \str_if_in:NnTF \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {#1} {\pgfkeysalso{#2}} {}
+\NewDocumentCommand{\robExtIfMatchesString}{mmm}{
+  \str_if_in:NnTF \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {#1} {\pgfkeysalso{#2}} {\pgfkeysalso{#3}}
 }
 
 % \robExtRegisterWord {namespace} {word} {style}
@@ -3080,7 +3080,8 @@ if __name__ == '__main__':
   auto forward words/.style={auto forward words namespace={}},
   %% This will
   if matches regex/.code 2 args={\robExtIfMatchesRegex{#1}{#2}},
-  if matches/.code 2 args={\robExtIfMatchesString{#1}{#2}},
+  if matches/.code 2 args={\robExtIfMatchesString{#1}{#2}{}},
+  if matches else/.code n args={3}{\robExtIfMatchesString{#1}{#2}{#3}},
   if matches word/.code 2 args={%
     \robExtRegisterWord{}{#1}{#2}%
     % If ran inside a preset, we want to enable it, otherwise we enable it on the latex preset
@@ -3476,7 +3477,7 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
 
 %% Compilation commands
 \robExtSetPlaceholder{__ROBEXT_LATEX_COMPILATION_COMMAND__}{__ROBEXT_LATEX_ENGINE__ __ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__ "__ROBEXT_SOURCE_FILE__"}
-\robExtSetPlaceholder{__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error}
+\robExtSetPlaceholder{__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error -interaction=nonstopmode}
 \robExtSetPlaceholder{__ROBEXT_LATEX_ENGINE__}{pdflatex}
 
 \robExtConfigure{
