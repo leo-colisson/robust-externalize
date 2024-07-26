@@ -33,6 +33,11 @@
 \setjobnameNoQuotes
 
 \ExplSyntaxOn
+% in pgf it is not possible to use explsyntax
+\NewDocumentCommand{\robExtMsgError}{m}{%
+  \msg_error:nn{robExt}{#1}
+}
+
 \NewDocumentCommand{\robExtIfWindowsTF}{mm}{%
   \sys_if_platform_windows:TF {#1}{#2}%
 }
@@ -240,6 +245,7 @@
 
 \msg_new:nnn {robExt}{missing compiled pdf parallel with log}{The~compilation~of~the~code~block~at~line~#2~failed:~the~following ~ file~is~indeed~missing: ~ #1.pdf. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed~with~errors:^^Jvvvvvv^^J\l__robExt_tmp_str^^J\string^\string^\string^\string^\string^\string^ ^^JSee~full~logs~#4~ or ~ in ~ #1-compilation.log.}
 \msg_new:nnn {robExt}{remove spaces until non spaces characters}{The~placeholder~#1~contains~characters~other~than~spaces~(#2)~before~the~separator~#3.}
+\msg_new:nnn {robExt}{need to load pythonhighlight}{You~need~to~load~the~package~pythonhighlight~to~use~the~lstlisting~style~pythonhighlight-style.}
 
 
 \msg_new:nnn {robExt}{auto forward not in cachemecode}{Auto~forward~is~less~efficient~in~cacheMeCode.}
@@ -2377,6 +2383,11 @@ if __name__ == '__main__':
   \str_if_in:NnTF \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str {#1} {\pgfkeysalso{#2}} {\pgfkeysalso{#3}}
 }
 
+\NewDocumentCommand{\robExtIfPlaceholderMatchesString}{mmmm}{
+  \str_if_in:cnTF {l__robExt_placeholder_#1_str} {#2} {#3} {#4}
+}
+\let\ifPlaceholderMatchesString\robExtIfPlaceholderMatchesString
+
 % \robExtRegisterWord {namespace} {word} {style}
 \NewDocumentCommand{\robExtRegisterWord}{mmm}{
   % \robExt_register_match_word:nnn {#1} {#2} {\pgfkeysalso{#3}}
@@ -3742,7 +3753,7 @@ print_file.close()
 \robExtSetPlaceholder{__ROBEXT_PYTHON_TCOLORBOX_PROPS__}{colback=red!5!white,colframe=red!75!black}
 \robExtSetPlaceholder{__ROBEXT_PYTHON_CODE_MESSAGE__}{}
 \robExtSetPlaceholder{__ROBEXT_PYTHON_RESULT_MESSAGE__}{Output:}
-\robExtSetPlaceholder{__ROBEXT_PYTHON_LSTINPUT_STYLE__}{frame=single, breakindent=.5\textwidth, frame=single, breaklines=true, style=mypython}
+\robExtSetPlaceholder{__ROBEXT_PYTHON_LSTINPUT_STYLE__}{breakindent=.5\textwidth, frame=single, breaklines=true, style=pythonhighlight-style}
 
 \robExtConfigure{
   python print code and result/.style={
@@ -3756,6 +3767,17 @@ print_file.close()
     set title={Python code},
     custom include command={
       % Useful to replace __MY_TITLE__:
+      %% To print a nicer error message, we check if the user uses the default style
+      \robExtIfPlaceholderMatchesString{__ROBEXT_PYTHON_LSTINPUT_STYLE__}{pythonhighlight-style}{%
+        \ifcsname lststy@pythonhighlight-style$\endcsname%
+        \else%
+          \ifcsname lststy@mypython$\endcsname%
+            \lstdefinestyle{pythonhighlight-style}{style=mypython}%
+          \else%
+            \robExtMsgError{needtoloadpythonhighlight}%
+          \fi%
+        \fi%
+      }{}%
       \evalPlaceholder{
         \begin{tcolorbox}[title=__MY_TITLE__,__ROBEXT_PYTHON_TCOLORBOX_PROPS__]
           __ROBEXT_PYTHON_CODE_MESSAGE__%
