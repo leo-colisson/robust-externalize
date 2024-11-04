@@ -592,7 +592,7 @@ For TeXstudio, you can enable shell-escape on the current document by adding in 
 \end{verbatim}
 and you might also want to enable:
 \begin{verbatim}
-\robExtConfigure{textstudio}
+\robExtConfigure{texstudio}
 \end{verbatim}
 to get clearer error messages as TeXstudio is \mylink{https://github.com/texstudio-org/texstudio/issues/1410}{fairly bad at parsing error messages} (see also |print whole file in error message|).
 
@@ -602,11 +602,11 @@ $pdf_mode = 1;
 $pdflatex = 'pdflatex --shell-escape';
 \end{verbatim}
 
-For other editors, \mylink{https://tex.stackexchange.com/questions/598818/how-can-i-enable-shell-escape}{this answer} describe pretty accurately the solutions you have depending on your software.
+For other editors, \mylink{https://tex.stackexchange.com/questions/598818/how-can-i-enable-shell-escape}{this answer} describes pretty accurately the solutions you have depending on your software.
 
 \subsection{Caching a tikz picture}
 
-If you only care about \tikzname's picture, you have 3 options:
+If you only care about \tikzname's picture, you have 4 options:
 \begin{enumerate}
 \item Call once |\cacheTikz| that will redefine |tikzpicture| and |\tikz| to use our library (if you use this solution, make sure to read how to disable externalization (\cref{sec:disableExternalization}) as we do not support for instance |remember picture|). Then, configure the default preamble for cached files as explained below by extending the |tikz| or |tikzpicture| presets (that first loads |tikz|).
 \item Use the generic commands that allows you to wrap an arbitrary environment:
