@@ -105,7 +105,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 2.9+unstable}\\[3mm]
+  {Léo Colisson \quad Version 3.0}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -147,7 +147,7 @@ Then type something like this (note the |C| for |cached| at the end of |tikzpict
 
 Since v2.3 we also provide a way to include online pictures with |\includegraphicsWeb|:
 \begin{codeexample}[width=0pt,vbox]
-Here is a picture of cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
+Here is a picture of bear downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
 \end{codeexample}
 
 You can also cache arbitrary code (e.g.\ python). Note that if you use a version before 2.7, you cannot indent the python code. You can also define arbitrary compilation commands, inclusion commands, and presets to fit you need. For instance, you can create a preset to obtain:
@@ -1331,7 +1331,8 @@ print_file.close()
             breakindent=.5\textwidth,
             frame=single,
             breaklines=true,
-            style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+            % On old distribution, this is called mypython
+            style=pythonhighlight-style]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
           Output: 
           \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-print.txt}}
         \end{tcolorbox}
@@ -1398,7 +1399,7 @@ print_file.close()
       \evalPlaceholder{
         \begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=__MY_TITLE__]
           % \noindent Code:
-          \lstinputlisting[frame=single,breakindent=.5\textwidth,frame=single,breaklines=true,style=mypython]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
+          \lstinputlisting[frame=single,breakindent=.5\textwidth,frame=single,breaklines=true,style=pythonhighlight-style]{\robExtAddCachePathAndName{\robExtFinalHash-code.txt}}
           Output: 
           \verbatiminput{\robExtAddCachePathAndName{\robExtFinalHash-print.txt}}
         \end{tcolorbox}
@@ -4139,7 +4140,7 @@ We also provide support for online images since v2.3.
   \pgfmanualbody
   |\includegraphicsWeb| is used in place of |\includegraphics| to download online images:
 \begin{codeexample}[width=0pt,vbox]
-Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
+Here is a bear downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/300}.
 \end{codeexample}
 By default, the engine uses |wget| in linux (since it is installed by default) and |curl| on windows (should also be installed by default on recent windows). But you can change it by modifying the |web image| preset (or using the optional robExt options that are loaded after |web image|):
 \begin{codeexample}[width=0pt,vbox]
@@ -4149,7 +4150,7 @@ By default, the engine uses |wget| in linux (since it is installed by default) a
   },
 }
 
-Here is a cat downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/303}. 
+Here is a bear downloaded online: \includegraphicsWeb[width=3cm]{https://placebear.com/400/303}. 
 \end{codeexample}
 By default, the |wget| and |curl| presets are defined as:
 \begin{verbatim}
@@ -4961,7 +4962,7 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
-\item v2.10 (not yet released, github master branch):
+\item v3.0:
   \begin{itemize}
   \item Added |dvi to ps| and |use latex and dvi|
   \item Fix bug with |no cache folder|
