@@ -1,4 +1,4 @@
-\ProvidesPackage{robust-externalize}[2025/04/08 v3.0 Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
+\ProvidesPackage{robust-externalize}[2025/07/03 v3.0+unstable Cache anything (tikz, latex, python) in a robust, efficient and pure way.]
 % todo: 
 % change order argument replace from list, it is hard to read this way
 
@@ -148,7 +148,7 @@
 \def\robExtDebugInfo#1{\message{#1}}
 \def\robExtDebugWarning#1{\message{^^J[robExt warning] #1}}
 
-\NewDocumentCommand{\robExtConfigure}{m}{%
+\NewDocumentCommand{\robExtConfigure}{+m}{%
   \pgfqkeys{/robExt}{#1}% faster than \pgfkeys{/robExt/.cd,#1}
 }
 
@@ -179,7 +179,7 @@
 
 \cs_generate_variant:Nn \seq_remove_all:Nn { NV }
 
-\cs_generate_variant:Nn \iow_now:Nn { NV,Nx }
+\cs_generate_variant:Nn \iow_now:Nn { NV,Nx,Nv }
 \cs_generate_variant:Nn \iow_open:Nn { Nx }
 \cs_generate_variant:Nn \ior_str_get:NN { Nc }
 
@@ -215,7 +215,7 @@
 
 % Double the number of hashes... quite dirty but cannot find any solution or the user need to double it itself
 %% See also https://tex.stackexchange.com/questions/695432/latex3-latex-doubles-the-number-of-hashes-when-storing-them-in-string/695460#695460
-\NewDocumentCommand{\robExtStrSetDoubleHash}{mm}{
+\NewDocumentCommand{\robExtStrSetDoubleHash}{m+m}{
   \str_set:Nn {#1} {#2}
   \str_replace_all:Nnx {#1} { ## } { \c_hash_str \c_hash_str }
 }
@@ -451,9 +451,45 @@ if __name__ == '__main__':
 %%%%%%%%%%% Paths %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% For support of --output-directory
-\def\robExtPrefixAllCompilationCommands{\ifdefined\robExtOutputDirectory cd~"\robExtOutputDirectory"~&&~\fi}
+%%% For support of --output-directory
+\sys_if_platform_windows:TF {
+  % Windows uses "set FOO=" to remove an environment variable
+  \def\robExtPrefixAllCompilationCommands{\ifdefined\robExtOutputDirectory cd~"\robExtOutputDirectory"~&&~set~ TEXMF_OUTPUT_DIRECTORY=~&&~\fi}
+  \edef\robExtPathSeparator{\c_backslash_str}
+}{
+  % Linux/Unix uses "unset FOO" to remove an environment variable
+  \def\robExtPrefixAllCompilationCommands{\ifdefined\robExtOutputDirectory cd~"\robExtOutputDirectory"~&&~unset~ TEXMF_OUTPUT_DIRECTORY~&&~\fi}
+  \def\robExtPathSeparator{/}
+}%
 
+
+% TEXMF_OUTPUT_DIRECTORY is supposed to contain the build folder in recent distributions
+% but first we need to get it
+% Adapted from https://tex.stackexchange.com/questions/62010 (+ check undefined environments)
+\NewDocumentCommand{\robExtGetenv}{om}
+{
+  \sys_get_shell:nnN { kpsewhich ~ --var-value ~ #2 } { } \l_tmpa_tl
+  \tl_trim_spaces:N \l_tmpa_tl
+  \tl_if_empty:NTF \l_tmpa_tl {}{
+    \IfNoValueTF { #1 }
+    {
+      \tl_use:N \l_tmpa_tl
+    }
+    {
+      \tl_set_eq:NN #1 \l_tmpa_tl
+    }
+  }
+}
+% Can be disabled since it uses get_shell, does not require shell-escape since kpsewhich is allowed
+% but who knows in really restricted systems this may also be forbidden
+\ifdefined\robExtDoNotCheckOutputDirectory\else
+  \robExtGetenv[\robExtOutputDirectory]{TEXMF_OUTPUT_DIRECTORY}
+  \ifdefined\robExtOutputDirectory
+    \message{[robExt]~Detected~output~directory~\robExtOutputDirectory}
+  \fi
+\fi
+
+ 
 \def\robExtPrefixFilename{robExt-}
 
 \NewExpandableDocumentCommand{\robExtAddCachePathAndName}{m}{%
@@ -531,23 +567,31 @@ if __name__ == '__main__':
 }
 
 \NewDocumentCommand{\robExtCopyFileToCache}{m}{
-  \robExtCheckIfPrefixFolderExists%
-  \file_if_exist:xTF {#1}{}{
-    \msg_error:nnx{robExt}{file does not exist}{#1~(to~copy~to~cache)}
-  }
-  \file_if_exist:xTF {\robExtAddCachePath{#1}}{
-    \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~already~exists,~let~us~compare~md5~sum.}
-    \str_set:Nx \l_tmpa_str {\file_mdfive_hash:n{#1}}
-    \str_set:Nx \l_tmpb_str {\file_mdfive_hash:n{\robExtAddCachePath{#1}}}
-    \str_compare:eNeTF {\l_tmpa_str} = {\l_tmpb_str} {
-      \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~has~the~good~md5~hash.}
-    }{
-      \robExtDebugInfo{The~md5~hashes~of~#1~and~\robExtAddCachePath{#1}~are~different(\l_tmpa_str \space vs \space \l_tmpb_str),~let~us~copy~the~file.}%
-      \robExtRunCmdIfPossible{\robExtCp \space "#1"~"\robExtAddCachePath{#1}"}%
+  {% we don't want to go to the "build" folder if any is configured
+    \def\robExtPrefixAllCompilationCommands{}%
+    \ifdefined\robExtOutputDirectory%
+      \edef\robExtOutputDirectory{\robExtOutputDirectory\robExtPathSeparator}%
+    \else%
+      \def\robExtOutputDirectory{}%
+    \fi%
+    \robExtCheckIfPrefixFolderExists%
+    \file_if_exist:xTF {#1}{}{
+      \msg_error:nnx{robExt}{file does not exist}{#1~(to~copy~to~cache)}
     }
-  }{
-    \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~does~not~exist,~let~us~copy~it:}
-    \robExtRunCmdIfPossible{\robExtCp \space "#1"~"\robExtAddCachePath{#1}"}%   
+    \file_if_exist:xTF {\robExtAddCachePath{#1}}{
+      \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~already~exists,~let~us~compare~md5~sum.}
+      \str_set:Nx \l_tmpa_str {\file_mdfive_hash:n{#1}}
+      \str_set:Nx \l_tmpb_str {\file_mdfive_hash:n{\robExtAddCachePath{#1}}}
+      \str_compare:eNeTF {\l_tmpa_str} = {\l_tmpb_str} {
+        \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~has~the~good~md5~hash.}
+      }{
+        \robExtDebugInfo{The~md5~hashes~of~#1~and~\robExtAddCachePath{#1}~are~different(\l_tmpa_str \space vs \space \l_tmpb_str),~let~us~copy~the~file.}%
+        \robExtRunCmdIfPossible{\robExtCp \space "#1"~"\robExtAddCachePath{#1}"}%
+      }
+    }{
+      \robExtDebugInfo{The~file~\robExtAddCachePath{#1}~does~not~exist,~let~us~copy~it:}
+      \robExtRunCmdIfPossible{\robExtCp \space "#1"~"\robExtOutputDirectory\robExtAddCachePath{#1}"}%   
+    }
   }
 }
 \let\copyFileToCache\robExtCopyFileToCache
@@ -587,6 +631,29 @@ if __name__ == '__main__':
     \robExtDebugInfo{Warning:~#2~does~not~exist,~so~we~will~not~rename~back~elements~for~arXiv.}
   }
 }
+
+% Usage: \saveRawPlaceholderToFile{myfile.txt}{__MY_PLACEHOLDER__}
+\NewDocumentCommand{\robExtSaveOrAppendRawPlaceholderToFile}{mm}{
+  {
+    % We retrieve the content
+    \robExtPlaceholderFromFileContent{__ROBEXTINTERNAL_CURRENT_FILE__}{#1}
+    \iow_open:Nx \g__robExt_write_iow {#1}
+    \iow_now:Nv \g__robExt_write_iow {l__robExt_placeholder___ROBEXTINTERNAL_CURRENT_FILE___str}  
+    \iow_now:Nv \g__robExt_write_iow {l__robExt_placeholder_#2_str}%  
+    \iow_close:N \g__robExt_write_iow
+  }
+}
+\let\saveOrAppendRawPlaceholderToFile\robExtSaveOrAppendRawPlaceholderToFile
+
+% \robExtSaveRawPlaceholderToFile{myfile.txt}{__MY_PLACEHOLDER__}
+\NewDocumentCommand{\robExtSaveRawPlaceholderToFile}{mm}{
+  {
+    \iow_open:Nx \g__robExt_write_iow {#1}
+    \iow_now:Nv \g__robExt_write_iow {l__robExt_placeholder_#2_str}%  
+    \iow_close:N \g__robExt_write_iow
+  }
+}
+\let\saveRawPlaceholderToFile\robExtSaveRawPlaceholderToFile
 
 \NewExpandableDocumentCommand{\robExtGetPrefixPath}{}{%
   \ifdefined\robExtCacheFolder%
@@ -757,6 +824,21 @@ if __name__ == '__main__':
 }
 \let\rescanPlaceholderInVariableNoReplacement\robExtRescanPlaceholderInVariableNoReplacement
 
+% Move placeholder to a global variable, useful as we do not (currently) allow global placeholders, hence the workflow to deal with them
+% is to copy your placeholder to a global macro, then when you need it to import it from a variable
+% Usage: \placeholderToGlobalMacro{\foo}{__MY_PLACEHOLDER__}
+\NewExpandableDocumentCommand{\robExtPlaceholderToGlobalMacro}{mm}{
+  \str_gset_eq:cc { #1 } { l__robExt_placeholder_#2_str }
+}
+\let\placeholderToGlobalMacro\robExtPlaceholderToGlobalMacro
+\NewDocumentCommand{\robExtPlaceholderFromGlobalMacro}{smm}{
+  \str_set_eq:cc { l__robExt_placeholder_#2_str } { #3 }
+  \checkIfPlaceholderNameIsLegal{#2}
+  \IfBooleanTF {#1} {} {\robExtAddPlaceholderToList{#2}}
+}
+\let\placeholderFromGlobalMacro\robExtPlaceholderFromGlobalMacro
+
+
 % Make sure that the placeholder is in the list \l__robExt_placeholder_group_main_seq.
 % This should automatically be called by other tools
 \NewDocumentCommand{\robExtAddPlaceholderToList}{m}{
@@ -890,7 +972,7 @@ if __name__ == '__main__':
 
 %% Add something to the right of the placeholder
 %% By default it adds a space in between, unless we use the star version
-\NewDocumentCommand{\robExtAddToPlaceholder}{smm}{
+\NewDocumentCommand{\robExtAddToPlaceholder}{sm+m}{
   \str_if_exist:cTF { l__robExt_placeholder_#2_str } {
     \robExt_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
     \IfBooleanTF{#1}{}{\str_put_right:cn { l__robExt_placeholder_#2_str } { ~ } }
@@ -902,7 +984,7 @@ if __name__ == '__main__':
 }
 \let\addToPlaceholder\robExtAddToPlaceholder
 
-\NewDocumentCommand{\robExtAddToPlaceholderNoImport}{smm}{
+\NewDocumentCommand{\robExtAddToPlaceholderNoImport}{sm+m}{
   \str_if_exist:cTF { l__robExt_placeholder_#2_str } {
     \robExt_set_hash_robust:Nn \l_tmp_str {#3} %% needed as put_right does not convert to string first
     \IfBooleanTF{#1}{}{\str_put_right:cn { l__robExt_placeholder_#2_str } { ~ } }
@@ -1634,6 +1716,18 @@ if __name__ == '__main__':
     \msg_error:nnx{robExt}{dependency does not exist}{#1}
   }
 }
+\NewDocumentCommand{\robExtAddDependencyIfExistsWarning}{m}{
+  \file_if_exist:nTF {#1} {
+    \seq_put_left:Nx \l__robExt_dependencies_str {#1}
+  } {
+    \msg_warning:nnx{robExt}{dependency does not exist}{#1}
+  }
+}
+\NewDocumentCommand{\robExtAddDependencyIfExists}{m}{
+  \file_if_exist:nTF {#1} {
+    \seq_put_left:Nx \l__robExt_dependencies_str {#1}
+  } {}
+}
 
 \NewDocumentCommand{\robExtDebugDependency}{}{
   \show\l__robExt_dependencies_str
@@ -1929,13 +2023,14 @@ if __name__ == '__main__':
     \else%
       \bool_if:nTF { \sys_if_shell_unrestricted_p: || \cs_if_exist_p:N \robExtForceCompilation }
       {
+        \message{[robExt] We ~ will ~ start ~ the ~ compilation ~ using:^^J\robExtPrefixAllCompilationCommands \l__robExt_current_compilation_command_str^^J}%
         % For a better debugging, we create a new file:
         \ifdefined\robExtDoNotRedirectOutput%
           \sys_shell_now:x {\robExtPrefixAllCompilationCommands \l__robExt_current_compilation_command_str}%
         \else
           \sys_shell_now:x {\robExtPrefixAllCompilationCommands (~\l__robExt_current_compilation_command_str~)~>~\robExtAddCachePathAndName{\robExtFinalHash-compilation.log}~2>&1}%
         \fi
-        \message{[robExt] We ~ will ~ start ~ the ~ compilation ~ using: ~ \l__robExt_current_compilation_command_str.}%
+        \message{[robExt]~Compilation~finished}%
         %% We notify that we are running the compilation command, this way it is possible to check later
         %% if the file is not present because of some compilation error or because we are in manual mode
         %% or fallback
@@ -2124,6 +2219,14 @@ if __name__ == '__main__':
   % we need to remove the leading space
   % \str_set:Nx \l__robExt_tmp_str {\cs_to_str:N #1}
   \expandafter\def \csname l__robExt_execute_if_macro_present\string#1\endcsname {#2}%
+  % It is easy to forget "auto forward" in the latex preset so let's automatically add it with an option not to
+  \ifdefined\robExtRegisterAutoForward\else%
+    % avoid to run it twice for efficiency reasons
+    \ifdefined\l__robExt_robExtSetCodeToRunIfMacroPresent_already_ran\else%
+      \robExtRegisterAutoforward%
+      \def\l__robExt_robExtSetCodeToRunIfMacroPresent_already_ran{}%
+    \fi%
+  \fi%
 }
 
 % \robExtRunCodeToRunForMacroPresent{\hello} will run the code that was configured when calling
@@ -2148,6 +2251,7 @@ if __name__ == '__main__':
 }
 \let\autoForwardMacro\robExtAutoForwardMacro
 
+% \robExtLoadAutoForwardMacroConfig{\MyName} will forward apply the same config as the config of macro \MyName.
 \NewDocumentCommand{\robExtLoadAutoForwardMacroConfig}{+m}{
   %\str_set:Nx \l__robExt_tmp_str {\cs_to_str:N #1}
   \cs_if_exist:cTF {l__robExt_execute_if_macro_present\string#1}{
@@ -2175,13 +2279,19 @@ if __name__ == '__main__':
 %% "auto forward"
 \NewDocumentCommand{\robExtAutoForward}{}{
   % some code will automatically add auto forward, but we don't want to run it twice.
-  \robExtDebugInfo{Running auto forward.}
+  \robExtDebugInfo{Running~auto~forward.}
   \ifdefined\robExt@already@ran@autoforward\robExtDebugInfo{Auto forward already ran}\else
     \ifdefined\robExtUserInputCacheMe\else
       \msg_warning:nn{robExt}{auto forward not in cachemecode}
-      \tl_set_rescan:NnV \robExtUserInputCacheMe {} \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
+      % https://tex.stackexchange.com/a/732058/116348
+      \tl_set_rescan:NnV \robExtUserInputCacheMe {\newlinechar=10 \endlinechar=10 \catcode10=5}  \l__robExt_placeholder___ROBEXT_MAIN_CONTENT_ORIG___str
     \fi
     \robExt@normalBraces\robExtUserInputCacheMe
+    % \robExt@normalBraces defines \robExtUserInputCacheMe globally, let's define it locally otherwise creates bugs
+    % where this is reused in the next block
+    \let\robExtUserInputCacheMeTmp\robExtUserInputCacheMe
+    \global\let\robExtUserInputCacheMe\undefined
+    \let\robExtUserInputCacheMe\robExtUserInputCacheMeTmp
     \expandafter\robExt@getfromstringA\robExtUserInputCacheMe\robExt@getfromstringA%\robExt@getfromstringA is added to know when to stop
     \def\robExt@already@ran@autoforward{}%
   \fi
@@ -2313,8 +2423,9 @@ if __name__ == '__main__':
   \robExtConfigure{if matches word={#1}{forward color=#1,#3}}%
 }
 
-
-\NewDocumentCommand{\robExtRunHereAndInPreambleOfCachedFiles}{O{latex}m}{%
+%% Avoid to run these functions as they do not preserve some stuff, like \foo@ is turned into \foo @ (even when putting \makeatletter everywhere)
+%% breaking some code. Better use cachemecode then, and I'll add a style for it.
+\NewDocumentCommand{\robExtRunHereAndInPreambleOfCachedFiles}{O{latex}+m}{%
   #2%
   \robExtConfigure{%
     add to preset={#1}{%
@@ -2323,6 +2434,200 @@ if __name__ == '__main__':
   }%
 }
 \let\runHereAndInPreambleOfCachedFiles\robExtRunHereAndInPreambleOfCachedFiles
+
+% Better to use this preset:
+%% \begin{CacheMeCode}{run here and in preamble of cached files}
+%%   \def\foo{45}%
+%%   \makeatletter%
+%%   \def\foo@bar{42}%
+%%   \makeatother%
+%% \end{CacheMeCode}
+%%
+\newcounter{robExtAutomaticStyleCounter}
+\setcounter{robExtAutomaticStyleCounter}{0}
+
+\robExtConfigure{%
+  run here/.style={
+    placeholder to global macro/.expanded={__ROBEXT_MAIN_CONTENT_ORIG_TMP__}{__ROBEXT_MAIN_CONTENT_ORIG__},
+    run after group/.expanded={%
+      % Creates a \robExtInMainDocument macro only if ran here to create codes that run different code
+      % if they are in the main document or in a cached document
+      \noexpand\def\noexpand\robExtInMainDocument{}%
+      \noexpand\scantokens{\csname __ROBEXT_MAIN_CONTENT_ORIG_TMP__\endcsname}%
+    },
+  },
+  % TODO: this code seems buggy, see 01-quickstart-pure.tex
+  run here and in preamble of cached files/.style={
+    /utils/exec={\stepcounter{robExtAutomaticStyleCounter}},
+    % We store the placeholder in a global macro to execute it later after the group
+    placeholder to global macro/.expanded={__ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter}{__ROBEXT_MAIN_CONTENT_ORIG__},
+    run after group/.expanded={%
+      \noexpand\scantokens{\csname __ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter\endcsname}%
+      \noexpand\robExtConfigure{%
+        /utils/exec={\noexpand\message{We will add stuff to the preset --#1-- from __ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter}},        
+        add to preset={#1}{
+          placeholder from global macro/.expanded={__ROBEXT_MAIN_CONTENT_ORIG_TMP__}{__ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter},
+          set placeholder rec replace from list={__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_MAIN_CONTENT_ORIG_TMP__}{__ROBEXT_LATEX_PREAMBLE__}{__ROBEXT_LATEX_PREAMBLE____ROBEXT_MAIN_CONTENT_ORIG_TMP__},
+        },
+      }%
+    },
+    do not compile,
+  },
+  run here and in preamble of cached files/.default=latex,
+  % Just simpler to remember
+  latex too pure workflow/.style={
+    run here and in preamble of cached files
+  },
+}
+
+
+%% Usage: sometimes, it can be a bit tedious to specify all dependencies on external code
+%% so we can include instead a whole bunch of code if one macro/word is present:
+%% \begin{CacheMeCode}{run here and if macro present={\myfirstmacro,\mysecondmacro}{myfirstenv,mysecondenv}}
+%%   \def\commonstuff{42}%
+%%   \def\myfirstmacro{I like \commonstuff}%
+%%   \def\mysecondenv{I like \commonstuff\commonstuff}%
+%%   \NewDocumentEnvironment{myfirstenv}{}{Hello, do you like \commonstuff or }{better?}
+%%   \NewDocumentEnvironment{mysecondenv}{}{Hello, do you like \commonstuff\commonstuff or }{better?}
+%% \end{CacheMeCode}
+%% More robust than \robExtRunHereAndIfMacrosPresent
+
+\robExtConfigure{%
+  % version with presets: run here and in preset if macro present={latex}{my namespace}{\mycommand,\myword}{myword,myotherword}
+  run here and in preset if macro present/.style n args={4}{
+    /utils/exec={\stepcounter{robExtAutomaticStyleCounter}},
+    % We store the placeholder in a global macro to execute it later after the group
+    placeholder to global macro/.expanded={__ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter}{__ROBEXT_MAIN_CONTENT_ORIG__},
+    run after group/.expanded={%
+      \noexpand\scantokens{\csname __ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter\endcsname}%
+      \noexpand\robExtConfigure{% FIXME: bug, only the last one is added, makes sense
+        new preset={robExtAutoStyle\therobExtAutomaticStyleCounter}{
+          load at most once={
+            % We bring the global placeholder back to a temporary local placeholder
+            placeholder from global macro/.expanded={__ROBEXT_MAIN_CONTENT_ORIG_TMP__}{__ROBEXT_MAIN_CONTENT_ORIG_TMP__\therobExtAutomaticStyleCounter},
+            % we add to the latex_preamble placeholder its content.
+            set placeholder rec replace from list={__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_MAIN_CONTENT_ORIG_TMP__}{__ROBEXT_LATEX_PREAMBLE__}{__ROBEXT_LATEX_PREAMBLE____ROBEXT_MAIN_CONTENT_ORIG_TMP__},
+          }
+        },
+        % Automatically add "auto forward", too easy to forget
+        add to preset={#1}{auto forward},
+        % Deal with macros
+        config if macros present={\unexpanded{#3}}{robExtAutoStyle\therobExtAutomaticStyleCounter},
+        % Deal with environments
+        robExt_tmp_one_loop/.style={
+          register word with namespace/.expanded={\unexpanded{#2}}{\unexpanded{####1}}{robExtAutoStyle\therobExtAutomaticStyleCounter},
+        },
+        robExt_tmp_one_loop/.list={#4},
+        add to preset={#1}{auto forward words namespace={#2}},
+      }%
+    },
+    do not compile,
+  },
+  run here and if macro present/.style 2 args={
+    run here and in preset if macro present={latex}{}{#1}{#2},
+  },
+  latex pure workflow/.style 2 args={
+    run here and if macro present={#1}{#2},
+  },
+}
+
+
+
+% To easily add impurity (see also \begin{CacheMeCode}{latex impure})
+% Usage:
+% \begin{CacheMeCode}{impurely create or add to file=input.tex}
+% \def\mymacro{bar}
+% \end{CacheMeCode}
+% will create a new file input.tex in the cache folder (or append to this file if this file was already created
+% with this command above)
+\robExtConfigure{%
+  impurely create or add to file/.style={
+    do not compile,
+    /utils/exec={%
+      \ifcsname robExt@impurely@create@or@add@to@file@#1\endcsname%
+        \robExtSaveOrAppendRawPlaceholderToFile{\robExtAddCachePath{#1}}{__ROBEXT_MAIN_CONTENT_ORIG__}%
+      \else%
+        \robExtSaveRawPlaceholderToFile{\robExtAddCachePath{#1}}{__ROBEXT_MAIN_CONTENT_ORIG__}%
+      \fi%
+      \expandafter\gdef\csname robExt@impurely@create@or@add@to@file@#1\endcsname{}%
+    }
+  },
+  run here and impurely create or add to file/.style={
+    run here,
+    impurely create or add to file={#1},
+  },
+  run here and impurely create file/.style={
+    run here,
+    impurely create file={#1},
+  },
+  impurely create file/.style={
+    do not compile,
+    /utils/exec={%
+      \robExtSaveRawPlaceholderToFile{\robExtAddCachePath{#1}}{__ROBEXT_MAIN_CONTENT_ORIG__}%
+    }
+  },
+  latex impure workflow/.style={
+    run here and impurely create or add to file=robExtLatexInput.tex,
+    run after group={%
+      \robExtConfigure{
+        load at most once={
+          add to preset={latex}{
+            add to preamble={\input{robExtLatexInput.tex}},
+          },
+        },
+      }%
+    },
+  },
+}
+
+
+% DEPRECATED, use "run here and if macro present" instead: very buggy:
+% - this fails if it contains some @symbols as it is parsed like \foo @ instead of \foo@
+% [namespace]{\pr,\foo,\bar}[worda,wordb]{stuff to load if macros or words are present}
+% - does not work if two elements are used is two runHereAndIfMacrosPresent.
+%% Usage:
+%% \runHereAndIfMacrosPresent{\pr,\esp}[espal,pral]{
+%%   Code that should be run just once if \pr, \esp or espal/pral are detected
+%% }
+%%
+\NewDocumentCommand{\robExtRunHereAndIfMacrosPresent}{O{}mO{}+m}{%
+  #4% We execute the code
+  % We create a new name for the style (exact name does not really matters, so we take it based on a counter)
+  \edef\robExt@nameOfTheStyle{robExtAutoStyle\therobExtAutomaticStyleCounter}%
+  \stepcounter{robExtAutomaticStyleCounter}%
+  % We add stuff to automatically call the above style
+  \robExtConfigure{
+    %/utils/exec={\message{AAA creating the style for \noexpand#2}\show\creating},
+    % We create a style called like robExt@nameOfTheStyle with the content of the code to run
+    new preset/.expanded={\robExt@nameOfTheStyle}{
+      % First, we check if the style was loaded earlier, to avoid calling it twice
+      % todo: maybe create a style that could be used by the user easily.
+      /utils/exec={
+        %\noexpand\message{We execute \robExt@nameOfTheStyle \noexpand#2}\noexpand\show\noexpand\weexecute
+        \noexpand\ifcsname robExtStyleAlreadyCalled\robExt@nameOfTheStyle\noexpand\endcsname
+          %\noexpand\message{The style \robExt@nameOfTheStyle was already ran before}\noexpand\show\noexpand\alreadyran
+          \noexpand\else
+           % the style was not used yet, let's say we used it already by creating a macro
+           \noexpand\expandafter\noexpand\def\noexpand\csname robExtStyleAlreadyCalled\robExt@nameOfTheStyle\noexpand\endcsname{}%
+           % let's apply the style
+           \noexpand\pgfkeysalso{
+             add to preamble={\unexpanded{#4}},
+           }%
+          \noexpand\fi
+      },
+    },
+    tmp if macro present/.code={\message{We will load the style \robExt@nameOfTheStyle if the macro \noexpand##1 is present.}\robExtConfigIfMacroPresent{##1}{\robExt@nameOfTheStyle}},
+    tmp if macro present/.list={#2},
+    tmp if word present/.style={
+      register word with namespace/.expanded={#1}{##1}{
+        /utils/exec={\noexpand\pgfkeysalso{\robExt@nameOfTheStyle}},
+      },
+    },
+    tmp if word present/.list={#3},
+  }%
+}
+\let\runHereAndIfMacrosPresent\robExtRunHereAndIfMacrosPresent
+
 
 \NewDocumentCommand{\robExtGenericAutoForward}{sO{latex}O{}mO{}m}{%
   \IfBooleanTF{#1}{}{#6}% We run the code right now
@@ -2335,13 +2640,13 @@ if __name__ == '__main__':
             \expandonce{\zxTmpMacro}%
           }%
         },%
-        #5%
+        \unexpanded{#5}%
       },%
       add to preset={#2}{%
         auto forward words namespace={#3},%
       }%
     }%
-  }%  
+  }%
 }
 
 \let\genericAutoForward\robExtGenericAutoForward
@@ -2494,12 +2799,26 @@ if __name__ == '__main__':
 }
 \def\robExt@set@to@comma #1{\ifx\relax#1\else \lccode`#1=`, \expandafter\robExt@set@to@comma\fi}
 \def\robExt@wordscan@aux#1,{\ifx\relax#1\empty\else%
-   %\message{{#1}}  % prints each scanned "word"
-   \ifcsname robExt@action@to@run@on@word:\robExt@namespace:#1\endcsname \csname robExt@action@to@run@on@word:\robExt@namespace:#1\endcsname \fi%
+    \ifcsname robExt@action@to@run@on@word:\robExt@namespace:#1\endcsname%
+      % We don't run the action twice
+      \ifcsname robExt@action@already@run@on@word:\robExt@namespace:#1\endcsname\else%
+        \csname robExt@action@to@run@on@word:\robExt@namespace:#1\endcsname%
+        \expandafter\def\csname robExt@action@already@run@on@word:\robExt@namespace:#1\endcsname{}%
+      \fi%
+    \fi%
    \expandafter\robExt@wordscan@aux\fi%
 }
 %\robExtRegisterWordCode{namespace}{word}{code}
-\def\robExtRegisterWordCode#1#2#3{\expandafter\gdef\csname robExt@action@to@run@on@word:\string#1:\string#2\endcsname{#3}}
+\def\robExtRegisterWordCode#1#2#3{%
+  % First for efficiency reasons (at least until further optimizations are done), the text is replaced in
+  % lowercase as discussed in https://tex.stackexchange.com/questions/701351/more-efficient-string-extraction-of-words/701441#701441
+  % But this also means that we need to turn the input text in lower text. Since lowercase is not expandable, we use
+  % this trick:
+  \lowercase{\def\robExt@word@tmp{#2}}%
+  % Then we register the corresponding action
+  \expandafter\gdef\csname robExt@action@to@run@on@word:\string#1:\robExt@word@tmp\endcsname{#3}%
+}%
+%\def\robExtRegisterWordCode#1#2#3{\expandafter\gdef\csname robExt@action@to@run@on@word:\string#1:\string#2\endcsname{#3}}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2508,8 +2827,66 @@ if __name__ == '__main__':
 % We create interface into pgfkeys in order to allow easier creation of content via style
 \pgfkeys{%
   /robExt/.cd,%
-  % We create a default style that will be loaded (mostly for the user)
+  % We create a default style that will be loaded (mostly for the user, but use it with lots of care as it applies to ALL styles)
   default style/.style={},%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Call a preset+compilation in a preset %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % This helps to compose presets (e.g. first compile this, then that etc)
+  % a bit like calling \cacheMe{} inside, except that we don't reset the __ROBEXT_MAIN_CONTENT_ORIG__ placeholder
+  %% Since \begin{CacheMeCode} and \cacheMe already wrap cache me in a group, we provide a method to add cache me without an additional group, 
+  %% (usually not meant for the end user), this way we always have to pass a single group to go to the outer lever.
+  cache me no group/.style={%
+    %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz
+    %% picture etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not
+    %% want to reset all compilation commands etc), so you can add here stuff that might need to be restored
+    %% later.
+    reset,
+    % Sometimes we want to run stuff after the current group, e.g. to run a code here and in preamble etc
+    /utils/exec={\def\robExtRunAfterGroup{}},%
+    default style,%
+    #1,
+    /utils/exec={%
+      \robExtEvaluateCompileAndInclude%
+      % We use a temporary global macro since aftergroup expects a global macro
+      \global\let\robExtRunAfterGroupGtmp\robExtRunAfterGroup%
+      \aftergroup\robExtRunAfterGroupGtmp%
+    },%
+  },
+  cache me/.code={%
+    \begingroup% create group
+    \pgfkeysalso{cache me no group={#1}}%
+    \endgroup%
+  },
+  clear content/.style={
+    set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{},%
+    /utils/exec={\let\robExtUserInputCacheMe\undefined},% this is basically a somewhat simpler to parse equivalent of the above placeholder, so we need to clean it if we reset the placeholder
+  },
+  save content/.style={
+    copy placeholder={__ROBEXT_MAIN_CONTENT_ORIG_SAVED__}{__ROBEXT_MAIN_CONTENT_ORIG__},
+    /utils/exec={\let\robExtUserInputCacheMeSaved\robExtUserInputCacheMe},
+    clear content
+  },
+  restore content/.style={
+    copy placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{__ROBEXT_MAIN_CONTENT_ORIG_SAVED__},
+    /utils/exec={\let\robExtUserInputCacheMe\robExtUserInputCacheMeSaved},
+  },
+  % Usage:
+  % load at most once category={my unique category name}{your style}
+  load at most once category/.code 2 args={%
+    % We check if it was already loaded
+    \ifcsname robExtLoadAtMostOnceCat#1\endcsname%
+    \else% 
+      \expandafter\def\csname robExtLoadAtMostOnceCat#1\endcsname{}%
+      \pgfkeysalso{#2}%
+    \fi%
+  },
+  % load at most once={your style}
+  % like "load at most once category", but the category is the hash of the content
+  % this way we don't need to specify the category
+  load at most once/.style={%
+    load at most once category/.expanded={\robExt@pdfmdfivesum{\unexpanded{#1}}}{\unexpanded{#1}}
+  },
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%% Code to create new styles %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2672,6 +3049,8 @@ if __name__ == '__main__':
   set placeholder eval no import/.code 2 args={\robExtSetPlaceholderRec*{#1}{#2}\robExtEvalPlaceholderInplace{#1}},
   set placeholder eval replace from list/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList{#1}{#2}{#3}\robExtEvalPlaceholderInplace{#2}},
   set placeholder eval replace from list no import/.code n args={3}{\robExtSetPlaceholderRecReplaceFromList*{#1}{#2}{#3}\robExtEvalPlaceholderInplace{#2}},
+  placeholder from global macro/.code 2 args={\robExtPlaceholderFromGlobalMacro{#1}{#2}},
+  placeholder to global macro/.code 2 args={\robExtPlaceholderToGlobalMacro{#1}{#2}},
   eval placeholder/.code={\robExtEvalPlaceholder{#1}},
   eval placeholder replace from list/.code 2 args={\robExtEvalPlaceholderReplaceFromList{#1}{#2}},
   set placeholder from content/.code 2 args={\robExtPlaceholderFromContent{#1}{#2}},
@@ -2801,6 +3180,8 @@ if __name__ == '__main__':
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Auxiliary command:
   dependenciesList/.code={\robExtAddDependency{#1}},
+  dependenciesList if exists/.code={\robExtAddDependencyIfExists{#1}},
+  dependenciesList if exists warning/.code={\robExtAddDependencyIfExistsWarning{#1}},
   % Usage like: dependencies={input_externalize.tex,input_b.tex}
   % They should be relative to the main file when using the subfolder option.
   dependencies/.style={
@@ -2809,6 +3190,12 @@ if __name__ == '__main__':
   },
   add dependencies/.style={
     dependenciesList/.list={#1}
+  },
+  add dependencies if exists/.style={
+    dependenciesList if exists/.list={#1}
+  },
+  add dependencies if exists warning/.style={
+    dependenciesList if exists warning/.list={#1}
   },
   reset dependencies/.code={\robExtResetDependencies{}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -2822,6 +3209,14 @@ if __name__ == '__main__':
   % safe to remove files from this code, but this can also be done by the user hooking into
   recompile/.code={\def\robExtForceRecompilation{}},
   do not recompile/.code={\let\robExtForceRecompilation\undefined},
+  % Use this if you use cache me only to parse a string and execute something at every compilation, but actually don't to cache anything.
+  do not compile/.style={
+    command if no externalization/.code={},
+    set compilation command={},
+    set template={},
+    custom include command={},
+    disable externalization,
+  },
   set compilation command/.code={\robExtSetCompilationCommand{#1}},
   % like "set compilation command" but moves the "__ROBEXT_OUTPUT_PDF__-tmp" to "__ROBEXT_OUTPUT_PDF__" if
   % there is no error.
@@ -2883,6 +3278,7 @@ if __name__ == '__main__':
   %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz picture
   %% etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not want to reset
   %% all compilation commands etc), so you can add here stuff that might need to be restored later.
+  %% Just, do not reset the __ROBEXT_MAIN_CONTENT_ORIG__ placeholder
   reset/.code={%
     \let\robExtIncludeCommandAdvanced\undefined%
     \let\robExtIncludeCommand\undefined%
@@ -2934,11 +3330,16 @@ if __name__ == '__main__':
   do not cache tikz/.code={\robExtDoNotExternalizeAllTikzpictures{}},
   cache tikz 2 args/.code 2 args={\robExtExternalizeAllTikzpictures[#1][#2]{}},
   cache tikz 3 args/.code n args={3}{\robExtExternalizeAllTikzpictures[#1][#2][3]{}},
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% Run a command after the group %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % Sometimes we want to run a command after the end of the group created by cache me.
+  % Warning, all variables created inside of cache me will not be available anymore, so save them etc if needed
+  run after group/.code={\expandafter\def\expandafter\robExtRunAfterGroup\expandafter{\robExtRunAfterGroup #1}},
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %%% Disable externalization %%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
   %% Note: this does not work reliably for now
-  %% TODO: fix this!
   disable externalization/.code={\def\robExtDisableExternalization{}},
   de/.style={disable externalization},
   disable externalization now/.code={\robExtDisableTikzpictureOverwrite\def\robExtDisableExternalization{}},
@@ -3076,6 +3477,13 @@ if __name__ == '__main__':
     },
   },
   load auto forward macro config/.code={\robExtLoadAutoForwardMacroConfig{#1}},
+  config if macro present/.code 2 args={\robExtConfigIfMacroPresent{#1}{#2}},
+  config if macros present/.style 2 args={
+    robExt_tmp_execute_one_iteration/.style={
+      config if macro present={##1}{#2},
+    },
+    robExt_tmp_execute_one_iteration/.list={#1},
+  },
   %% Auto forward words
   auto forward words namespace/.code={%
     \ifdefined\robExt@autoforward@enabled\else%
@@ -3161,6 +3569,13 @@ if __name__ == '__main__':
   compile in parallel with xargs/.default={16},
   % By default, we compile with xargs and 16 processes:
   compile in parallel with xargs,
+}
+
+% Can't be written in Expl3 code because of space
+\NewDocumentCommand{\robExtRegisterAutoforward}{}{
+  \robExtConfigure{
+    add to preset={latex}{auto forward},
+  }
 }
 
 \ExplSyntaxOn
@@ -3250,9 +3665,14 @@ if __name__ == '__main__':
 % It assumes that __ROBEXT_COMPILATION_COMMAND__ and __ROBEXT_TEMPLATE__ is set
 \NewDocumentCommand{\robExtEvaluateCompileAndInclude}{}{%
   \ifdefined\robExtDisableExternalization%
+    %%% TODO: this group is added just because it removes an annoying bug (otherwise disable externalization
+    %%% fails with any tikz picture), but I have no idea why it works, and I don't like the idea of adding an
+    %%% extra group here. To clarify.
+    {%
     \pgfkeys{%
       /robExt/.cd,
       command if no externalization,
+    }%
     }%
   \else%
     \pgfkeys{%
@@ -3271,29 +3691,28 @@ if __name__ == '__main__':
 
 
 %% #1: Arguments, #2: content to externalize
+\NewDocumentCommand{\robExtCacheMeNoGroup}{O{}+m}{%
+  % executed at the end of the \cacheMe command even for nested data etc without risks of interfering between data.
+  %% We store the input in a non-string element for efficiently implementing "auto forward"
+  \edef\robExtUserInputCacheMe{\unexpanded{#2}}% \unexpanded is needed if the macro contains a #1
+  \pgfkeys{%
+    /robExt/.cd,%
+    set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},%
+    cache me no group={#1},
+  }%
+}
+
+%% #1: Arguments, #2: content to externalize
 \NewDocumentCommand{\robExtCacheMe}{O{}+m}{%
   {% Group
-    %% We store the input in a non-string element for efficiently implementing "auto forward"
-    \edef\robExtUserInputCacheMe{\unexpanded{#2}}% \unexpanded is needed if the macro contains a #1
-    \pgfkeys{%
-      /robExt/.cd,%
-      %% This is needed notably if the cached elements are nested, like the include command uses itself a tikz
-      %% picture etc cached via \cacheTikz... It it hard to reset everything efficiently (like we might not
-      %% want to reset all compilation commands etc), so you can add here stuff that might need to be restored
-      %% later.
-      reset,
-      set placeholder={__ROBEXT_MAIN_CONTENT_ORIG__}{#2},%
-      default style,%
-      #1,
-    }%
-    \robExtEvaluateCompileAndInclude%
+    \robExtCacheMeNoGroup[#1]{#2}%
   }%
 }
 \let\cacheMe\robExtCacheMe
 
 %% #1: Arguments, #2: content to externalize
 \NewDocumentEnvironment{RobExtCacheMe}{m+b}{%
-  \robExtCacheMe[#1]{#2}%
+  \robExtCacheMeNoGroup[#1]{#2}% 
 }{}
 \let\CacheMe\RobExtCacheMe
 \let\endCacheMe\endRobExtCacheMe
@@ -3304,9 +3723,8 @@ if __name__ == '__main__':
   \endRobExtPlaceholderFromCode%
   \pgfkeys{%
     /robExt/.cd,%
-    #1,%
+    cache me no group={#1},
   }%
-  \robExtEvaluateCompileAndInclude%
 }
 \let\CacheMeCode\RobExtCacheMeCode
 \let\endCacheMeCode\endRobExtCacheMeCode
@@ -3568,7 +3986,10 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     },
     do not wrap code/.style={
       set placeholder={__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__}{__ROBEXT_MAIN_CONTENT__},
-    },    
+    },
+    do not wrap code except out file/.style={
+      set placeholder={__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__}{__ROBEXT_LATEX_CREATE_OUT_FILE____ROBEXT_MAIN_CONTENT__},
+    },
     add to includegraphics options={trim=__ROBEXT_LATEX_TRIM_LENGTH__ __ROBEXT_LATEX_TRIM_LENGTH__ __ROBEXT_LATEX_TRIM_LENGTH__ __ROBEXT_LATEX_TRIM_LENGTH__},
     add to latex options={margin=__ROBEXT_LATEX_TRIM_LENGTH__},
     do not add margins/.style={
@@ -3583,6 +4004,17 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
   tikzpicture/.style={
     tikz,
     set placeholder no import={__ROBEXT_MAIN_CONTENT__}{\begin{tikzpicture}__ROBEXT_MAIN_CONTENT_ORIG__\end{tikzpicture}},
+  },
+  support pictures/.style={
+    add to preamble={
+      \usepackage{graphicx}
+      \graphicspath{{__ROBEXT_WAY_BACK__}}
+    },
+  },
+  latex support pictures/.style={
+    add to preset={latex}{
+      support pictures
+    },
   },
 }
 

@@ -1,0 +1,42 @@
+% Recommended (pure but recompiles only needed blocks), but slightly more complex
+% (requires v4.0 or above)
+\documentclass{article}
+
+\usepackage{tikz}
+\usepackage{robust-externalize}
+% Updates \graphicspath in compiled files to look for images in the root folder
+% (require v4.0 or above):
+\robExtConfigure{latex support pictures}
+
+% You can combine this with the too pure/impure workflows to include code in all images
+% or use the following code to execute code only in cached content but not in current document:
+% \robExtConfigure{add to preset={latex}{add to preamble={code to load only in cached pictures}}}.
+
+% Add "AutoForward" to all self-contained macro definitions that may be used in cached content
+% The definition will automatically be copied when compiling the picture, and when this macro
+% changes only pictures using them will be recompiled
+% (can be further customized to automatically load packages etc, see the documentation)
+\NewDocumentCommandAutoForward{\mySelfcontainedMacro}{m}{``#1''}
+
+% When macros are not self-contained, it is simpler to include all the block that defines them:
+% This is the list of macros that will trigger inclusion of this code --V
+\begin{CacheMeCode}{latex pure workflow={\myname,\myfullname,\myfirstname}{myenv}}
+  \def\myfirstname{Alice}
+  \def\mysecondname{Bob}
+  \def\myname{\myfirstname{} \mysecondname{}}
+  \NewDocumentEnvironment{myenv}{}{My env involving \myname{}}{}
+\end{CacheMeCode}
+
+\begin{document}
+
+You can use the macro \mySelfcontainedMacro{\myname{}} in the main document or in cached pictures,
+and only pictures containing them will be recompiled when you change their definition:
+
+% Note the C -----+ to mean that we should cache this picture.
+%                 |  See \cacheTikz + \cacheCommand to automatically cache all tikz pictures
+%                 V
+\begin{tikzpictureC}
+  \node[draw,rounded corners,fill=yellow,align=left,text width=7cm]{\mySelfcontainedMacro{\myname{}}};
+\end{tikzpictureC}
+
+\end{document}

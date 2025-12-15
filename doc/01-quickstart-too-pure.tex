@@ -1,0 +1,30 @@
+% Simple but not recommended: impure (= manual recompilations), requires v4.0 or above
+\documentclass{article}
+
+\usepackage{tikz}
+\usepackage{robust-externalize}
+% Updates \graphicspath in compiled files to look for images in the root folder,
+% requires v4.0 or above:
+\robExtConfigure{latex support pictures}
+
+% Put your preamble here (loaded in this file + cached files)
+% (warning: recompile all pictures when changed)
+\begin{CacheMeCode}{latex too pure workflow}
+  \def\myname{Alice}
+\end{CacheMeCode}
+
+\begin{document}
+
+You can use the macro ``\myname{}'' in the main document or in cached pictures. Since you are
+in the too pure workflow, you don't need to force recompilation, but it will recompile all
+pictures every time you update the preamble. See ``pure workflows'' and ``defAutoForward''
+for more fine-grained recompilation.
+
+% Note the C -----+ to mean that we should cache this picture.
+%                 |  See \cacheTikz + \cacheCommand to automatically cache all tikz pictures
+%                 V
+\begin{tikzpictureC}
+  \node[draw,rounded corners,fill=yellow,align=left,text width=7cm]{\myname{}};
+\end{tikzpictureC}
+
+\end{document}

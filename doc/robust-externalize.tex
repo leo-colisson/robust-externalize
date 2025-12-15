@@ -26,8 +26,8 @@
   copy file to cache={tikzlibraryzx-calculus.code.tex},
   % You need to uncomment that line to rename the .tex files into .tex-backup
   % backup source for arxiv,
-  rename backup files for arxiv,
-  print source when saving, % debug
+  % rename backup files for arxiv,
+  % print source when saving, % debug
 }
 \usepackage{zx-calculus}
 \usepackage{forest}
@@ -105,7 +105,7 @@
   {\Large\bfseries Cache anything (\tikzname, tikz-cd, python…),\\in a robust, efficient and pure way.}
 
   \vspace{1em}
-  {Léo Colisson \quad Version 3.0}\\[3mm]
+  {Léo Colisson \quad Version 4.0}\\[3mm]
   {\href{https://github.com/leo-colisson/robust-externalize}{\texttt{github.com/leo-colisson/robust-externalize}}}
 \end{center}
 
@@ -118,6 +118,136 @@
 \textbf{WARNING 2: the recent versions 2.1 and 2.2 improves significantly the compilation time compared with 2.0 that was surprisingly slow. Now, it is fairly well optimized, and version 2.3 is even more optimized.}
 
 \textbf{WARNING 3: If you read this documentation from the arXiv or CTAN, you might prefer to read it from \mylink{https://github.com/leo-colisson/robust-externalize}{Github} to get the latest version.}
+
+
+\newpage
+\section{Quickstart by example}\label{sec:quickstartbyexample}
+
+This library can be used to do many things described in the next section, to cache tikz/python/anything you want. For readers that prefer to just copy/paste code to get started, here are a few example of document to copy/paste depending on the generic workflow you want to follow. The examples in this section require to use a \textbf{recent version} (4.0 at least, published in december 2025) of this library. To download the latest version in your project (always recommended) just download \mylink{https://github.com/leo-colisson/robust-externalize/blob/master/robust-externalize.sty}{this file} in your project, for instance via:
+\begin{lstlisting}[breaklines]
+wget https://raw.githubusercontent.com/leo-colisson/robust-externalize/refs/heads/master/robust-externalize.sty
+\end{lstlisting}
+
+Unless your pictures are already cached, you also need to compile all the codes with shell-escape (enabled by default on overleaf!), for instance via:
+\begin{verbatim}
+$ pdflatex -shell-escape example.tex
+\end{verbatim}
+or by configuring appropriately your editor.
+
+\subsection{Method 1 (NOT recommended): simple but impure}
+
+For people that want to quickly get started, we support (since v4.0 in december 2025) a simple method (basically just put all your preamble between |CacheMeCode|). This is simple (and basically what is done by other libraries like \texttt{tikz-externalize})\dots{} but not great since any time you change your preamble, the pictures will not be recompiled. Hence you need to \textbf{manually specify which figure must be recompiled} (read comments for details). \textbf{To avoid these issues}, see the next methods involving |latex too pure workflow| or |latex pure workflow| and |\defAutoForward|.
+
+The code presented in this section is also ``opt-in'' (to avoid breaking existing code), i.e.\ you need to manually specify which tikz-picture you want to cache or not by using |\begin{tikzpictureC}| instead of |\begin{tikzpicture}|. \textbf{To cache all tikz pictures by default}, use |\cacheTikz|, but first read \cref{subsec:bonusCacheAllTikzPictures} or you will run into troubles and have many compilation issues.
+
+\codeexample[code only, from file={00-quickstart-impure.tex}]
+
+\subsection{Method 2 (NOT recommended): simple but TOO pure}
+
+The above code has the drawback that if you change your macros, you need to manually specify which figures to recompile. This has the risk that if you forget to recompile an image after changing a macro, the image will contain outdated content. A \textbf{(NOT recommended, but super simple)} approach (since v4.0 in december 2025) is to go all the way to the other hand of the spectrum: \textbf{always recompile} all pictures if a single macro changes in your preamble:
+
+\codeexample[code only, from file={01-quickstart-too-pure.tex}]
+
+\newpage 
+\subsection{Method 3 (recommended): good balance between purity and simplicity}
+
+In this section, we describe two methods (recommended this time if you don't mind the additional small complexity!) that recompile only the pictures that must be recompiled without recompiling all the other ones: this way you have perfect purity without too much recompilation:
+
+\codeexample[code only, from file={02-quickstart-pure.tex}]
+
+%\newpage 
+\subsection{Bonus: how to cache all \tikzname{} pictures automatically}\label{subsec:bonusCacheAllTikzPictures}
+
+\textbf{PLEASE \textcolor{red}{READ THIS SECTION COMPLETELY} IF YOU PLAN TO USE} |\cacheTikz|~\textbf{!}
+
+\medskip
+
+If you want to automatically cache all \tikzname{} pictures instead of using |tikzpictureC|, you can use the |\cacheTikz| command, but first you need to understand why other commands/packages might break, and how to fix them.
+
+First, for now, we don't support \tikzname{} pictures that rely on |remember picture| or internal links (and certainly many more obscure functionalities) in the document since the figures are compiled into a separate pdf file before being included. We can disable externalization for these images only via |<disable externalization>|, but even if we only consider ``basic'' tikz pictures some care must be taken.
+
+This library is indeed fairly naive (and it's hard to be much clever) when you use |\cacheTikz|: every time it sees a new \tikzname{} picture, it puts its content in a new file and compiles this extra file before including the result back in the current document. But if you use a package |mydummypackage| that defines a command like:
+
+\begin{codeexample}[width=0pt,vbox,code only]
+  \NewDocumentCommand{\mytikzfigure}{m}{%
+    \def\myinternalvariable{#1}%
+    \begin{tikzpicture}
+      \node{\myinternalvariable};
+    \end{tikzpicture}
+  }
+\end{codeexample}
+
+\noindent and if you use |\mytikzfigure{bar}| in your document, then when seeing |\mytikzfigure|, \LaTeX{} will expand it to:
+
+\begin{codeexample}[width=0pt,vbox,code only]
+  \def\myinternalvariable{bar}%
+  \begin{tikzpicture}
+    \node{\myinternalvariable};
+  \end{tikzpicture}
+\end{codeexample}
+
+Hence, later on, when our library will see the |\begin{tikzpicture}|, it will copy its content into a file, creating and compiling a file looking like:
+\begin{codeexample}[width=0pt,vbox,code only]
+  \documentclass{standalone}
+  \usepackage{tikz}
+  \begin{document}
+    \begin{tikzpicture}
+      \node{\myinternalvariable};
+    \end{tikzpicture}
+  \end{document}
+\end{codeexample}
+
+But this document cannot compile and you'll get an error like ``|\myinternalvariable| is not defined'' since, as you can see, the macro |\myinternalvariable| is not defined: our library was not clever enough to know that it needed to also forward the definition |\def\myinternalvariable{bar}| by copying it into our intermediate file. This is indeed a fairly complicated task, since when seeing a macro, we cannot know if it is a macro to forward (like |\myinternalvariable|) or a macro defined by an already-loaded package (e.g.\ |\node| is defined by |\usepackage{tikz}| and should not be forwarded!). While we do allow some specific macros to be forwarded automatically, it is just not possible to automatically guess when seeing a new macro if we should forward it or not.
+
+So now that you understand why you'll get an error when typing |\mytikzfigure{bar}|, we have a \textbf{good news: it is possible to fix this error easily}: you need to tell |robust-externalize| what to do with the |\mytikzfigure| command: either simply disable externalization (so the \tikzname{} picture will not be cached at all), or cache the whole |\mytikzfigure| command directly:
+
+\paragraph{Method 1: disable caching.}
+
+If you want to disable caching for the |\mytikzfigure| command, just write:
+\begin{codeexample}[width=0pt,vbox,code only]
+  \cacheCommand{\mytikzfigure}[m]{disable externalization}
+\end{codeexample}
+
+This way, our library will simply disable any sort of externalization when calling |\mytikzfigure|. The |[m]| means that |\mytikzfigure| accepts one mandatory argument (xparse syntax), so something like |mO{}m| would mean ``it accepts one mandatory argument followed by an optional one, followed by another mandatory argument'': this can be omitted if you defined your command via |\NewDocumentCommand| or other xparse-compatible functions.
+
+\paragraph{Method 2: enable caching.}
+
+In some cases, you may still want to enable externalization of |\mytikzfigure|. In that case, you can write in your preamble something like this:
+\begin{codeexample}[width=0pt,vbox,code only]
+  \cacheCommand{\mytikzfigure}[m]{latex, add to preamble={\usepackage{mydummypackage}}}
+\end{codeexample}
+
+\noindent The |[m]| has been explained in the previous paragraph, and the last argument:
+
+|latex, add to preamble={\usepackage{mydummypackage}}|
+
+\noindent basically specifies that the package |mydummypackage| should be loaded when compiling |\mytikzfigure|. This way, when seeing |\mytikzfigure{bar}|, our library will directly write a file looking like:
+
+\begin{codeexample}[width=0pt,vbox,code only]
+  \documentclass{standalone}
+  \usepackage{mydummypackage}
+  \begin{document}
+    \mytikzfigure{bar}
+  \end{document}
+\end{codeexample}
+
+\noindent and compile and include this file.
+
+You can similarly use |\cacheEnvironment{name of environment}{options}| to cache environments (for environments, there is no need to specify the argument specification). For instance, here is a full example to cache the |forest| package:
+
+\codeexample[code only, from file={04-example-forest.tex}]
+
+Note also that when using |\cacheEnvironment|, |\cacheCommand| or |\cacheTikz|, the cached command accept an additional optional argument (before all others) enclosed into |<...>|. This way, you can specify on a per-image basis additional configuration, for instance to disable externalization temporarily like in:
+
+\begin{codeexample}[width=0pt]
+%% We override the default tikzpicture environment to externalize all pictures
+%% WARNING: read the "Bonus: how to cache all tikz pictures automatically" or you'll get into troubles
+\cacheTikz
+
+I am a non-cached picture: \begin{tikzpicture}<disable externalization>[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpicture}.
+\end{codeexample}
 
 \section{A taste of this library}
 
@@ -132,17 +262,67 @@ This library allows you to cache any language: not only \LaTeX{} documents and \
 \end{verbatim}
 Then type something like this (note the |C| for |cached| at the end of |tikzpictureC|, see below to override the original tikz commands), and compile with |pdflatex -shell-escape yourfile.tex| (or \textcolor{red}{\textbf{read below if you do not want to use }}|-shell-escape|\textcolor{red}{\textbf{ (note that overleaf enables shell-escape by default, and it is not needed once all pictures are cached)}}):
 \begin{codeexample}[width=0pt,vbox]
+  %%% Method 1: Put this into your preamble
+  %%  (requires v4.0 or above. You can also use "latex impure workflow" if you prefer
+  %%   to manually recompile images when you change the preamble)
+  % \begin{CacheMeCode}{latex too pure workflow}
+  %   \usepackage{pifont}
+  % \end{CacheMeCode}
+  %%% Method 2:
+  %% works for older distributions + only load the package in the compiled image:
   \robExtConfigure{
     add to preset={tikz}{
       % we load some packages that will be loaded by figures based on the tikz preset
       add to preamble={\usepackage{pifont}}
     }
   }
+  
   The next picture is cached %
   \begin{tikzpictureC}[baseline=(A.base)]
     \node[fill=red, rounded corners](A){My node respecting baseline \ding{164}.};
     \node[fill=red, rounded corners, opacity=.3,overlay] at (A.north east){I am an overlay text};
   \end{tikzpictureC} and you can see that overlay and depth works.
+\end{codeexample}
+
+
+You can also choose to cache all \tikzname{} pictures automatically, but make sure to read \cref{subsec:bonusCacheAllTikzPictures} to know how to use |\cacheCommand| since this will break basically any package relying on \tikzname{} if you don't fix them properly.
+\begin{codeexample}[width=0pt]
+%% We override the default tikzpicture environment to externalize all pictures
+%% WARNING: read the "Bonus: how to cache all tikz pictures automatically" or you'll get into troubles
+\cacheTikz
+
+I am a cached picture: \begin{tikzpicture}[baseline=(A.base)]
+  \node[draw,rounded corners,fill=pink!60](A){Hello World!};
+\end{tikzpicture}.
+\end{codeexample}
+
+Since v4.0 (december 2025), we provide various simpler workflows depending on purity/simplicity, that are described into more details into \cref{sec:quickstartbyexample}. For instance if you like simple but impure workflow (i.e.\ you need to manually recompile pictures when the preamble change), you can do:
+
+\begin{codeexample}[width=0pt]
+\begin{CacheMeCode}{latex impure workflow}
+  \def\myname{Alice}
+\end{CacheMeCode}
+\begin{tikzpictureC}% Use \begin{tikzpictureC}<recompile> if the name changes
+  \node[draw,rounded corners,fill=pink!60]{Hello \myname{}!};
+\end{tikzpictureC}.
+\end{codeexample}
+
+If you prefer a very fine-grained compilation (i.e.\ recompile only what is needed), since v4.0 you can do:
+\begin{codeexample}[width=0pt]
+% Add "AutoForward" to all self-contained macro definitions that may be used in cached content
+\NewDocumentCommandAutoForward{\mySelfcontainedMacro}{m}{Hey #1!}
+
+% When macros are not self-contained, it is simpler to include all the block that defines them:
+\begin{CacheMeCode}{latex pure workflow={\myname,\myfullname,\myfirstname}{myenv}}
+  \def\myfirstname{Alice}
+  \def\mysecondname{Bob}
+  \def\myname{\myfirstname{} \mysecondname{}}
+  \NewDocumentEnvironment{myenv}{}{My env involving \myname{}}{}
+\end{CacheMeCode}
+
+\begin{tikzpictureC}
+  \node[draw,rounded corners,fill=yellow,align=left,text width=7cm]{\mySelfcontainedMacro{\myname{}}};
+\end{tikzpictureC}
 \end{codeexample}
 
 Since v2.3 we also provide a way to include online pictures with |\includegraphicsWeb|:
@@ -312,7 +492,7 @@ Or include images generated in python, note that if you use a version before 2.7
 \end{CacheMeCode}
 \end{codeexample}
 
-You can also include files from the root folder, if you want, recompile all pictures if this files changes (nice to ensure maximum purity):
+We also support dependencies, which are file that, when changed, trigger a recompilation. For instance, you can include files from the root folder and recompile all pictures if this files changes (nice to ensure maximum purity, see also the new |latex too pure workflow|):
 \begin{codeexample}[width=0pt,vbox]
 \begin{CacheMe}{latex,
     add dependencies={common_inputs.tex},
@@ -486,7 +666,7 @@ In my benchmark, I observed a compilation 1.5x faster than a normal compilation 
 
 Pros of \url{https://github.com/sasozivanovic/memoize}:
 \begin{itemize}
-\item The above library might be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz pictures are automatically memoized (we provide |\cacheTikz| for that, but you still need to specify the preamble once).
+\item The above library might be easier to setup as they do not need to specify the preamble of the file to compile (the preamble of the main file is used), and tikz pictures are automatically memoized, but with our recent v4.0 this is mitigated: we provide |\cacheTikz| for that + |latex impure workflow| where you can basically copy/paste the preamble, but you need to use |\cacheCommand| to avoid incompatibilities with packages.
 \item This library allows to compile multiple pictures while loading \LaTeX{} only once, saving the time to start \LaTeX{} for each picture. However, it is not clear that it brings a faster compilation time compared to our library for multiple reasons:
   \begin{itemize}
   \item While during the first run all pictures are compiled with a single \LaTeX{} instance\footnote{We could also do something similar using some scripting to merge multiple cached files together, but this is not yet implemented.} (and inserted at the beginning of the document), they still need to extract each picture in a separate pdf file to include it at the right place in the document. This is done by default using |pdflatex|, which means that you need to call |pdflatex| once per picture, mitigating the advantage of compiling all pictures at once. Note that they also provide a python script to separate the pictures more efficiently, but this needs further manual interventions.
@@ -2204,6 +2384,8 @@ Note that this works well for commands that expand completely, but some more com
 \end{codeAndResult}
 \end{pgfmanualentry}
 
+
+
 \subsubsection{Groups: the import system}\label{sec:importSystem}
 
 (This whole system was added v2.0.)
@@ -2944,7 +3126,7 @@ If needed, you can configure the cache:
   \extractkey/robExt/set output directory=\marg{output directory}\@nil
   \makeatother%
   \pgfmanualbody
-  If you compile with |--output-directory build|, you also need to tell this library that you are compiling with |--output-directory build|. As I can't find a reliable way to get this value, even using |TEXMF_OUTPUT_DIRECTORY|, you need to specify manually the compilation directory. To do that, you can either compile with:
+  If you compile with |--output-directory build| and run a \LaTeX{} engine before TexLive 2024, you also need to tell this library that you are compiling with |--output-directory build| (in recent versions (also requires |robust-externalize v3.1| or above), this is automatically detected). To do that, you can either compile with:
   \begin{codeexample}[code only]
     pdflatex -shell-escape -output-directory=build "\def\robExtOutputDirectory{build}\input{test.tex}"
   \end{codeexample}
@@ -3607,7 +3789,7 @@ Note that to make |if matches word| even more efficient, you can call it before 
 
 \subsubsection{Pass compiled file to another template}\label{sec:passOutputToOtherTemplate}
 
-It can sometimes be handy to use the result of a previous cached file to cache another file, or to do anything else (e.g.\ it can also be practical to debug an issue). |name output| can be used to do that
+It can sometimes be handy to use the result of a previously cached file to cache another file, or to do anything else (e.g.\ it can also be practical to debug an issue). |name output| can be used to do that
 \begin{pgfmanualentry}
   \makeatletter%
   \def\extrakeytext{style, }
@@ -3661,7 +3843,7 @@ will cause the cached elements to be compiled in parallel (this requires two com
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/compile in parallel command=\marg{command to run}\@nil
-  \extractkey/robExt/compile in parallel with xargs=\opt{number threads} (default 16\%)\@nil
+  \extractkey/robExt/compile in parallel with xargs=\opt{number threads} (default 16)\@nil
   \extractkey/robExt/compile in parallel with gnu parallel=\opt{--jobs option} (default 200\%)\@nil
   \makeatother%
   \pgfmanualbody
@@ -4962,6 +5144,18 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
+\item v4.0 (not published yet, TODO: document all added features):
+  \begin{itemize}
+  \item Added |run here and in preamble of cached files|, |run here|, |run here and if macro present|, |run here and in preset if macro present|, |impurely create or add to file|, |run here and impurely create or add to file|, |run here and impurely create file|, |impurely create file|, |\saveOrAppendRawPlaceholderToFile|, |\saveRawPlaceholderToFile|, |config if macros present|
+  \item Allow users to define styles that runs once even if loaded multiple times via |load at most once| and |load at most once category|
+  \item Provide better composability via |cache me|, |cache me no group|, |clear content|, |save content|, |restore content|, |run after group|
+  \item Workaround to implement global placeholders via |placeholder from global macro|, |placeholder to global macro|, |\placeholderToGlobalMacro| and |\placeholderFromGlobalMacro|
+  \item Added |add dependencies if exists|, |add dependencies if exists warning| and |do not compile|
+  \item Added |do not wrap code except out file| in the LaTeX preset to remove the wrapping code (computing depth etc) when necessary.
+  \item Fix bug with |--output-directory|, now this is automatically detected
+  \item You can now add empty lines in your configuration
+  \item Fix small bugs, notably with code executed too much time or not enough
+  \end{itemize}
 \item v3.0:
   \begin{itemize}
   \item Added |dvi to ps| and |use latex and dvi|
