@@ -2411,6 +2411,34 @@ if __name__ == '__main__':
 %    code to run in cached file if string matches, and to always run in current folder if not using
 %    the star version
 %  }
+
+
+%%%%    For beamer compatibility
+% compatibility lualatex/pdftex on pdf manipulation https://tex.stackexchange.com/a/610857/116348:
+\usepackage{luatex85}
+
+% Usage: \robExtIncludeMultiframes{file.pdf} + assume that for each frame (starting from 1), say the frame 42,
+% we have a macro called \csname robExtWidth42\endcsname (same for Height and Depth) that says how large the image
+% is. The first optional argument is the default width of the page. We assume that the image to include
+% is centered in the page, you can use tikz to position it absolutely.
+\NewDocumentCommand{\robExtIncludeMultiframes}{O{30cm}mO{}}{%
+  {%
+    \pdfximage{#2}
+    \int_step_inline:nn {\pdflastximagepages} {
+      \tl_set:Nx \l__robExt_trim_horizontal { \dim_eval:n {#1/2 - \tl_use:c {robExtWidth##1}/2}}
+      \tl_set:Nx \l__robExt_trim_vertical { \dim_eval:n {#1/2 - \tl_use:c {robExtHeight##1}/2 - \tl_use:c {robExtDepth##1}/2}}
+      \raisebox{-\tl_use:c {robExtDepth##1}}{%
+        \expanded{\noexpand\includegraphics<##1>[page=##1,
+          trim=
+          \l__robExt_trim_horizontal\space
+          \l__robExt_trim_vertical\space
+          \l__robExt_trim_horizontal\space
+          \l__robExt_trim_vertical,#3]{#2}}
+      }
+    }
+  }
+}
+
 \ExplSyntaxOff
 
 \NewDocumentCommand{\definecolorAutoForward}{mmmO{}}{%
@@ -3909,16 +3937,58 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
 \robExtSetPlaceholder{__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{-halt-on-error -interaction=nonstopmode}
 \robExtSetPlaceholder{__ROBEXT_LATEX_ENGINE__}{pdflatex}
 
+%%% For beamer
+
+\begin{RobExtPlaceholderFromCode}{__ROBEXT_LATEX_BEAMER__}
+\documentclass[__ROBEXT_LATEX_OPTIONS__]{__ROBEXT_LATEX_DOCUMENT_CLASS__}
+\usepackage{tikz}
+\setlength{\paperwidth}{30cm}
+\setlength{\paperheight}{30cm}
+\makeatletter
+\def\robExtBeamerCurrentOverlay{\beamer@slideinframe}
+\makeatother
+\usebackgroundtemplate{} % transparent background
+__ROBEXT_LATEX_PREAMBLE__
+% most packages must be loaded before hyperref
+% so we typically want to load hyperref here
+__ROBEXT_LATEX_PREAMBLE_HYPERREF__
+% some packages must be loaded after hyperref
+__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__
+\begin{document}%
+%% Record the height/depth of the content by using a savebox:
+% Store the height/depth in a file:
+\newwrite\writeRobExt%
+\immediate\openout\writeRobExt=\jobname-out.tex%
+\newsavebox\boxRobExt%
+\begin{standaloneframe}%
+  \begin{lrbox}{\boxRobExt}%
+    __ROBEXT_MAIN_CONTENT__%
+  \end{lrbox}%
+  \begin{tikzpicture}[overlay,remember picture]
+    \node[anchor=center,inner sep=0pt] at (current page.center) {%
+      \usebox{\boxRobExt}%
+      \immediate\write\writeRobExt{%
+        \string\expandafter\string\def\string\csname\space robExtWidth\the\robExtBeamerCurrentOverlay\string\endcsname{\the\wd\boxRobExt}%
+        \string\expandafter\string\def\string\csname\space robExtHeight\the\robExtBeamerCurrentOverlay\string\endcsname{\the\ht\boxRobExt}%
+        \string\expandafter\string\def\string\csname\space robExtDepth\the\robExtBeamerCurrentOverlay\string\endcsname{\the\dp\boxRobExt}%
+        \UseName{@percentchar}% this percent is needed since write adds a newline that is printed as space when including it, see https://tex.stackexchange.com/questions/757243/immediate-write-write-percent-or-skip-newline/757244?noredirect=1#comment1888467_757244
+      }%
+    };
+  \end{tikzpicture}
+\end{standaloneframe}
+\end{document}
+\end{RobExtPlaceholderFromCode}
+
 \robExtConfigure{
   %%%% Allow users to specify which command to try (or try first) when replacing placeholders. Order matters.
   %%%% it looks ugly, but it is mostly for performance improvements.
   first placeholders latex/.style={
     first placeholders in compilation command={__ROBEXT_LATEX_COMPILATION_COMMAND__,__ROBEXT_LATEX_ENGINE__,__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__},
-    first placeholders in template={__ROBEXT_LATEX__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_LATEX_DOCUMENT_CLASS__,__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_LATEX_PREAMBLE_HYPERREF__,__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_LATEX_CREATE_OUT_FILE__,__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
+    first placeholders in template={__ROBEXT_LATEX__,__ROBEXT_LATEX_BEAMER__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_LATEX_DOCUMENT_CLASS__,__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_LATEX_PREAMBLE_HYPERREF__,__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_LATEX_CREATE_OUT_FILE__,__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
   },
   only placeholders latex/.style={
     only placeholders in compilation command={__ROBEXT_LATEX_COMPILATION_COMMAND__,__ROBEXT_LATEX_ENGINE__,__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__},
-    only placeholders in template={__ROBEXT_LATEX__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_LATEX_DOCUMENT_CLASS__,__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_LATEX_PREAMBLE_HYPERREF__,__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_LATEX_CREATE_OUT_FILE__,__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
+    only placeholders in template={__ROBEXT_LATEX__,__ROBEXT_LATEX_BEAMER__,__ROBEXT_LATEX_OPTIONS__,__ROBEXT_LATEX_DOCUMENT_CLASS__,__ROBEXT_LATEX_PREAMBLE__,__ROBEXT_LATEX_PREAMBLE_HYPERREF__,__ROBEXT_LATEX_PREAMBLE_AFTER_HYPERREF__,__ROBEXT_LATEX_MAIN_CONTENT_WRAPPED__,__ROBEXT_LATEX_TRIM_LENGTH__,__ROBEXT_LATEX_CREATE_OUT_FILE__,__ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__,__ROBEXT_MAIN_CONTENT__,__ROBEXT_MAIN_CONTENT_ORIG__},
   },
   dvi to ps/.style={
     add to placeholder/.expanded={__ROBEXT_COMPILATION_COMMAND__}{ && dvips "__ROBEXT_OUTPUT_PREFIX__.dvi" && \robExtMv\space"__ROBEXT_OUTPUT_PREFIX__.ps" "__ROBEXT_OUTPUT_PDF__"},
@@ -3938,8 +4008,12 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     add to compilation command options/.style={
       add to placeholder={__ROBEXT_LATEX_COMPILATION_COMMAND_OPTIONS__}{##1},
     },
+    use latexmk no pdf/.style={
+      set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
+    },
     use latexmk/.style={
       set placeholder={__ROBEXT_LATEX_ENGINE__}{latexmk},
+      add to compilation command options={-pdf}, % otherwise it tries to compile in dvi
     },
     use latex and dvi/.style={
       set placeholder={__ROBEXT_LATEX_ENGINE__}{latex},
@@ -3994,6 +4068,18 @@ __ROBEXT_LATEX_WRITE_DEPTH_TO_OUT_FILE__%
     add to latex options={margin=__ROBEXT_LATEX_TRIM_LENGTH__},
     do not add margins/.style={
       set placeholder={__ROBEXT_LATEX_TRIM_LENGTH__}{0cm}
+    },
+    % Compile in the beamer class, needed to use beamer overlays like <>.
+    % This is mostly needed for tikz pictures.
+    in beamer frame/.style={
+      use latexmk,
+      set latex options={beamer},
+      set documentclass={standalone},
+      set template={__ROBEXT_LATEX_BEAMER__},
+      custom include command={\robExtIncludeMultiframes{\robExtAddCachePathAndName{\robExtFinalHash.pdf}}},
+    },
+    relative overlays/.style={
+      forward counter and back=beamerpauses,
     },
   },
   % U
@@ -4537,16 +4623,34 @@ echo "ok" > "${outputPdf}"
   \robExt@marshal%
 }
 
-\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{O{tikz}O{tikzpicture}O{<>}}{%
+\NewDocumentCommand{\robExtExternalizeAllTikzpictures}{ooO{<>}}{%
+  % the first oo is equivalent to: O{tikz}O{tikzpicture} in classes like article etc,
+  % and O{tikz,in beamer frame}O{tikzpicture,in beamer frame} in beamer
   \robExtDoNotExternalizeAllTikzpictures%
-  \robExtCacheEnvironment[#3]{tikzpicture}{#2}%
+  \IfNoValueTF{#2}{%
+    \@ifclassloaded{beamer}{%
+      \robExtCacheEnvironment[#3]{tikzpicture}{tikzpicture,in beamer frame,relative overlays}%
+    }{%
+      \robExtCacheEnvironment[#3]{tikzpicture}{tikzpicture}%
+    }%
+  }{%
+    \robExtCacheEnvironment[#3]{tikzpicture}{#2}%
+  }%
   % Tikz has a more complicated parsing system
   \DeclareCommandCopy{\robExtCommandOrigtikz}{\tikz}% we save the function for later reset
   \robExtAddToCommandResetList{tikz}% we add it to the list of functions to reset
   \DeclareDocumentCommand{\tikz}{D#3{}}{%
     \def\robExtCommandOrigName{tikz}% we specify the name of the current environment
     \edef\robExt@tmp@args{\detokenize{##1}}% we specify the name of the current environment
-    \edef\robExt@tmp@orig@args{\detokenize{#1}}% we specify the name of the current environment
+    \IfNoValueTF{#1}{%
+      \@ifclassloaded{beamer}{%
+        \edef\robExt@tmp@orig@args{\detokenize{tikz, in beamer frame, relative overlays}}% we specify the name of the current environment
+      }{%
+        \edef\robExt@tmp@orig@args{\detokenize{tikz}}% we specify the name of the current environment
+      }%
+    }{%
+      \edef\robExt@tmp@orig@args{\detokenize{#1}}% we specify the name of the current environment
+    }%
     % we start the parsing
     \robExt@tikz%
   }%
@@ -4569,6 +4673,10 @@ echo "ok" > "${outputPdf}"
 %% The cached version
 \DeclareDocumentEnvironment{tikzpictureC}{D<>{}O{}O{}}{%
   \begin{CacheMe}{tikzpicture,#1}[#2]%
+}{\end{CacheMe}}%
+
+\DeclareDocumentEnvironment{tikzpictureB}{D<>{}O{}O{}}{%
+  \begin{CacheMe}{tikzpicture,in beamer frame,#1}[#2]%
 }{\end{CacheMe}}%
 
 %%%%%% 
@@ -4615,7 +4723,7 @@ echo "ok" > "${outputPdf}"
 %%%%%% The generic functions
 %%%%%%
 
-%% Usage: \robExtCacheEnvironment{myenv}
+%% Usage: \robExtCacheEnvironment{myenv}{presets}
 \NewDocumentCommand{\robExtCacheEnvironment}{O{<>}mm}{%
   %% We need to save the original environment to avoid infinite recursion if we disable externalization
   %% https://tex.stackexchange.com/questions/695391/why-isnt-my-environment-restored/695398

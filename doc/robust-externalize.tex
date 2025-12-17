@@ -4055,6 +4055,7 @@ The next options can be used after calling the |latex| style:
   \makeatletter%
   \def\extrakeytext{style, }
   \extractkey/robExt/latex/use latexmk\@nil
+  \extractkey/robExt/latex/use latexmk no pdf\@nil
   \extractkey/robExt/latex/use lualatex\@nil
   \extractkey/robExt/latex/use xelatex\@nil
   \extractkey/robExt/latex/use latex and dvi\@nil
@@ -4063,6 +4064,7 @@ The next options can be used after calling the |latex| style:
   \pgfmanualbody
   The first three styles use latexmk/lualatex/xelatex to compile. It is a shortcut for:\\
   |set placeholder={__ROBEXT_LATEX_ENGINE__}{yourfavoriteengine}|\\
+  Since 4.1, |use latexmk| also forces the |-pdf| option since you want this most probably, but we introduced |use latexmk no pdf| to recover the old behavior.
   |dvi to ps| is called internally in |use latex and dvi|, converts the |.dvi| file into a |.ps| file, and renames it into |.pdf| so that it is automatically included. |use latex and dvi| sets the compiler to |latex|, producing |dvi| files, and call |dvi to ps| to convert them to ps files that can be included. So if your workflow involves dvi, you can call directly:
   \begin{codeexample}[code only]
     \robExtConfigure{
@@ -4146,6 +4148,20 @@ set placeholder={__ROBEXT_MAIN_CONTENT__}{%
 }
 \end{verbatim}
   so that the user does not need to type it. See for instance the introduction for examples of use.
+\end{pgfmanualentry}
+
+\begin{pgfmanualentry}
+  \makeatletter%
+  \def\extrakeytext{style, }
+  \extractkey/robExt/latex/in beamer frame\@nil
+  \extractkey/robExt/latex/relative overlays\@nil
+  \makeatother%
+  \pgfmanualbody
+  Since v4.1, we added support for beamer: these two styles are automatically loaded now if you use |\cacheTikz| in a beamer presentation (unless you specify the optional arguments), and it changes the template to support beamer overlays in tikz images like |\only<2->{}|. As of today, this also forces |use latexmk|. If you choose to only load |in beamer frame| but not |relative overlays|, for instance via:
+\begin{codeexample}[width=0pt,vbox,code only]
+  \cacheTikz[tikz, in beamer frame][tikzpicture, in beamer frame]
+\end{codeexample}
+then the counter counting relative overlays like |<+->| will be reset to 1 for each picture. This might lead to less recompilation (otherwise we recompile the picture each time you change the relative overlay), but you might get unexpected results if your tikz picture rely on this counter being set before the definition of the picture.
 \end{pgfmanualentry}
 
 
@@ -5144,8 +5160,10 @@ Options > Configure TeXstudio > Editor > Replace tabs in text with spaces
 \section{Changelog}
 
 \begin{itemize}
-\item v4.0 (not published yet, TODO: document all added features):
+\item v4.1 (not published yet, TODO: document all added features):
   \begin{itemize}
+  \item Added support for beamer overlays
+  \item Now forces |-pdf| in |use latexmk|, and introduces |use latexmk no pdf|.
   \item Added |run here and in preamble of cached files|, |run here|, |run here and if macro present|, |run here and in preset if macro present|, |impurely create or add to file|, |run here and impurely create or add to file|, |run here and impurely create file|, |impurely create file|, |\saveOrAppendRawPlaceholderToFile|, |\saveRawPlaceholderToFile|, |config if macros present|
   \item Allow users to define styles that runs once even if loaded multiple times via |load at most once| and |load at most once category|
   \item Provide better composability via |cache me|, |cache me no group|, |clear content|, |save content|, |restore content|, |run after group|
