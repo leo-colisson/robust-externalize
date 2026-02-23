@@ -237,9 +237,9 @@
 \msg_new:nnn {robExt}{underscore in name}{Error:~all~the~placeholders~should~contain~two~consecutive~underscores~in~their~name.}
 \msg_new:nnn {robExt}{placeholder not existing}{[robExtGetPlaceholderInResultFromSinglePlaceholder] ~ The ~ placeholder ~ #1 ~ does ~ not ~ exists.}
 \msg_new:nnn {robExt}{forgot template}{You ~ are ~ writing ~ __ROBEXT_TEMPLATE__ ~ to ~ your ~ file: ~ seems ~ like ~ you ~ forgot ~ to ~ define ~ your ~ template ~ or ~ set ~ a ~ preset}
-\msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures}
-\msg_new:nnn {robExt}{need shell escape with}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ #1}
-\msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel}
+\msg_new:nnn {robExt}{need shell escape}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures~(-shell-escape~must~appear~BEFORE~the~filename!)}
+\msg_new:nnn {robExt}{need shell escape with}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex"~(-shell-escape~must~appear~BEFORE~the~filename!) ~ to ~ be ~ able ~ to ~ #1}
+\msg_new:nnn {robExt}{need shell escape parallel}{You ~ need ~ to ~ compile ~ with ~ shell-escape ~ as ~ in: ~ "pdflatex ~ -shell-escape ~ yourfile.tex" ~ to ~ be ~ able ~ to ~ compile ~ automatically ~ the ~ figures ~ in ~ parallel~(-shell-escape~must~appear~BEFORE~the~filename!)}
 \msg_new:nnn {robExt}{missing compiled pdf parallel}{The~compilation~of~block~at~line~#2~failed~as~the~following ~ file~is~missing: ~ #1.pdf. ~ The ~ compilation ~ command ~ "#3"~used~to~compile~the~environment~on~line~#2~ certainly ~ failed, ~ see ~ logs ~ above ~ or ~ in ~ #1.log.}
 \msg_new:nnn {robExt}{dependency does not exist}{The~dependency~#1~does~not~exist.}
 
@@ -3588,6 +3588,18 @@ if __name__ == '__main__':
     compile in parallel command={parallel --jobs #1 :::: '\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}'},
   },
   compile in parallel with gnu parallel/.default={200\%},
+  if unix={
+    compile in parallel with rust parallel/.style={
+      % fix for nixos https://github.com/aaronriekenberg/rust-parallel/issues/86
+      compile in parallel command={rust-parallel --shell --shell-path bash -i "\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}" #1},
+    },
+  },
+  if windows={
+    compile in parallel with rust parallel/.style={
+      compile in parallel command={rust-parallel --shell -i "\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}" #1},
+    },
+  },
+  compile in parallel with rust parallel/.default={},
   compile in parallel with xargs/.style={
     % Use " instead of ' as Windows does not consider ' as a valid surrounding for strings
     compile in parallel command={xargs -t -I "{}" -P #1 \robExtParallelShell\space "{}" < "\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}"},
@@ -3596,7 +3608,12 @@ if __name__ == '__main__':
   % system a laggy, and it is actually *slower* (2:05mn vs 1:15mn) than when using 16 threads.
   compile in parallel with xargs/.default={16},
   % By default, we compile with xargs and 16 processes:
-  compile in parallel with xargs,
+  if unix={
+    compile in parallel with xargs,
+  },
+  if windows={
+    compile in parallel with rust parallel,
+  },
 }
 
 % Can't be written in Expl3 code because of space

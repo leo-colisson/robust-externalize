@@ -544,7 +544,7 @@ We also provide a number of other functionalities, among others:
   |new compiled preset={compiled ZX}{templateZX, compile latex template}{}|\\
   in order to make the compilation even faster (but you cannot use placeholders except |add to preamble|)
 \item We give a highly configurable template, compilation and inclusion system, to cache basically anything
-\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| or |\robExtConfigure{compile in parallel after=5}| (make sure to have xargs installed, which is available by default on linux but must be installed on Windows by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} if you use the default command) even during the first run, so that the first run becomes faster to compile than a normal run(!)
+\item We show how to compile all images in parallel using |\robExtConfigure{compile in parallel}| or |\robExtConfigure{compile in parallel after=5}| (make sure to have xargs installed, which is available by default on linux, on windows you should instead install \mylink{https://github.com/aaronriekenberg/rust-parallel}{rust-parallel}) even during the first run, so that the first run becomes faster to compile than a normal run(!)
 \item We furnish commands to automatically clean the cache while keeping cached elements that are still needed.
 \item And more\dots
 \end{itemize}
@@ -644,12 +644,14 @@ We completely rewrote the \href{https://github.com/leo-colisson/robust-externali
 
 \paragraph{Can I compile pictures in parallel to speed up notably the first run?}
 
-The first run might be particularly long to compile since many elements are still not cached and re-starting \LaTeX{} on each picture can take quite some time. If you have v2.1 or above, and if you have xargs installed (installed by default on most linux, on Windows you need to install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), you can simply compile all images in parallel by typing at the beginning of the file:
+The first run might be particularly long to compile since many elements are still not cached and re-starting \LaTeX{} on each picture can take quite some time. If you have v2.1 or above, and if you have xargs installed (installed by default on most linux) or \mylink{https://github.com/aaronriekenberg/rust-parallel}{rust-parallel} on Windows, you can simply compile all images in parallel by typing at the beginning of the file:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel
 }
 \end{codeexample}
+You can also type |compile in parallel=2| for instance to start the compilation in parallel if you have more than 2 elements to compile.
+
 In my benchmark, I observed a compilation 1.5x faster than a normal compilation without any caching involved. We provide more options in \cref{sec:compileParallel}.
 
 \paragraph{Can I use version-control to keep the cached files in my repository?} Sure, each cached figure is stored in a few files (typically one pdf and one \LaTeX{} file, plus the source) having the same prefix (the hash), avoiding collision between runs. Just commit these files and you are good to go.
@@ -1263,7 +1265,7 @@ and use the above solution for lualatex (you can change the font with |\fontfami
 
 
 \subsection{Compile in parallel}
-Make sure to have xargs installed (installed by default on most linux, on Windows you need to install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}), and type in your preamble:
+Make sure to have xargs installed (installed by default on most linux) or \mylink{https://github.com/aaronriekenberg/rust-parallel}{rust-parallel} on Windows, and type in your preamble:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel
@@ -1273,7 +1275,7 @@ to compile all figures in parallel (you need to compile your document twice). Yo
 only if you have more than, say, 5 new elements to cache, do:
 \begin{codeexample}[code only]
 \robExtConfigure{
-  compile in parallel after=5
+  compile in parallel=5
 }
 \end{codeexample}
 
@@ -3836,7 +3838,7 @@ Note that if you do not want to display the first cached file, you can use |do n
   compile in parallel
 }
 \end{codeexample}
-will cause the cached elements to be compiled in parallel (this requires two compilations of the main project). For this to work out of the box, you need to have |xargs| installed (on windows, install the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} to get |xargs|). Typing |compile in parallel after=3| will start the compilation in parallel only if you have more than 3 new elements to compile, and compile the first 3 elements normally (useful when you work on one picture at a time since you do not need to compile twice the document).
+will cause the cached elements to be compiled in parallel (this requires two compilations of the main project). For this to work out of the box, you need to have |xargs| installed, or on windows, install \mylink{https://github.com/aaronriekenberg/rust-parallel}{rust-parallel}. Typing |compile in parallel=3| will start the compilation in parallel only if you have more than 3 new elements to compile, and compile the first 3 elements normally (useful when you work on one picture at a time since you do not need to compile twice the document).
 \end{pgfmanualentry}
 
 \begin{pgfmanualentry}
@@ -3845,20 +3847,29 @@ will cause the cached elements to be compiled in parallel (this requires two com
   \extractkey/robExt/compile in parallel command=\marg{command to run}\@nil
   \extractkey/robExt/compile in parallel with xargs=\opt{number threads} (default 16)\@nil
   \extractkey/robExt/compile in parallel with gnu parallel=\opt{--jobs option} (default 200\%)\@nil
+  \extractkey/robExt/compile in parallel with rust parallel=\opt{generic options} (default )\@nil
   \makeatother%
   \pgfmanualbody
   You can customize the compilation command to run via something like:
 \begin{codeexample}[code only]
 \robExtConfigure{
   compile in parallel command={
-    parallel --jobs 200\% :::: '\jobname-\robExtAddPrefixName{compile-missing-figures.sh}
+    parallel --jobs 200\% :::: '\jobnameNoQuotes-\robExtAddPrefixName{compile-missing-figures.sh}
   },
 }
 \end{codeexample}
-The other styles are predefined commands to compile with xargs (by default, already installed in linux, on Windows you can get it by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow}) or gnu parallel. You can use these commands directly like:
+The other styles are predefined commands to compile with xargs (by default, already installed in linux, on Windows you can get it by installing the lightweight GNU On Windows (Gow) \url{https://github.com/bmatzelle/gow} but it was \mylink{https://github.com/leo-colisson/robust-externalize/issues/63}{reported to be buggy}), gnu parallel, or \mylink{https://github.com/aaronriekenberg/rust-parallel}{rust-parallel} (default on Windows). You can use these commands directly like:
 \begin{codeexample}[code only]
 \robExtConfigure{
-  compile in parallel with gnu parallel
+  compile in parallel with gnu parallel,
+  compile in parallel,
+}
+\end{codeexample}
+or for rust-parallel
+\begin{codeexample}[code only]
+\robExtConfigure{
+  compile in parallel with rust parallel=--jobs 32,
+  compile in parallel,
 }
 \end{codeexample}
 or use the optional parameter to configure the number of threads (xargs starts with 16 threads by default, and gnu parallel takes twice the number of CPU threads available), like in:
