@@ -2304,7 +2304,7 @@ if __name__ == '__main__':
   \expandafter\robExt@getfromstringA\fi
 }
 
-\def\robExt@normalBraces#1{{\catcode`{=12 \catcode`}=12 \everyeof={\endfile}%
+\def\robExt@normalBraces#1{{\catcode`{=12 \catcode`}=12 \catcode`&=12 \everyeof={\endfile}%
    \expandafter\robExt@normalBracesA\expandafter#1\scantokens\expandafter{#1}}}
 \long\def\robExt@normalBracesA#1#2\endfile{\gdef#1{#2}}
 
@@ -2807,7 +2807,7 @@ if __name__ == '__main__':
 
 % Thanks a lot wipet for this optimized version!!
 % https://tex.stackexchange.com/questions/701351/more-efficient-string-extraction-of-words/701441#701441
-\def\robExtWordSeparators{{ };:."?!@+-/*,=\{\}[]\\'()&|~_^<>}
+\def\robExtWordSeparators{{ };:."?!@+-/*,=\{\}[]\\'()|~_^<>}
 
 % Not for user, use \robExtAutoForwardWords
 % \robExt@scanmacro@find@word{namespace}\stringToParse
